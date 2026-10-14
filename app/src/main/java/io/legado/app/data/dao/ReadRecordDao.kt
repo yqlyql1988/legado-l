@@ -92,6 +92,32 @@ interface ReadRecordDao {
     @Query("select * from readRecord where bookName = :bookName and author = :author")
     fun getRecords(bookName: String, author: String): List<ReadRecord>
 
+    @Query("""select * from readRecord where bookName = :bookName and
+        (case when author = '' then coalesce(resolvedAuthor, '') else author end) = :author""")
+    fun getRecordsByEffectiveAuthor(bookName: String, author: String): List<ReadRecord>
+
+    /** Move every device's account together, including explicitly resolved legacy authors. */
+    @Transaction
+    fun updateBookMetadata(oldName: String, oldAuthor: String, newName: String, newAuthor: String) {
+        if (oldName == newName && oldAuthor == newAuthor) return
+        val originals = getRecordsByEffectiveAuthor(oldName, oldAuthor)
+        if (originals.isEmpty()) return
+        val destination = getRecordsByEffectiveAuthor(newName, newAuthor)
+        // Remove all selected rows first: a resolved blank-author row may share the new PK.
+        delete(*(originals + destination).toTypedArray())
+        (destination + originals).groupBy { it.deviceId }.values.forEach { records ->
+            val renamed = records.map {
+                it.copy(bookName = newName, author = newAuthor, resolvedAuthor = null)
+            }
+            val merged = renamed.reduce { current, incoming ->
+                mergeRestoredReadRecord(current, incoming, localDevice = true).copy(
+                    readTime = Math.addExact(current.readTime, incoming.readTime),
+                )
+            }
+            insert(merged)
+        }
+    }
+
     /** A user removes an obsolete label; the legacy row's undivided duration stays intact. */
     @Transaction
     fun removeLegacyAuthor(bookName: String, author: String, removedAuthor: String) {

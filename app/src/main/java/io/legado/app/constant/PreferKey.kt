@@ -200,6 +200,7 @@ object PreferKey {
     const val pullToToggleBookmark = "pullToToggleBookmark"
     const val pullBookmarkDistance = "pullBookmarkDistance"
     const val showAddToShelfAlert = "showAddToShelfAlert"
+    const val bookMetadataSync = "bookMetadataSync"
     const val ignoreAudioFocus = "ignoreAudioFocus"
     const val parallelExportBook = "parallelExportBook"
     const val progressBarBehavior = "progressBarBehavior"

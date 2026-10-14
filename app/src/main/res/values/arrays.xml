@@ -1,6 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
 
+    <string-array name="book_metadata_sync">
+        <item>@string/book_metadata_sync_yes</item>
+        <item>@string/book_metadata_sync_no</item>
+        <item>@string/book_metadata_sync_ask</item>
+    </string-array>
+    <string-array name="book_metadata_sync_value">
+        <item>sync</item>
+        <item>never</item>
+        <item>ask</item>
+    </string-array>
+
 	<string-array name="server_type">
 		<item>WEBDAV</item>
 	</string-array>

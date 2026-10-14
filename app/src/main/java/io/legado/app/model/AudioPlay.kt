@@ -11,12 +11,13 @@ import io.legado.app.constant.EventBus
 import io.legado.app.constant.IntentAction
 import io.legado.app.constant.Status
 import io.legado.app.data.appDb
+import io.legado.app.data.applyEditedMetadata
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.ReadRecord
 import io.legado.app.data.entities.updateSnapshot
-import io.legado.app.data.entities.saveWithCover
+import io.legado.app.data.entities.prepareSaveWithCover
 import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.getBookSource
 import io.legado.app.help.book.readSimulating
@@ -292,6 +293,15 @@ object AudioPlay : CoroutineScope by MainScope() {
     }
 
     @Synchronized
+    fun updateEditedMetadata(edited: Book) {
+        val current = book?.takeIf { it.bookUrl == edited.bookUrl } ?: return
+        if (current.name != edited.name || current.author != edited.author) {
+            resetReadRecord(edited, resumeIfPlaying = true)
+        }
+        AudioPlay.book = current.copy().apply { applyEditedMetadata(edited) }
+    }
+
+    @Synchronized
     private fun resetReadRecord(book: Book, resumeIfPlaying: Boolean = false) {
         upReadTime()
         val record = ReadRecord(
@@ -335,7 +345,8 @@ object AudioPlay : CoroutineScope by MainScope() {
             lastRead = System.currentTimeMillis(),
         ) ?: return
         val snapshotBook = book?.copy()
-        executor.execute { record.saveWithCover(snapshotBook, elapsed) }
+        val saveRecord = record.prepareSaveWithCover(snapshotBook, elapsed)
+        executor.execute { saveRecord() }
     }
 
     private fun addLoading(index: Int): Boolean {

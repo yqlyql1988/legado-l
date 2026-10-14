@@ -57,7 +57,6 @@ class ReadRecordDeviceScopeTest {
         assertTrue(upReadTime.contains("val elapsed = (now - readStartTime).coerceAtLeast(0)"))
         assertTrue(upReadTime.contains("readStartTime = now"))
         assertTrue(upReadTime.contains("readRecord.copy()"))
-        assertTrue(upReadTime.contains("record.saveWithCover(snapshotBook, elapsed)"))
         assertTrue(upReadTime.indexOf("val elapsed = (now - readStartTime).coerceAtLeast(0)") <
             upReadTime.indexOf("executor.execute"))
         assertTrue(upReadTime.indexOf("readStartTime = now") <

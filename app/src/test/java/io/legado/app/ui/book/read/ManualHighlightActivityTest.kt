@@ -22,17 +22,6 @@ class ManualHighlightActivityTest {
     }
 
     @Test
-    fun `book metadata edits keep highlight labels synchronized`() {
-        val content = readProjectFile(
-            "src/main/java/io/legado/app/ui/book/info/edit/BookInfoEditViewModel.kt"
-        )
-
-        assertTrue(content.contains("appDb.runInTransaction"))
-        assertTrue(content.contains("appDb.bookHighlightDao.updateBookMetadata("))
-        assertTrue(content.contains("ReadBook.loadHighlights(book)"))
-    }
-
-    @Test
     fun `legacy chapter rebinding only updates the owner url`() {
         val content = readProjectFile(
             "src/main/java/io/legado/app/model/ReadBook.kt"

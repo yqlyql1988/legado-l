@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--App-->
-    <string name="app_name">Legado</string>
-    <string name="app_name_a">Legado·A</string>
-    <string name="app_name_s" translatable="false">LegadoPlus</string>
+    <string name="app_name">阅读L</string>
+    <string name="app_name_a">阅读L</string>
+    <string name="app_name_s" translatable="false">阅读L</string>
     <string name="receiving_shared_label">Legado·search</string>
     <string name="receiving_shared_import_label">Legado·import</string>
     <string name="tip_perm_request_storage">Legado needs storage access to find and read books. please go "App Settings" to allow "Storage permission".</string>
@@ -1320,6 +1320,12 @@
     <string name="page_touch_click_dialog_title">边缘点击阈值</string>
     <string name="check_selected_interval">Select zones</string>
     <string name="show_add_to_shelf_alert_title">Prompt to add to bookshelf when return</string>
+    <string name="book_metadata_sync_title">Book information sync</string>
+    <string name="book_metadata_sync_summary">After editing a book title or author, sync matching bookmarks and reading history while preserving positions, duration and progress. Applies to all books.</string>
+    <string name="book_metadata_sync_yes">Sync</string>
+    <string name="book_metadata_sync_no">Do not sync</string>
+    <string name="book_metadata_sync_ask">Ask every time</string>
+    <string name="book_metadata_sync_prompt">The book title or author has changed. Update matching bookmarks and reading history to the new title and author?</string>
     <string name="show_add_to_shelf_alert_summary">Prompt to add to bookshelf when return from reading books that are not on the bookshelf</string>
     <string name="review">Review</string>
     <string name="rule_review_summary_url">Review summary URL (reviewSummaryUrl)</string>

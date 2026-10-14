@@ -11,7 +11,6 @@ import io.legado.app.base.VMBaseActivity
 import io.legado.app.constant.BookType
 import io.legado.app.data.entities.Book
 import io.legado.app.databinding.ActivityBookInfoEditBinding
-import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.addType
 import io.legado.app.help.book.hasEditedNetworkCover
 import io.legado.app.help.book.isAudio
@@ -19,6 +18,9 @@ import io.legado.app.help.book.isImage
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isVideo
 import io.legado.app.help.book.removeType
+import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.BookMetadataSync
+import io.legado.app.lib.dialogs.alert
 import io.legado.app.ui.book.changecover.ChangeCoverDialog
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.utils.FileUtils
@@ -122,8 +124,9 @@ class BookInfoEditActivity :
     }
 
     private fun saveData() = binding.run {
-        val book = viewModel.book ?: return@run
-        val oldBook = book.copy()
+        if (viewModel.isSaving) return@run
+        val oldBook = viewModel.book ?: return@run
+        val book = oldBook.copy()
         book.name = tieBookName.text?.toString() ?: ""
         book.author = tieBookAuthor.text?.toString() ?: ""
         val local = if (book.isLocal) BookType.local else 0
@@ -142,8 +145,27 @@ class BookInfoEditActivity :
         book.customCoverUrl = if (customCoverUrl == book.coverUrl) null else customCoverUrl
         val customIntro = tieBookIntro.text?.toString()
         book.customIntro = if (customIntro == book.intro) null else customIntro
-        BookHelp.updateCacheFolder(oldBook, book)
-        viewModel.saveBook(book) {
+        val metadataChanged = oldBook.name != book.name || oldBook.author != book.author
+        if (!metadataChanged) {
+            saveBook(book, false)
+        } else {
+            when (AppConfig.bookMetadataSync) {
+                BookMetadataSync.SYNC -> saveBook(book, true)
+                BookMetadataSync.NEVER -> saveBook(book, false)
+                BookMetadataSync.ASK -> alert(
+                    R.string.book_metadata_sync_title,
+                    R.string.book_metadata_sync_prompt,
+                ) {
+                    positiveButton(R.string.book_metadata_sync_yes) { saveBook(book, true) }
+                    negativeButton(R.string.book_metadata_sync_no) { saveBook(book, false) }
+                    neutralButton(R.string.cancel)
+                }
+            }
+        }
+    }
+
+    private fun saveBook(book: Book, syncMetadata: Boolean) {
+        viewModel.saveBook(book, syncMetadata) {
             setResult(RESULT_OK)
             finish()
         }

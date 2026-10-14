@@ -8,6 +8,7 @@ import io.legado.app.constant.EventBus
 import io.legado.app.constant.PageAnim.scrollPageAnim
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
+import io.legado.app.data.applyEditedMetadata
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookHighlight
@@ -17,7 +18,7 @@ import io.legado.app.data.entities.HighlightRule
 import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.data.entities.ReadRecord
 import io.legado.app.data.entities.updateSnapshot
-import io.legado.app.data.entities.saveWithCover
+import io.legado.app.data.entities.prepareSaveWithCover
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.HighlightAnchor
 import io.legado.app.help.HighlightMatcher
@@ -848,11 +849,23 @@ object ReadBook : CoroutineScope by MainScope() {
             ?: ReadRecord(deviceId = AppConst.androidId, bookName = book.name, author = book.author)
     }
 
+    fun updateEditedMetadata(edited: Book) {
+        val current = synchronized(readRecordLock) {
+            val current = book?.takeIf { it.bookUrl == edited.bookUrl } ?: return
+            val changed = current.name != edited.name || current.author != edited.author
+            val updated = current.copy().apply { applyEditedMetadata(edited) }
+            ReadBook.book = updated
+            if (changed) resetReadRecord(updated)
+            updated
+        }
+        loadHighlights(current)
+    }
+
     fun upReadTime() {
         if (!AppConfig.enableReadRecord) {
             return
         }
-        val (record, currentBook, elapsed) = synchronized(readRecordLock) {
+        val saveRecord = synchronized(readRecordLock) {
             val currentBook = book?.copy() ?: return
             // Book details may fill in an author on the existing Book instance.
             if (readRecord.bookName != currentBook.name || readRecord.author != currentBook.author) {
@@ -864,10 +877,10 @@ object ReadBook : CoroutineScope by MainScope() {
             readStartTime = now
             readRecord.lastRead = now
             readRecord.updateSnapshot(currentBook, durChapterIndex, durChapterPos)
-            Triple(readRecord.copy(), currentBook, elapsed)
+            readRecord.copy().prepareSaveWithCover(currentBook, elapsed)
         }
         executor.execute {
-            record.saveWithCover(currentBook, elapsed)
+            saveRecord()
         }
     }
 

@@ -1,0 +1,14 @@
+// Personal 阅读L release: use the package and signing identity of the local APK.
+// Pass -ParmOnly=true when assembling to use the original APK's two ARM ABIs.
+gradle.beforeProject { project ->
+    if (project.path == ':app') {
+        project.pluginManager.withPlugin('com.android.application') {
+            project.extensions.getByName('androidComponents').finalizeDsl { androidDsl ->
+                androidDsl.defaultConfig.minSdk = 26
+                def release = androidDsl.buildTypes.getByName('release')
+                release.signingConfig = androidDsl.signingConfigs.getByName('debug')
+                release.applicationIdSuffix = '.debug'
+            }
+        }
+    }
+}

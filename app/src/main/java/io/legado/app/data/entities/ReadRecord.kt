@@ -55,7 +55,30 @@ fun ReadRecord.updateSnapshot(
 }
 
 fun ReadRecord.saveWithCover(book: Book?, elapsed: Long? = null) {
-    val snapshotBook = book?.takeIf { it.name == bookName && it.author == author }
+    saveWithCover(book, elapsed, null)
+}
+
+/** Capture routing while the reader still holds its record lock, before submitting the write. */
+fun ReadRecord.prepareSaveWithCover(book: Book?, elapsed: Long): () -> Unit {
+    val ticket = book?.let { readRecordMetadataRoutes.capture(it.bookUrl, bookName, author) }
+    return { saveWithCover(book, elapsed, ticket) }
+}
+
+private fun ReadRecord.saveWithCover(
+    book: Book?,
+    elapsed: Long?,
+    ticket: ReadRecordMetadataRoutes.Ticket?,
+) {
+    ticket?.let {
+        val identity = readRecordMetadataRoutes.resolve(it)
+        bookName = identity.name
+        author = identity.author
+        resolvedAuthor = null
+    }
+    val routedBook = book?.let {
+        if (ticket == null) it else it.copy(name = bookName, author = author)
+    }
+    val snapshotBook = routedBook?.takeIf { it.name == bookName && it.author == author }
     refreshChapterTitle(snapshotBook)
     var saved = this
     appDb.runInTransaction {

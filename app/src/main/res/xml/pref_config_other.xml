@@ -171,6 +171,14 @@
             android:summary="@string/show_add_to_shelf_alert_summary"
             android:title="@string/show_add_to_shelf_alert_title" />
 
+        <io.legado.app.lib.prefs.NameListPreference
+            android:defaultValue="ask"
+            android:key="bookMetadataSync"
+            android:title="@string/book_metadata_sync_title"
+            android:summary="@string/book_metadata_sync_summary"
+            app:entries="@array/book_metadata_sync"
+            app:entryValues="@array/book_metadata_sync_value" />
+
 <!--        <io.legado.app.lib.prefs.NameListPreference-->
 <!--            android:defaultValue="default_version"-->
 <!--            android:key="updateToVariant"-->
