@@ -60,7 +60,15 @@ git clone "备份文件的完整路径.bundle" "新的项目目录"
 
 APK 单独保存在 `build/outputs`，不进入源码历史。签名密钥、`local.properties` 和本机配置需要另行私密备份。
 
-需要异地版本管理时，可以再将本地仓库关联到自己的远程私有仓库。
+云端备份已关联到个人私有仓库 `yqlyql1988/reading-l`，远程名称为 `origin`。
+
+后续修改先保存本地提交，再同步源码与版本标签：
+
+```powershell
+git push origin main --tags
+```
+
+该仓库用于备份，GitHub Actions 已停用；源码中的工作流文件仍保留在版本历史中。
 
 ## 当前精简版的构建和验证记录
 
