@@ -24,6 +24,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.RequestOptions
 import io.legado.app.R
@@ -135,6 +136,9 @@ class BookInfoActivity :
     ChangeBookSourceDialog.CallBack,
     ChangeCoverDialog.CallBack,
     VariableDialog.Callback {
+
+    private var reviewJob: Job? = null
+    private var reviewIdentity: Pair<String, String>? = null
 
     private val tocActivityResult = registerForActivityResult(TocActivityResult()) {
         it?.let {
@@ -609,6 +613,19 @@ class BookInfoActivity :
 
     private fun showBook(book: Book) = binding.run {
         showCover(book)
+        bookReview.setBook(book)
+        val identity = book.name to book.author
+        if (reviewIdentity != identity) {
+            reviewIdentity = identity
+            reviewJob?.cancel()
+            reviewJob = lifecycleScope.launch {
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    appDb.bookReviewDao.flowForBook(book.name, book.author).collect {
+                        bookReview.submitReviews(it)
+                    }
+                }
+            }
+        }
         tvName.text = book.name
         tvAuthor.text = getString(R.string.author_show, book.getRealAuthor())
         tvOrigin.text = getString(R.string.origin_show, book.originName)

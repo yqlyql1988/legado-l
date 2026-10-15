@@ -10,6 +10,9 @@ internal fun AppDatabase.saveEditedBook(book: Book, syncMetadata: Boolean): Book
         original = oldBook
         bookDao.update(oldBook.copy().apply { applyEditedMetadata(book) })
         bookHighlightDao.updateBookMetadata(book.bookUrl, book.name, book.author)
+        if (oldBook.name != book.name || oldBook.author != book.author) {
+            bookReviewDao.updateBookMetadata(oldBook.name, oldBook.author, book.name, book.author)
+        }
         if (syncMetadata && (oldBook.name != book.name || oldBook.author != book.author)) {
             bookmarkDao.updateBookMetadata(oldBook.name, oldBook.author, book.name, book.author)
             readRecordDao.updateBookMetadata(oldBook.name, oldBook.author, book.name, book.author)

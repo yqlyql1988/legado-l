@@ -15,6 +15,7 @@ import io.legado.app.data.dao.BookDao
 import io.legado.app.data.dao.BookGroupDao
 import io.legado.app.data.dao.BookHighlightDao
 import io.legado.app.data.dao.BookMemoDao
+import io.legado.app.data.dao.BookReviewDao
 import io.legado.app.data.dao.BookSourceDao
 import io.legado.app.data.dao.BookmarkDao
 import io.legado.app.data.dao.AutoTaskRuleDao
@@ -40,6 +41,7 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookHighlight
 import io.legado.app.data.entities.BookMemo
+import io.legado.app.data.entities.BookReview
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.BookSourceCheckState
 import io.legado.app.data.entities.BookSourcePart
@@ -77,7 +79,7 @@ val appDb by lazy {
 }
 
 @Database(
-    version = 111,
+    version = 112,
     exportSchema = true,
     entities = [Book::class, BookGroup::class, BookSource::class, BookChapter::class,
         ReplaceRule::class, SearchBook::class, SearchKeyword::class, Cookie::class,
@@ -85,7 +87,7 @@ val appDb by lazy {
         RssStar::class, TxtTocRule::class, ReadRecord::class, HttpTTS::class, Cache::class,
         RuleSub::class, DictRule::class, KeyboardAssist::class, Server::class,
         AutoTaskRule::class, BookHighlight::class, HighlightRule::class, BookSourceCheckState::class,
-        BookMemo::class],
+        BookMemo::class, BookReview::class],
     views = [BookSourcePart::class],
     autoMigrations = [
         AutoMigration(from = 43, to = 44),
@@ -148,7 +150,8 @@ val appDb by lazy {
         AutoMigration(from = 101, to = 102, spec = DatabaseMigrations.Migration_101_102::class),
         AutoMigration(from = 102, to = 103),
         AutoMigration(from = 103, to = 104),
-        AutoMigration(from = 110, to = 111)
+        AutoMigration(from = 110, to = 111),
+        AutoMigration(from = 111, to = 112)
     ]
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -158,6 +161,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract val bookGroupDao: BookGroupDao
     abstract val bookHighlightDao: BookHighlightDao
     abstract val bookMemoDao: BookMemoDao
+    abstract val bookReviewDao: BookReviewDao
     abstract val highlightRuleDao: HighlightRuleDao
     abstract val bookSourceDao: BookSourceDao
     abstract val bookChapterDao: BookChapterDao

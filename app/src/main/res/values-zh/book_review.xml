@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="book_reviews">我的书评</string>
+    <string name="book_reviews_summary">按书籍归档评分、评价和重读追评</string>
+    <string name="book_review_none">尚未写书评</string>
+    <string name="book_review_write">写书评</string>
+    <string name="book_review_follow_up">写追评</string>
+    <string name="book_review_initial">初评</string>
+    <string name="book_review_follow_up_label">追评</string>
+    <string name="book_review_all">查看全部书评</string>
+    <string name="book_review_edit">编辑书评</string>
+    <string name="book_review_expand">展开</string>
+    <string name="book_review_collapse">收起</string>
+    <string name="book_review_count">%1$d 篇书评</string>
+    <string name="book_review_archive_count">%1$d 本书 · %2$d 篇书评</string>
+    <string name="book_review_score">%1$.1f 分 / 5</string>
+    <string name="book_review_current_score">当前评分：%1$s</string>
+    <string name="book_review_no_score">沿用此前评分</string>
+    <string name="book_review_rating">本次评分</string>
+    <string name="book_review_date">书评日期</string>
+    <string name="book_review_content">文字评价</string>
+    <string name="book_review_content_hint">记下读完这本书的感受……</string>
+    <string name="book_review_empty">还没有书评，可以从书籍信息页开始写。</string>
+    <string name="book_review_book_empty">还没有给这本书写过书评。</string>
+    <string name="book_review_search_hint">搜索书名、作者或书评内容</string>
+    <string name="book_review_search_empty">没有找到匹配的书评</string>
+    <string name="book_review_saved">书评已保存</string>
+    <string name="book_review_draft_restored">已恢复未完成的草稿</string>
+    <string name="book_review_load_failed">加载书评失败，请重试。</string>
+    <string name="book_review_missing">这篇书评已不存在。</string>
+    <string name="book_review_required">请填写文字评价，初评还需要选择评分。</string>
+</resources>

@@ -33,6 +33,43 @@ class MigrationTest {
     )
 
     @Test
+    fun migrate111To112PreservesBooksBookmarksAndDeviceRecords() {
+        val databaseName = "migration-book-reviews"
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        context.deleteDatabase(databaseName)
+        helper.createDatabase(databaseName, 111).apply {
+            execSQL("insert into books (bookUrl, name, author) values ('review-book', 'Book', 'Author')")
+            execSQL("""insert into bookmarks
+                (time, bookName, bookAuthor, chapterIndex, chapterPos, chapterName, bookText, content)
+                values (123, 'Book', 'Author', 2, 8, 'Chapter', 'Text', 'Note')""")
+            execSQL("""insert into readRecord (deviceId, bookName, author, readTime, lastRead)
+                values ('device-1', 'Book', 'Author', 100, 200)""")
+            execSQL("""insert into readRecord (deviceId, bookName, author, readTime, lastRead)
+                values ('device-2', 'Book', 'Author', 300, 400)""")
+            close()
+        }
+        val db = Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
+            .addMigrations(*ALL_MIGRATIONS).build()
+        try {
+            assertEquals("Book", db.bookDao.getBook("review-book")?.name)
+            assertTrue(db.bookReviewDao.all().isEmpty())
+            db.openHelper.readableDatabase.query(
+                "select count(*) from bookmarks where time = 123"
+            ).use { cursor -> cursor.moveToFirst(); assertEquals(1, cursor.getInt(0)) }
+            db.openHelper.readableDatabase.query(
+                "select count(*), sum(readTime) from readRecord where bookName = 'Book'"
+            ).use { cursor ->
+                cursor.moveToFirst()
+                assertEquals(2, cursor.getInt(0))
+                assertEquals(400, cursor.getInt(1))
+            }
+        } finally {
+            db.close()
+        }
+        context.deleteDatabase(databaseName)
+    }
+
+    @Test
     @Throws(IOException::class)
     fun migrateAll() {
         // Create earliest version of the database.

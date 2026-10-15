@@ -128,6 +128,13 @@
             app:iconSpaceReserved="false" />
 
         <io.legado.app.lib.prefs.Preference
+            android:icon="@drawable/ic_bookmark"
+            android:key="bookReviews"
+            android:summary="@string/book_reviews_summary"
+            android:title="@string/book_reviews"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
             android:icon="@drawable/ic_folder_outline"
             android:key="fileManage"
             android:summary="@string/file_manage_summary"
