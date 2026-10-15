@@ -1,0 +1,11 @@
+// Test-only Android API stubs used by the inherited local JVM tests.
+// Load alongside slim-release.init.gradle; this never changes an APK build.
+gradle.beforeProject { project ->
+    if (project.path == ':app') {
+        project.pluginManager.withPlugin('com.android.application') {
+            project.extensions.getByName('androidComponents').finalizeDsl { androidDsl ->
+                androidDsl.testOptions.unitTests.returnDefaultValues = true
+            }
+        }
+    }
+}

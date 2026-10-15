@@ -1,0 +1,108 @@
+name: 阅读L检查
+
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      android_tests:
+        description: 同时运行 Android 单元测试
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reading-l-check-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source:
+    name: 源码与管理检查
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      android: ${{ steps.changes.outputs.android }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: 检查个人配置与源码排除规则
+        run: python tools/reading-l/manage.py check
+      - name: 测试本地备份和私有仓库同步流程
+        run: python -m unittest discover -s tools/reading-l/tests -v
+      - name: 校验工作流和问题模板
+        run: |
+          ruby -e 'require "yaml"; Dir[".github/**/*.yml"].each { |file| YAML.load_file(file); puts file }'
+      - name: 判断 Android 改动
+        id: changes
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          ANDROID_REQUESTED: ${{ inputs.android_tests }}
+        run: |
+          python - <<'PY'
+          import os, subprocess
+          from pathlib import PurePosixPath
+          base = os.environ["BASE_SHA"]
+          manual = os.environ["EVENT_NAME"] == "workflow_dispatch"
+          if manual:
+              android = os.environ["ANDROID_REQUESTED"] == "true"
+          elif not base or set(base) == {"0"}:
+              android = True
+          else:
+              paths = subprocess.check_output(
+                  ["git", "diff", "--name-only", base, "HEAD"], text=True
+              ).splitlines()
+              android = any(
+                  (p.startswith(("app/", "modules/book/", "modules/rhino/", "gradle/"))
+                   and p != "app/src/main/assets/updateLog.md")
+                  or PurePosixPath(p).suffix in {".gradle", ".kts"}
+                  or p in {"gradle.properties", "gradlew", "gradlew.bat", "settings.gradle",
+                           ".github/workflows/reading-l-check.yml"}
+                  for p in paths
+              )
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"android={str(android).lower()}\n")
+          PY
+
+  android:
+    name: Android 单元测试
+    needs: source
+    if: needs.source.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v6.4.0
+      - name: 测试阅读L精简配置
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:testAppDebugUnitTest \
+            --init-script tools/reading-l/slim-release.init.gradle \
+            --init-script tools/reading-l/unit-tests.init.gradle \
+            -ParmOnly=true -Pksp.incremental=false --stacktrace
+      - name: 保存测试报告
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reading-l-unit-tests
+          path: |
+            app/build/reports/tests/
+            app/build/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
