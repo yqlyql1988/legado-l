@@ -1,0 +1,13 @@
+{
+  "repository": "https://github.com/LegadoTeam/legado",
+  "branch": "master",
+  "original_upstream_commit": "5198645f0a504b1f6d1259885317e056ff6a4a02",
+  "synced_upstream_commit": "f5467141c4c5d668b24319b0701a28011e255236",
+  "snapshot_commit": "86c213e51787487c117b4c8ff961e03052ca48f4",
+  "snapshot_branch": "upstream-source",
+  "synced_on": "2026-10-15",
+  "integration": "merge_filtered_source_snapshot",
+  "excluded_from_source_history": [
+    ".github/workflows/legado.jks"
+  ]
+}
