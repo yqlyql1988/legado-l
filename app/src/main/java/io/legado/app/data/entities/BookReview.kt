@@ -47,10 +47,20 @@ data class BookReviewArchive(val reviews: List<BookReview>) {
     val rating: Int? get() = reviews.firstOrNull { it.rating != null }?.rating
 }
 
-fun archiveBookReviews(reviews: List<BookReview>): List<BookReviewArchive> =
+enum class BookReviewSort { RECENT, RATING }
+
+fun archiveBookReviews(
+    reviews: List<BookReview>,
+    sort: BookReviewSort = BookReviewSort.RECENT,
+): List<BookReviewArchive> =
     reviews.groupBy { it.bookName to it.bookAuthor }
         .values.map { BookReviewArchive(it.sortedWith(bookReviewOrder)) }
-        .sortedWith { left, right -> bookReviewOrder.compare(left.latest, right.latest) }
+        .sortedWith { left, right ->
+            val scoreOrder = if (sort == BookReviewSort.RATING) {
+                (right.rating ?: -1).compareTo(left.rating ?: -1)
+            } else 0
+            if (scoreOrder != 0) scoreOrder else bookReviewOrder.compare(left.latest, right.latest)
+        }
 
 /** IDs make repeated restores idempotent; an older backup cannot overwrite a newer edit. */
 fun mergeBookReviews(

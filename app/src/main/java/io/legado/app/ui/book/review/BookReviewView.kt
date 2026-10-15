@@ -25,6 +25,10 @@ class BookReviewView @JvmOverloads constructor(
     private var hasLoaded = false
 
     init {
+        binding.reviewHeader.setOnClickListener {
+            expanded = expanded != true
+            render()
+        }
         binding.tvReviewToggle.setOnClickListener {
             expanded = expanded != true
             render()
@@ -63,20 +67,20 @@ class BookReviewView @JvmOverloads constructor(
         val latest = reviews.firstOrNull()
         val isExpanded = expanded == true
         tvReviewTitle.text = context.getString(R.string.book_reviews)
-        tvReviewRating.text = if (latest == null) {
-            context.getString(R.string.book_review_none)
-        } else {
-            BookReviewArchive(reviews).rating?.let {
-                context.getString(R.string.book_review_score, it / 2.0)
-            } ?: context.getString(R.string.book_review_unrated)
-        }
+        bindBookReviewRating(reviewRatingStars, tvReviewRating,
+            latest?.let { BookReviewArchive(reviews).rating },
+            if (latest == null) R.string.book_review_none else R.string.book_review_unrated)
+        tvReviewCount.text = if (latest == null) "" else
+            context.getString(R.string.book_review_short_count, reviews.size)
         tvReviewToggle.setText(
             if (isExpanded) R.string.book_review_collapse else R.string.book_review_expand
         )
         llReviewDetails.isVisible = isExpanded
+        reviewSummary.isVisible = latest != null
         tvReviewDate.isVisible = latest != null
         tvReviewDate.text = latest?.let {
-            "${it.reviewDate} · ${context.getString(R.string.book_review_count, reviews.size)}"
+            "${it.reviewDate} · ${context.getString(
+                if (it.isFollowUp) R.string.book_review_follow_up_label else R.string.book_review_initial)}"
         }
         tvReviewContent.text = latest?.content
             ?: context.getString(R.string.book_review_book_empty)

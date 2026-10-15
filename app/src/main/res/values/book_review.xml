@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="book_reviews">My book reviews</string>
+    <string name="book_review_history">Review history</string>
+    <string name="book_review_sort_recent">Latest review first</string>
+    <string name="book_review_sort_rating">Highest rating first</string>
+    <string name="book_review_actions">Review actions</string>
+    <string name="book_review_short_count">%1$d reviews</string>
+    <string name="book_review_current_rating">Current rating</string>
     <string name="book_reviews_summary">Ratings, reviews and rereading follow-ups, grouped by book</string>
     <string name="book_review_none">No review yet</string>
     <string name="book_review_write">Write a review</string>

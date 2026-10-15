@@ -46,6 +46,7 @@ public class OptimizedBookReviewTest {
     private ActivityScenario<Activity> scenario;
     private SQLiteDatabase database;
     private final List<String> reviewIds = new ArrayList<>();
+    private final List<String> extraBookNames = new ArrayList<>();
     private String bookDraftKey;
 
     private int id(String name) {
@@ -128,8 +129,10 @@ public class OptimizedBookReviewTest {
     }
 
     private void deleteFromHistory(String content) {
-        onView(allOf(withId(id("tv_delete")),
+        onView(allOf(withId(id("review_more")),
             withParent(withParent(hasDescendant(withText(content)))))).perform(click());
+        SystemClock.sleep(350);
+        onView(withText(string("delete"))).perform(click());
     }
 
     private void deleteFromEditor() {
@@ -176,6 +179,9 @@ public class OptimizedBookReviewTest {
     @After public void cleanup() {
         if (scenario != null) scenario.close();
         db().delete("book_reviews", "bookName = ?", new String[]{name});
+        for (String extraName : extraBookNames) {
+            db().delete("book_reviews", "bookName = ?", new String[]{extraName});
+        }
         for (String reviewId : reviewIds) {
             db().delete("book_review_deletions", "id = ?", new String[]{reviewId});
             context.getSharedPreferences("bookReviewDrafts", 0).edit().remove("edit:" + reviewId).commit();
@@ -256,6 +262,7 @@ public class OptimizedBookReviewTest {
             }
         });
         launch("io.legado.app.ui.book.review.BookReviewActivity", false);
+        onView(withId(id("menu_search"))).perform(click());
         onView(withId(id("search_src_text"))).perform(replaceText(name), closeSoftKeyboard());
         onView(allOf(withId(id("tv_title")), withText(name))).check(matches(isDisplayed()));
         onView(withText(author)).check(matches(isDisplayed()));
@@ -396,8 +403,83 @@ public class OptimizedBookReviewTest {
 
     private void archive() {
         launch("io.legado.app.ui.book.review.BookReviewActivity", false);
+        onView(withId(id("menu_search"))).perform(click());
         onView(withId(id("search_src_text"))).perform(replaceText(name), closeSoftKeyboard());
         onView(allOf(withId(id("tv_title")), withText(name))).check(matches(isDisplayed()));
+    }
+
+    private void archiveReview(String title, int rating, String date) {
+        String reviewId = UUID.randomUUID().toString();
+        ContentValues values = new ContentValues();
+        values.put("id", reviewId);
+        values.put("bookName", title);
+        values.put("bookAuthor", author);
+        values.put("bookUrl", url);
+        values.put("rating", rating);
+        values.put("content", "归档排序和长书名验证");
+        values.put("reviewDate", date);
+        values.put("isFollowUp", 0);
+        values.put("createdAt", 1);
+        values.put("updatedAt", 1);
+        db().insertOrThrow("book_reviews", null, values);
+        extraBookNames.add(title);
+        reviewIds.add(reviewId);
+    }
+
+    private String firstArchiveTitle() {
+        String[] title = {""};
+        scenario.onActivity(activity -> {
+            android.view.ViewGroup list = activity.findViewById(id("recycler_view"));
+            if (list.getChildCount() > 0) {
+                title[0] = ((TextView) list.getChildAt(0).findViewById(id("tv_title"))).getText().toString();
+            }
+        });
+        return title[0];
+    }
+
+    @Test public void archiveSortingPersistsAndLongTitlesUseAtMostTwoLines() throws Exception {
+        editor();
+        android.content.SharedPreferences preferences =
+            context.getSharedPreferences(context.getPackageName() + "_preferences", 0);
+        String key = "bookReviewArchiveSort";
+        String previous = preferences.getString(key, null);
+        String recent = name + "-sort-" + new String(new char[100]).replace("\0", "长书名");
+        String high = name + "-sort-高评分";
+        try {
+            preferences.edit().putString(key, "recent").commit();
+            archiveReview(recent, 6, "2026-10-15");
+            archiveReview(high, 10, "2026-10-14");
+            launch("io.legado.app.ui.book.review.BookReviewActivity", false);
+            onView(withId(id("menu_search"))).perform(click());
+            onView(withId(id("search_src_text"))).perform(replaceText(name), closeSoftKeyboard());
+            await(() -> firstArchiveTitle().equals(recent));
+            scenario.onActivity(activity -> {
+                android.view.ViewGroup list = activity.findViewById(id("recycler_view"));
+                TextView title = list.getChildAt(0).findViewById(id("tv_title"));
+                assertEquals(2, title.getMaxLines());
+                assertEquals(2, title.getLineCount());
+                assertEquals(android.text.TextUtils.TruncateAt.END, title.getEllipsize());
+                assertTrue(title.getLayout().getEllipsisCount(1) > 0);
+                RatingBar stars = list.getChildAt(0).findViewById(id("review_rating_stars"));
+                assertEquals(3f, stars.getRating(), 0f);
+            });
+            screenshot("review-archive-two-lines.png");
+            onView(withId(id("tv_sort"))).perform(click());
+            SystemClock.sleep(350);
+            onView(withText(string("book_review_sort_rating"))).perform(click());
+            await(() -> firstArchiveTitle().equals(high));
+            scenario.recreate();
+            await(() -> firstArchiveTitle().equals(high));
+            onView(withId(id("tv_sort"))).check(matches(withText(string("book_review_sort_rating"))));
+            screenshot("review-archive-rating-sort.png");
+            onView(withId(id("tv_sort"))).perform(click());
+            SystemClock.sleep(350);
+            onView(withText(string("book_review_sort_recent"))).perform(click());
+            await(() -> firstArchiveTitle().equals(recent));
+        } finally {
+            if (previous == null) preferences.edit().remove(key).commit();
+            else preferences.edit().putString(key, previous).commit();
+        }
     }
 
     private void assertResumed(String activityName) {

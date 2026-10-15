@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="book_reviews">我的书评</string>
+    <string name="book_review_history">书评记录</string>
+    <string name="book_review_sort_recent">最近书评在前</string>
+    <string name="book_review_sort_rating">最高评分在前</string>
+    <string name="book_review_actions">书评操作</string>
+    <string name="book_review_short_count">%1$d 篇</string>
+    <string name="book_review_current_rating">当前评分</string>
     <string name="book_reviews_summary">按书籍归档评分、评价和重读追评</string>
     <string name="book_review_none">未评价</string>
     <string name="book_review_write">写书评</string>
