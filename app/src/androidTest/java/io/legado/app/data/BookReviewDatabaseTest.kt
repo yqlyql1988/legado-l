@@ -33,6 +33,7 @@ class BookReviewDatabaseTest {
             reviewDate = "2026-10-16", content = "Second impression"), now = 200)
         assertFalse(first.isFollowUp)
         assertTrue(follow.isFollowUp)
+        assertEquals(9, follow.rating)
         val edited = db.bookReviewDao.save(first.copy(content = "Edited", rating = 8), now = 300)
         assertEquals(100L, edited.createdAt)
         assertEquals(300L, edited.updatedAt)
@@ -95,8 +96,10 @@ class BookReviewDatabaseTest {
         val first = db.bookReviewDao.save(initial, now = 100)
         val newer = db.bookReviewDao.save(initial.copy(id = "newer", rating = 6,
             reviewDate = "2026-10-17"), now = 200)
-        val earlier = db.bookReviewDao.save(initial.copy(id = "earlier", rating = null,
-            content = "Text only", reviewDate = "2026-10-16"), now = 300)
+        // A legacy backup may contain a text-only follow-up without its own score.
+        val earlier = initial.copy(id = "earlier", rating = null, isFollowUp = true,
+            content = "Text only", reviewDate = "2026-10-16", createdAt = 300, updatedAt = 300)
+        db.bookReviewDao.insert(earlier)
         assertTrue(db.bookReviewDao.delete(first, now = 400))
         assertNull(db.bookReviewDao.get(first.id))
         val promoted = requireNotNull(db.bookReviewDao.get(earlier.id))
@@ -165,5 +168,39 @@ class BookReviewDatabaseTest {
         assertThrows(IllegalStateException::class.java) { db.bookReviewDao.delete(first) }
         assertEquals(edited, db.bookReviewDao.get(first.id))
         assertTrue(db.bookReviewDao.deletions().isEmpty())
+    }
+
+    @Test fun newFollowUpWithoutRatingUsesLatestScoreAcrossLegacyUnratedReviews() {
+        db.bookReviewDao.save(initial, now = 100)
+        db.bookReviewDao.save(initial.copy(id = "rated", rating = 6,
+            reviewDate = "2026-10-16"), now = 200)
+        db.bookReviewDao.insert(initial.copy(id = "legacy", rating = null, isFollowUp = true,
+            reviewDate = "2026-10-17"))
+        val inherited = db.bookReviewDao.save(initial.copy(id = "new", rating = null,
+            reviewDate = "2026-10-18"), now = 300)
+        assertEquals(6, inherited.rating)
+        assertTrue(inherited.isFollowUp)
+        assertNull(db.bookReviewDao.get("legacy")!!.rating)
+        assertEquals(10, db.bookReviewDao.save(initial.copy(id = "explicit", rating = 10)).rating)
+    }
+
+    @Test fun followUpRatingDoesNotCrossAuthorsOrInventMissingLegacyScores() {
+        db.bookReviewDao.save(initial)
+        assertThrows(IllegalArgumentException::class.java) {
+            db.bookReviewDao.save(initial.copy(id = "other", bookAuthor = "Other", rating = null))
+        }
+        db.bookReviewDao.insert(initial.copy(id = "unrated", bookAuthor = "Other", rating = null))
+        assertNull(db.bookReviewDao.save(initial.copy(id = "follow-other",
+            bookAuthor = "Other", rating = null)).rating)
+    }
+
+    @Test fun editingOrRestoringLegacyFollowUpKeepsItsUnratedState() {
+        db.bookReviewDao.save(initial, now = 100)
+        val legacy = initial.copy(id = "legacy", rating = null, isFollowUp = true,
+            createdAt = 200, updatedAt = 200)
+        db.bookReviewDao.restore(listOf(legacy))
+        val edited = db.bookReviewDao.save(legacy.copy(content = "Edited legacy text"), now = 300)
+        assertNull(edited.rating)
+        assertEquals("Edited legacy text", edited.content)
     }
 }

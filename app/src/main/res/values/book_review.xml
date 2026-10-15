@@ -16,6 +16,7 @@
     <string name="book_review_score">%1$.1f / 5</string>
     <string name="book_review_current_score">Current rating: %1$s</string>
     <string name="book_review_no_score">Keep the previous rating</string>
+    <string name="book_review_use_previous_score">Use the previous rating</string>
     <string name="book_review_unrated">Not rated</string>
     <string name="book_review_delete">Delete review</string>
     <string name="book_review_delete_confirm">Delete this review? This cannot be undone.</string>

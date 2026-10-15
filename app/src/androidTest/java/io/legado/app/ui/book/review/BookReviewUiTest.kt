@@ -137,8 +137,9 @@ class BookReviewUiTest {
     @Test fun promotedTextOnlyInitialKeepsOptionalScoreAcrossRecreation() {
         val initial = appDb.bookReviewDao.save(BookReview(bookName = book.name, bookAuthor = book.author,
             rating = 9, content = "Initial", reviewDate = "2026-10-14"))
-        val follow = appDb.bookReviewDao.save(initial.copy(id = UUID.randomUUID().toString(),
-            rating = null, content = "Text follow-up", reviewDate = "2026-10-15"))
+        val follow = initial.copy(id = UUID.randomUUID().toString(),
+            rating = null, isFollowUp = true, content = "Text follow-up", reviewDate = "2026-10-15")
+        appDb.bookReviewDao.insert(follow)
         appDb.bookReviewDao.delete(initial)
         try {
             ActivityScenario.launch<BookReviewEditActivity>(
