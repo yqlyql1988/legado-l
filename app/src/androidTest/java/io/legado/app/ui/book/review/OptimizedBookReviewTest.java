@@ -16,6 +16,8 @@ import android.widget.TextView;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry;
+import androidx.test.runner.lifecycle.Stage;
 import org.junit.After;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -179,6 +181,9 @@ public class OptimizedBookReviewTest {
             context.getSharedPreferences("bookReviewDrafts", 0).edit().remove("edit:" + reviewId).commit();
         }
         db().delete("books", "bookUrl = ?", new String[]{url});
+        db().delete("books", "bookUrl = ?", new String[]{url + "-current"});
+        db().delete("searchBooks", "bookUrl = ?", new String[]{url});
+        db().delete("book_sources", "bookSourceUrl = ?", new String[]{url + "-source"});
         android.content.SharedPreferences preferences = context.getSharedPreferences("bookReviewDrafts", 0);
         android.content.SharedPreferences.Editor cleanup = preferences.edit();
         for (Map.Entry<String, ?> entry : preferences.getAll().entrySet()) {
@@ -223,7 +228,7 @@ public class OptimizedBookReviewTest {
         }
         editor();
         scenario.onActivity(activity -> {
-            assertEquals(0f, ((RatingBar) activity.findViewById(id("rating_bar"))).getRating(), 0f);
+            assertEquals(4.5f, ((RatingBar) activity.findViewById(id("rating_bar"))).getRating(), 0f);
             ((EditText) activity.findViewById(id("et_content"))).setText("重读追评：这次更能理解主角的选择。");
         });
         onView(withId(id("menu_save"))).perform(click());
@@ -305,6 +310,9 @@ public class OptimizedBookReviewTest {
         String initialId = reviewId("待删除初评");
         write("保留的文字追评", 0f);
         String followId = reviewId("保留的文字追评");
+        ContentValues legacy = new ContentValues();
+        legacy.putNull("rating"); // Preserve the old-backup text-only promotion regression.
+        db().update("book_reviews", legacy, "id = ?", new String[]{followId});
         addShelfBook();
         launch("io.legado.app.ui.book.review.BookReviewActivity", true);
         onView(withText("待删除初评")).check(matches(isDisplayed()));
@@ -384,5 +392,145 @@ public class OptimizedBookReviewTest {
         });
         assertEquals(0, count());
         assertFalse(context.getSharedPreferences("bookReviewDrafts", 0).contains(key));
+    }
+
+    private void archive() {
+        launch("io.legado.app.ui.book.review.BookReviewActivity", false);
+        onView(withId(id("search_src_text"))).perform(replaceText(name), closeSoftKeyboard());
+        onView(allOf(withId(id("tv_title")), withText(name))).check(matches(isDisplayed()));
+    }
+
+    private void assertResumed(String activityName) {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
+            java.util.Collection<Activity> activities = ActivityLifecycleMonitorRegistry.getInstance()
+                .getActivitiesInStage(Stage.RESUMED);
+            assertEquals(1, activities.size());
+            Activity activity = activities.iterator().next();
+            assertEquals(activityName, activity.getClass().getName());
+            if (activityName.endsWith("BookReviewActivity")) {
+                assertFalse("Back from details must return directly to the archive",
+                    activity.getIntent().hasExtra("bookName"));
+            }
+        });
+    }
+
+    @Test public void archiveClickKeepsHistoryAndLongPressOpensDetailsWithoutExtraClick() throws Exception {
+        write("点击查看书评，长按查看详情", 4f);
+        addShelfBook();
+        archive();
+        onView(allOf(withId(id("tv_title")), withText(name))).perform(click());
+        onView(withId(id("tv_write"))).check(matches(isDisplayed()));
+        onView(withText(string("book_review_initial"))).check(matches(isDisplayed()));
+        androidx.test.espresso.Espresso.pressBack();
+        onView(allOf(withId(id("tv_title")), withText(name))).perform(longClick());
+        onView(allOf(withId(id("tv_name")), withText(name))).check(matches(isDisplayed()));
+        assertResumed("io.legado.app.ui.book.info.BookInfoActivity");
+        screenshot("review-long-press-info.png");
+        androidx.test.espresso.Espresso.pressBack();
+        onView(allOf(withId(id("tv_title")), withText(name))).check(matches(isDisplayed()));
+        assertResumed("io.legado.app.ui.book.review.BookReviewActivity");
+        assertEquals(1, count());
+    }
+
+    @Test public void archiveLongPressUsesCurrentBookAfterSourceChange() {
+        write("换源前写的书评", 4.5f);
+        addShelfBook();
+        ContentValues changed = new ContentValues();
+        changed.put("bookUrl", url + "-current");
+        changed.put("originName", "换源后的书源");
+        db().update("books", changed, "bookUrl = ?", new String[]{url});
+        // An old URL can now identify another book; name and author must win.
+        ContentValues old = new ContentValues();
+        old.put("bookUrl", url);
+        old.put("name", name + "-另一部");
+        old.put("author", "另一位作者");
+        old.put("origin", "https://review-test.invalid");
+        db().insertOrThrow("books", null, old);
+        archive();
+        onView(allOf(withId(id("tv_title")), withText(name))).perform(longClick());
+        onView(allOf(withId(id("tv_name")), withText(name))).check(matches(isDisplayed()));
+        onView(withId(id("tv_origin"))).check(matches(withText(
+            org.hamcrest.Matchers.containsString("换源后的书源"))));
+        assertEquals(1, count());
+    }
+
+    @Test public void archiveLongPressOpensSearchCacheForBookOutsideShelf() {
+        write("移出书架后保留的书评", 4f);
+        ContentValues source = new ContentValues();
+        source.put("bookSourceUrl", url + "-source");
+        source.put("bookSourceName", "缓存测试书源");
+        source.put("bookSourceType", 0);
+        source.put("lastUpdateTime", 0);
+        source.put("respondTime", 0);
+        source.put("weight", 0);
+        db().insertOrThrow("book_sources", null, source);
+        ContentValues cached = new ContentValues();
+        cached.put("bookUrl", url);
+        cached.put("name", name);
+        cached.put("author", author);
+        cached.put("origin", url + "-source");
+        cached.put("originName", "缓存测试书源");
+        cached.put("type", 0);
+        cached.put("tocUrl", "");
+        cached.put("time", System.currentTimeMillis());
+        cached.put("originOrder", 0);
+        db().insertOrThrow("searchBooks", null, cached);
+        archive();
+        onView(allOf(withId(id("tv_title")), withText(name))).perform(longClick());
+        onView(allOf(withId(id("tv_name")), withText(name))).check(matches(isDisplayed()));
+        onView(withId(id("tv_shelf"))).check(matches(withText(string("add_to_bookshelf"))));
+        try (Cursor cursor = db().rawQuery("select count(*) from books where name = ?",
+                new String[]{name})) {
+            assertTrue(cursor.moveToFirst());
+            assertEquals("Opening details must not add the book to the shelf", 0, cursor.getInt(0));
+        }
+        assertEquals(1, count());
+    }
+
+    @Test public void followUpPrefillsPreviousScoreAndSavesItUnlessChanged() throws Exception {
+        write("上次评分四星半", 4.5f);
+        editor();
+        scenario.onActivity(activity -> {
+            assertEquals(4.5f, ((RatingBar) activity.findViewById(id("rating_bar"))).getRating(), 0f);
+            ((EditText) activity.findViewById(id("et_content"))).setText("这次只写文字");
+        });
+        scenario.recreate();
+        await(() -> {
+            boolean[] ready = {false};
+            scenario.onActivity(activity -> ready[0] =
+                ((TextView) activity.findViewById(id("tv_book"))).getText().toString().equals(name));
+            return ready[0];
+        });
+        scenario.onActivity(activity ->
+            assertEquals(4.5f, ((RatingBar) activity.findViewById(id("rating_bar"))).getRating(), 0f));
+        screenshot("review-follow-up-rating.png");
+        onView(withId(id("menu_save"))).perform(click());
+        await(() -> count() == 2);
+        String inheritedId = reviewId("这次只写文字");
+        try (Cursor cursor = db().rawQuery("select rating from book_reviews where id = ?",
+                new String[]{inheritedId})) {
+            assertTrue(cursor.moveToFirst());
+            assertEquals(9, cursor.getInt(0));
+        }
+        write("重新改成三星", 3f);
+        editor();
+        scenario.onActivity(activity -> {
+            RatingBar rating = activity.findViewById(id("rating_bar"));
+            assertEquals(3f, rating.getRating(), 0f);
+            rating.setRating(5f);
+        });
+        onView(withId(id("tv_clear_rating"))).perform(scrollTo(), click());
+        scenario.onActivity(activity -> {
+            assertEquals(3f, ((RatingBar) activity.findViewById(id("rating_bar"))).getRating(), 0f);
+            ((EditText) activity.findViewById(id("et_content"))).setText("恢复上次评分后保存");
+        });
+        onView(withId(id("menu_save"))).perform(click());
+        await(() -> count() == 4);
+        String resetId = reviewId("恢复上次评分后保存");
+        try (Cursor cursor = db().rawQuery("select rating from book_reviews where id = ?",
+                new String[]{resetId})) {
+            assertTrue(cursor.moveToFirst());
+            assertEquals(6, cursor.getInt(0));
+        }
     }
 }

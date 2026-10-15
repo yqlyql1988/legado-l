@@ -16,6 +16,7 @@
     <string name="book_review_score">%1$.1f 分 / 5</string>
     <string name="book_review_current_score">当前评分：%1$s</string>
     <string name="book_review_no_score">未重新评分</string>
+    <string name="book_review_use_previous_score">沿用上次评分</string>
     <string name="book_review_unrated">未评分</string>
     <string name="book_review_delete">删除书评</string>
     <string name="book_review_delete_confirm">确定删除这篇书评吗？删除后无法撤销。</string>

@@ -60,10 +60,12 @@ interface BookReviewDao {
             val book = bookForUrl(review.bookUrl)
             val name = book?.name ?: review.bookName
             val author = book?.author ?: review.bookAuthor
+            val history = forBook(name, author)
             review.copy(
                 bookName = name,
                 bookAuthor = author,
-                isFollowUp = forBook(name, author).isNotEmpty(),
+                rating = review.rating ?: history.firstOrNull { it.rating != null }?.rating,
+                isFollowUp = history.isNotEmpty(),
                 createdAt = now,
                 updatedAt = now,
             )

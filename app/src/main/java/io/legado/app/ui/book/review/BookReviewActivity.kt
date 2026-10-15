@@ -21,6 +21,7 @@ import io.legado.app.data.entities.archiveBookReviews
 import io.legado.app.databinding.ActivityBookReviewBinding
 import io.legado.app.databinding.ItemBookReviewBinding
 import io.legado.app.lib.theme.primaryTextColor
+import io.legado.app.ui.book.info.BookInfoActivity
 import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.toastOnUi
@@ -160,6 +161,16 @@ class BookReviewActivity : BaseActivity<ActivityBookReviewBinding>() {
                     if (isArchive) open(this@BookReviewActivity, review.asBook())
                     else BookReviewEditActivity.edit(this@BookReviewActivity, review.id)
                 }
+                root.setOnLongClickListener(if (isArchive) {
+                    android.view.View.OnLongClickListener {
+                        startActivity(Intent(this@BookReviewActivity, BookInfoActivity::class.java)
+                            .putExtra("name", review.bookName)
+                            .putExtra("author", review.bookAuthor)
+                            .putExtra("bookUrl", review.bookUrl))
+                        true
+                    }
+                } else null)
+                root.isLongClickable = isArchive
             }
         }
     }

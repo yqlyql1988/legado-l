@@ -45,6 +45,7 @@ class BookReviewEditActivity : BaseActivity<ActivityBookReviewEditBinding>() {
     private var ready = false
     private var persisted = false
     private var requiresRating = true
+    private var previousRating: Int? = null
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         binding.root.setOnApplyWindowInsetsListenerCompat { view, insets ->
@@ -67,7 +68,11 @@ class BookReviewEditActivity : BaseActivity<ActivityBookReviewEditBinding>() {
             } else ratingHint()
             persistDraft()
         }
-        binding.tvClearRating.setOnClickListener { binding.ratingBar.rating = 0f }
+        binding.tvClearRating.setOnClickListener {
+            binding.ratingBar.rating = if (!persisted && review?.isFollowUp == true) {
+                (previousRating ?: 0) / 2f
+            } else 0f
+        }
         binding.etContent.doAfterTextChanged { persistDraft() }
         lifecycleScope.launch {
             try {
@@ -88,10 +93,12 @@ class BookReviewEditActivity : BaseActivity<ActivityBookReviewEditBinding>() {
                         val book = requireNotNull(intent.reviewBook())
                         // A rotation can interrupt the UI after the transaction has committed.
                         // Reuse that row instead of turning its saved draft into a duplicate.
+                        val history = appDb.bookReviewDao.forBook(book.name, book.author)
+                        previousRating = history.firstOrNull { it.rating != null }?.rating
                         BookReview(id = draft?.id ?: UUID.randomUUID().toString(),
                                 bookName = book.name, bookAuthor = book.author,
                                 bookUrl = book.bookUrl, coverUrl = book.getDisplayCover(),
-                                isFollowUp = appDb.bookReviewDao.forBook(book.name, book.author).isNotEmpty())
+                                rating = previousRating, isFollowUp = history.isNotEmpty())
                     }
                 }
                 if (loaded == null) {
@@ -103,7 +110,8 @@ class BookReviewEditActivity : BaseActivity<ActivityBookReviewEditBinding>() {
                 requiresRating = !loaded.isFollowUp && (!persisted || loaded.rating != null)
                 // Use the freshly loaded identity/version after renames or a restored backup.
                 review = draft?.let { loaded.copy(
-                    rating = it.rating, content = it.content, reviewDate = it.reviewDate,
+                    rating = it.rating ?: loaded.rating.takeUnless { persisted },
+                    content = it.content, reviewDate = it.reviewDate,
                 ) } ?: loaded
                 showReview(requireNotNull(review))
                 ready = true
@@ -132,7 +140,11 @@ class BookReviewEditActivity : BaseActivity<ActivityBookReviewEditBinding>() {
         date = LocalDate.parse(value.reviewDate)
         tvDate.text = date.toString()
         tvClearRating.isVisible = !requiresRating
-        tvClearRating.setText(if (value.isFollowUp) R.string.book_review_no_score else R.string.book_review_unrated)
+        tvClearRating.setText(when {
+            value.isFollowUp && !persisted -> R.string.book_review_use_previous_score
+            value.isFollowUp -> R.string.book_review_no_score
+            else -> R.string.book_review_unrated
+        })
         ratingBar.rating = (value.rating ?: 0) / 2f
         tvRating.text = if (ratingBar.rating > 0f) {
             getString(R.string.book_review_score, ratingBar.rating.toDouble())
