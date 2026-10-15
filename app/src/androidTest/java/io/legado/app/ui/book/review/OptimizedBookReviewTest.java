@@ -23,6 +23,11 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import org.json.JSONObject;
+import static org.hamcrest.Matchers.allOf;
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.*;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
@@ -38,11 +43,17 @@ public class OptimizedBookReviewTest {
     private final String url = "review-smoke:" + UUID.randomUUID();
     private ActivityScenario<Activity> scenario;
     private SQLiteDatabase database;
+    private final List<String> reviewIds = new ArrayList<>();
+    private String bookDraftKey;
 
     private int id(String name) {
         int result = context.getResources().getIdentifier(name, "id", context.getPackageName());
         assertNotEquals("Missing resource " + name, 0, result);
         return result;
+    }
+
+    private String string(String name) {
+        return context.getString(context.getResources().getIdentifier(name, "string", context.getPackageName()));
     }
 
     private SQLiteDatabase db() {
@@ -79,6 +90,68 @@ public class OptimizedBookReviewTest {
         }
     }
 
+    private String reviewId(String content) {
+        try (Cursor cursor = db().rawQuery("select id from book_reviews where bookName = ? and content = ?",
+                new String[]{name, content})) {
+            assertTrue(cursor.moveToFirst());
+            String result = cursor.getString(0);
+            reviewIds.add(result);
+            return result;
+        }
+    }
+
+    private void write(String content, float score) {
+        editor();
+        scenario.onActivity(activity -> {
+            ((RatingBar) activity.findViewById(id("rating_bar"))).setRating(score);
+            ((EditText) activity.findViewById(id("et_content"))).setText(content);
+        });
+        // Use the actual editor's key, including its JSON formatting, for stale-draft checks.
+        for (Map.Entry<String, ?> entry : context.getSharedPreferences("bookReviewDrafts", 0).getAll().entrySet()) {
+            try {
+                if (!entry.getKey().startsWith("edit:") && entry.getValue() instanceof String &&
+                        new JSONObject((String) entry.getValue()).optString("bookName").equals(name)) {
+                    bookDraftKey = entry.getKey();
+                }
+            } catch (org.json.JSONException ignored) { }
+        }
+        onView(withId(id("menu_save"))).perform(click());
+        await(() -> {
+            try (Cursor cursor = db().rawQuery("select id from book_reviews where bookName = ? and content = ?",
+                    new String[]{name, content})) {
+                return cursor.moveToFirst();
+            }
+        });
+        reviewId(content);
+    }
+
+    private void deleteFromHistory(String content) {
+        onView(allOf(withId(id("tv_delete")),
+            withParent(withParent(hasDescendant(withText(content)))))).perform(click());
+    }
+
+    private void deleteFromEditor() {
+        androidx.test.espresso.Espresso.openActionBarOverflowOrOptionsMenu(context);
+        SystemClock.sleep(400); // The custom overflow popup animates outside Espresso's idle tracking.
+        onView(withText(string("book_review_delete"))).perform(click());
+    }
+
+    private void addShelfBook() {
+        ContentValues values = new ContentValues();
+        values.put("bookUrl", url);
+        values.put("name", name);
+        values.put("author", author);
+        values.put("origin", "https://review-test.invalid");
+        values.put("intro", "这是简介。书评应始终在简介之前，可以反复展开和收起。");
+        db().insertOrThrow("books", null, values);
+    }
+
+    private void information() {
+        if (scenario != null) scenario.close();
+        scenario = ActivityScenario.launch(new Intent().setClassName(context.getPackageName(),
+            "io.legado.app.ui.book.info.BookInfoActivity").putExtra("bookUrl", url));
+    }
+
     private void await(BooleanSupplier condition) {
         long until = SystemClock.elapsedRealtime() + 10000;
         while (SystemClock.elapsedRealtime() < until) {
@@ -101,10 +174,22 @@ public class OptimizedBookReviewTest {
     @After public void cleanup() {
         if (scenario != null) scenario.close();
         db().delete("book_reviews", "bookName = ?", new String[]{name});
+        for (String reviewId : reviewIds) {
+            db().delete("book_review_deletions", "id = ?", new String[]{reviewId});
+            context.getSharedPreferences("bookReviewDrafts", 0).edit().remove("edit:" + reviewId).commit();
+        }
         db().delete("books", "bookUrl = ?", new String[]{url});
-        String key = UUID.nameUUIDFromBytes(("[\"" + name + "\",\"" + author + "\"]")
-            .getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString();
-        context.getSharedPreferences("bookReviewDrafts", 0).edit().remove(key).commit();
+        android.content.SharedPreferences preferences = context.getSharedPreferences("bookReviewDrafts", 0);
+        android.content.SharedPreferences.Editor cleanup = preferences.edit();
+        for (Map.Entry<String, ?> entry : preferences.getAll().entrySet()) {
+            try {
+                if (entry.getValue() instanceof String &&
+                        new JSONObject((String) entry.getValue()).optString("bookName").equals(name)) {
+                    cleanup.remove(entry.getKey());
+                }
+            } catch (org.json.JSONException ignored) { }
+        }
+        cleanup.commit();
         database.close();
     }
 
@@ -167,7 +252,8 @@ public class OptimizedBookReviewTest {
         });
         launch("io.legado.app.ui.book.review.BookReviewActivity", false);
         onView(withId(id("search_src_text"))).perform(replaceText(name), closeSoftKeyboard());
-        onView(withText(name + " · " + author)).check(matches(isDisplayed()));
+        onView(allOf(withId(id("tv_title")), withText(name))).check(matches(isDisplayed()));
+        onView(withText(author)).check(matches(isDisplayed()));
         screenshot("review-archive.png");
         assertEquals(2, count());
     }
@@ -180,16 +266,8 @@ public class OptimizedBookReviewTest {
         });
         onView(withId(id("menu_save"))).perform(click());
         await(() -> count() == 1);
-        ContentValues values = new ContentValues();
-        values.put("bookUrl", url);
-        values.put("name", name);
-        values.put("author", author);
-        values.put("origin", "https://review-test.invalid");
-        values.put("intro", "这是简介。书评应始终在简介之前，可以反复展开和收起。");
-        db().insertOrThrow("books", null, values);
-        if (scenario != null) scenario.close();
-        scenario = ActivityScenario.launch(new Intent().setClassName(context.getPackageName(),
-            "io.legado.app.ui.book.info.BookInfoActivity").putExtra("bookUrl", url));
+        addShelfBook();
+        information();
         await(() -> {
             boolean[] ready = {false};
             scenario.onActivity(activity -> {
@@ -220,5 +298,91 @@ public class OptimizedBookReviewTest {
         onView(withId(id("tv_review_toggle"))).perform(scrollTo(), click());
         scenario.onActivity(activity -> assertEquals(View.VISIBLE,
             activity.findViewById(id("ll_review_details")).getVisibility()));
+    }
+
+    @Test public void deleteConfirmsBeforePromotingTextFollowUpAndReturningToUnreviewed() throws Exception {
+        write("待删除初评", 4.5f);
+        String initialId = reviewId("待删除初评");
+        write("保留的文字追评", 0f);
+        String followId = reviewId("保留的文字追评");
+        addShelfBook();
+        launch("io.legado.app.ui.book.review.BookReviewActivity", true);
+        onView(withText("待删除初评")).check(matches(isDisplayed()));
+        deleteFromHistory("待删除初评");
+        assertEquals(2, count()); // Merely opening the confirmation does not delete.
+        screenshot("review-delete-confirm.png");
+        onView(withId(android.R.id.button2)).perform(click());
+        assertEquals(2, count());
+        deleteFromHistory("待删除初评");
+        onView(withId(android.R.id.button1)).perform(click());
+        await(() -> count() == 1);
+        try (Cursor cursor = db().rawQuery(
+            "select isFollowUp, rating, content from book_reviews where id = ?", new String[]{followId})) {
+            assertTrue(cursor.moveToFirst());
+            assertEquals(0, cursor.getInt(0));
+            assertTrue(cursor.isNull(1));
+            assertEquals("保留的文字追评", cursor.getString(2));
+        }
+        onView(withText(string("book_review_initial"))).check(matches(isDisplayed()));
+        onView(withText("保留的文字追评")).perform(click());
+        onView(withId(id("et_content"))).perform(scrollTo(), replaceText("递补为初评后仍可修改文字"), closeSoftKeyboard());
+        onView(withId(id("menu_save"))).perform(click());
+        await(() -> {
+            try (Cursor cursor = db().rawQuery("select content from book_reviews where id = ?", new String[]{followId})) {
+                return cursor.moveToFirst() && cursor.getString(0).equals("递补为初评后仍可修改文字");
+            }
+        });
+        deleteFromHistory("递补为初评后仍可修改文字");
+        onView(withId(android.R.id.button1)).perform(click());
+        await(() -> count() == 0);
+        onView(withText(string("book_review_none"))).check(matches(isDisplayed()));
+        information();
+        await(() -> {
+            boolean[] ready = {false};
+            scenario.onActivity(activity -> {
+                TextView rating = activity.findViewById(id("tv_review_rating"));
+                ready[0] = rating != null && rating.getText().toString().equals(string("book_review_none"));
+            });
+            return ready[0];
+        });
+        scenario.onActivity(activity -> {
+            assertEquals(View.GONE, activity.findViewById(id("tv_review_date")).getVisibility());
+            assertEquals(View.GONE, activity.findViewById(id("ll_review_details")).getVisibility());
+            View card = activity.findViewById(id("review_card"));
+            assertTrue("Collapsed empty review bar should be compact",
+                card.getHeight() <= Math.ceil(50 * context.getResources().getDisplayMetrics().density));
+        });
+        onView(withId(id("tv_review_toggle"))).perform(scrollTo());
+        screenshot("review-unreviewed.png");
+    }
+
+    @Test public void editorDeleteCanBeCancelledAndDeletedDraftDoesNotReturn() throws Exception {
+        write("编辑页删除测试", 4f);
+        String initialId = reviewId("编辑页删除测试");
+        String key = bookDraftKey;
+        assertNotNull("The editor must persist its actual draft before saving", key);
+        JSONObject draft = new JSONObject();
+        draft.put("id", initialId).put("bookName", name).put("bookAuthor", author)
+            .put("bookUrl", url).put("rating", 8).put("content", "不应复活的旧草稿")
+            .put("reviewDate", "2026-10-15").put("isFollowUp", false)
+            .put("createdAt", 1).put("updatedAt", 1);
+        context.getSharedPreferences("bookReviewDrafts", 0).edit().putString(key, draft.toString()).commit();
+        if (scenario != null) scenario.close();
+        scenario = ActivityScenario.launch(new Intent().setClassName(context.getPackageName(),
+            "io.legado.app.ui.book.review.BookReviewEditActivity").putExtra("reviewId", initialId));
+        onView(withText(name)).check(matches(isDisplayed()));
+        deleteFromEditor();
+        onView(withId(android.R.id.button2)).perform(click());
+        assertEquals(1, count());
+        deleteFromEditor();
+        onView(withId(android.R.id.button1)).perform(click());
+        await(() -> count() == 0);
+        editor();
+        scenario.onActivity(activity -> {
+            assertEquals("", ((EditText) activity.findViewById(id("et_content"))).getText().toString());
+            assertEquals(0f, ((RatingBar) activity.findViewById(id("rating_bar"))).getRating(), 0f);
+        });
+        assertEquals(0, count());
+        assertFalse(context.getSharedPreferences("bookReviewDrafts", 0).contains(key));
     }
 }

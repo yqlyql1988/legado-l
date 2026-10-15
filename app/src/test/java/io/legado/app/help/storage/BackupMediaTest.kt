@@ -75,6 +75,7 @@ class BackupMediaTest {
                 "readRecord.json",
                 "searchHistory.json",
                 "bookReview.json",
+                "bookReviewDeletion.json",
                 "readConfig.json",
                 "shareReadConfig.json",
                 "themeConfig.json",
@@ -88,7 +89,7 @@ class BackupMediaTest {
     @Test
     fun reviewsCanBeBackedUpWithoutBookshelfOrReadingHistory() {
         assertEquals(
-            listOf("bookReview.json"),
+            listOf("bookReview.json", "bookReviewDeletion.json"),
             selectedBackupFileNames { it == "backupBookReviews" },
         )
     }

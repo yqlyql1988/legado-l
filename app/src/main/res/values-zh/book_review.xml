@@ -2,7 +2,7 @@
 <resources>
     <string name="book_reviews">我的书评</string>
     <string name="book_reviews_summary">按书籍归档评分、评价和重读追评</string>
-    <string name="book_review_none">尚未写书评</string>
+    <string name="book_review_none">未评价</string>
     <string name="book_review_write">写书评</string>
     <string name="book_review_follow_up">写追评</string>
     <string name="book_review_initial">初评</string>
@@ -15,7 +15,13 @@
     <string name="book_review_archive_count">%1$d 本书 · %2$d 篇书评</string>
     <string name="book_review_score">%1$.1f 分 / 5</string>
     <string name="book_review_current_score">当前评分：%1$s</string>
-    <string name="book_review_no_score">沿用此前评分</string>
+    <string name="book_review_no_score">未重新评分</string>
+    <string name="book_review_unrated">未评分</string>
+    <string name="book_review_delete">删除书评</string>
+    <string name="book_review_delete_confirm">确定删除这篇书评吗？删除后无法撤销。</string>
+    <string name="book_review_delete_initial_confirm">确定删除这篇初评吗？如有追评，最早的一篇将自动变为初评；全部删除后，本书恢复为“未评价”。删除后无法撤销。</string>
+    <string name="book_review_deleted">书评已删除</string>
+    <string name="book_review_delete_failed">删除书评失败，请重试。</string>
     <string name="book_review_rating">本次评分</string>
     <string name="book_review_date">书评日期</string>
     <string name="book_review_content">文字评价</string>

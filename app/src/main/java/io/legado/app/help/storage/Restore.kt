@@ -305,8 +305,12 @@ object Restore {
         fileToListT<BookMemo>(path, "bookMemo.json")?.let { memos ->
             appDb.bookMemoDao.restore(memos.filter { it.bookUrl in restoredBookUrls })
         }
-        fileToListT<BookReview>(path, "bookReview.json")?.let { reviews ->
-            appDb.bookReviewDao.restore(reviews)
+        val reviews = fileToListT<BookReview>(path, "bookReview.json")
+        val reviewDeletions = fileToListT<io.legado.app.data.entities.BookReviewDeletion>(
+            path, "bookReviewDeletion.json"
+        )
+        if (reviews != null || reviewDeletions != null) {
+            appDb.bookReviewDao.restore(reviews.orEmpty(), reviewDeletions.orEmpty())
         }
         fileToListT<Bookmark>(path, "bookmark.json")?.let {
             appDb.bookmarkDao.insert(*it.toTypedArray())
