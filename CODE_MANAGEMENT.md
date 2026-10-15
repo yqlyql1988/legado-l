@@ -1,6 +1,48 @@
 # 阅读L 代码管理
 
-本项目使用本地 Git 保存源码版本。Git 仓库位于项目的 `.git` 目录。
+本项目使用本地 Git 和 GitHub 私有仓库共同管理源码、功能分支、PR、问题、测试与版本发布。Git 仓库位于项目的 `.git` 目录，个人仓库为 `yqlyql1988/reading-l`。
+
+## 当前管理方式（2026-10-15）
+
+沿用原有提交历史和版本标签，补齐与上游类似的开发管理流程：
+
+| 内容 | 阅读L约定 |
+| --- | --- |
+| 稳定源码 | `main`，GitHub 默认分支 |
+| 功能开发 | 从 `main` 建立 `codex/*`，完成验证后通过 PR 合入 |
+| 上游源码 | `upstream-source`，继续使用已核验快照；不重写历史 |
+| 问题与需求 | 使用个人仓库 Issues 的 Bug、功能模板，自动分类 |
+| 源码检查 | 推送 `main`、`codex/*` 和提交 PR 时运行“阅读L检查” |
+| Android 测试 | Android 代码、资源、Gradle 配置或检查工作流改变时自动执行；也可手动运行 |
+| 可用版本 | 使用独立 `reading-l-*` 标签与私有 Releases 保存 APK、SHA256 和发布说明 |
+| 本机备份 | 自动验证的 Git bundle；签名、本机配置另行私密备份 |
+
+当前 GitHub 账号方案返回私有仓库分支保护不可用（HTTP 403，要求升级 GitHub Pro 或公开仓库）。项目继续保持私有；使用上述 PR 约定、本地检查及 Actions。此约定并非服务器强制保护，不改变账号付费方案。
+
+开发流程见 `CONTRIBUTING.md`。个人仓库启用“阅读L检查”和上游已有的“Triage labels”分类工作流。其他官方工作流在个人仓库停用，包括官方发布、第三方分发、自动关 Issue 和需要 API 密钥的代码审查；源码文件仍保留，便于继续合并上游。
+
+“阅读L检查”默认只读源码；分类流程仅有 Issues 和 PR 标签写权限。CI 不接收本机签名，原签名精简 APK 在本机生成后归档至私有 Releases。
+
+### 本地管理工具
+
+需 Python 3.10+ 与 Git。在项目目录执行：
+
+```powershell
+python tools/reading-l/manage.py check
+python -m unittest discover -s tools/reading-l/tests -v
+python tools/reading-l/manage.py backup
+python tools/reading-l/manage.py sync
+```
+
+`check` 校验已跟踪源码的排除规则、各语言与调试资源中的阅读L名称、书籍信息同步入口、精简配置、两份日志日期和上游记录。
+
+`backup` 要求工作区干净，生成带时间戳的 bundle 并执行 `git bundle verify`。`sync` 要求处于 `main`，核对 origin 的获取与推送地址、确认远程分支可以快进后，一次原子推送 `main`、`upstream-source` 和标签，逐一核对远程提交，再生成本机 bundle。不使用强制推送；远程领先、分叉、工作区未提交或推送地址不符时拒绝同步。
+
+### 发布与验证记录
+
+发布前更新两份日志，执行管理检查和适用的 Android 测试，再使用原精简构建命令。用 `Get-FileHash -Algorithm SHA256` 核验 APK，检查应用名称、包名、最低系统版本、双 ARM 架构及签名与既有 APK 一致。
+
+发布说明填写版本名、对应源码提交、测试结果、APK 文件名和 SHA256；将安装包和校验文件附到私有仓库对应标签的 Release。APK 不提交到 Git；每个发布标签固定到该版本，不覆盖旧标签。
 
 ## 已保存的版本
 
@@ -37,7 +79,7 @@ git log --oneline --decorate
 git diff original-source..main
 ```
 
-标签用于标记可用版本；历史记录中的源码可随时取回。后续增加功能时继续在 `main` 上保存新提交。
+标签用于标记可用版本；历史记录中的源码可随时取回。后续功能在 `codex/*` 分支保存新提交，再通过 PR 合入 `main`。用户明确要求直接保存或紧急修复时，也可以在完成同样验证后提交到 `main`。
 
 ## 备份
 
@@ -68,7 +110,7 @@ APK 单独保存在 `build/outputs`，不进入源码历史。签名密钥、`lo
 git push origin main --tags
 ```
 
-该仓库用于备份，GitHub Actions 已停用；源码中的工作流文件仍保留在版本历史中。
+仓库现同时用于个人开发与备份，GitHub Actions 按上面的个人工作流启用范围管理。源码中的官方工作流继续保留在版本历史中。
 
 ## 同步上游更新
 
