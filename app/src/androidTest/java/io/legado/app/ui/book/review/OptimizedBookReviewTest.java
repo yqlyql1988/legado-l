@@ -270,6 +270,88 @@ public class OptimizedBookReviewTest {
         assertEquals(2, count());
     }
 
+    @Test public void editorAcceptsTouchHalfStarsAndRestoresUnicodeDraft() throws Exception {
+        editor();
+        screenshot("review-editor-empty.png");
+        scenario.onActivity(activity ->
+            ((EditText) activity.findViewById(id("et_content"))).setText("重读📚"));
+        // A new initial review must still have a rating before it can be saved.
+        onView(withId(id("menu_save"))).check(matches(withText(string("action_save")))).perform(click());
+        assertEquals(0, count());
+        onView(withId(id("rating_bar"))).perform(scrollTo(),
+            new androidx.test.espresso.action.GeneralClickAction(
+                androidx.test.espresso.action.Tap.SINGLE, view -> {
+                    int[] location = new int[2];
+                    view.getLocationOnScreen(location);
+                    // Touch inside the left half of the fourth star; the native
+                    // RatingBar snaps touches near a star's right edge upwards.
+                    return new float[]{location[0] + view.getWidth() * .62f,
+                        location[1] + view.getHeight() * .5f};
+                }, androidx.test.espresso.action.Press.FINGER));
+        scenario.onActivity(activity -> {
+            assertEquals(3.5f, ((RatingBar) activity.findViewById(id("rating_bar"))).getRating(), 0f);
+            int resource = context.getResources().getIdentifier(
+                "book_review_character_count", "string", context.getPackageName());
+            assertEquals(context.getString(resource, 3),
+                ((TextView) activity.findViewById(id("tv_content_count"))).getText().toString());
+        });
+        scenario.recreate();
+        await(() -> {
+            boolean[] ready = {false};
+            scenario.onActivity(activity -> ready[0] =
+                ((TextView) activity.findViewById(id("tv_book"))).getText().toString().equals(name));
+            return ready[0];
+        });
+        scenario.onActivity(activity -> {
+            assertEquals("重读📚", ((EditText) activity.findViewById(id("et_content"))).getText().toString());
+            assertEquals(3.5f, ((RatingBar) activity.findViewById(id("rating_bar"))).getRating(), 0f);
+            assertEquals(context.getString(context.getResources().getIdentifier(
+                "book_review_character_count", "string", context.getPackageName()), 3),
+                ((TextView) activity.findViewById(id("tv_content_count"))).getText().toString());
+        });
+        onView(withId(id("menu_save"))).perform(click());
+        await(() -> count() == 1);
+        String reviewId = reviewId("重读📚");
+        try (Cursor cursor = db().rawQuery("select rating from book_reviews where id = ?",
+                new String[]{reviewId})) {
+            assertTrue(cursor.moveToFirst());
+            assertEquals(7, cursor.getInt(0));
+        }
+    }
+
+    @Test public void editorCanSaveLongTextWhileKeyboardIsOpen() throws Exception {
+        editor();
+        scenario.onActivity(activity -> ((RatingBar) activity.findViewById(id("rating_bar"))).setRating(4f));
+        String content = new String(new char[80]).replace("\0", "重读后的感受：人物和情节有了新的意味。\n");
+        onView(withId(id("et_content"))).perform(scrollTo(), click(), replaceText(content));
+        scenario.onActivity(activity -> {
+            EditText input = activity.findViewById(id("et_content"));
+            input.setSelection(input.length());
+            assertTrue(input.hasFocus());
+        });
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            await(() -> {
+                boolean[] keyboard = {false};
+                scenario.onActivity(activity -> {
+                    android.view.WindowInsets insets =
+                        activity.getWindow().getDecorView().getRootWindowInsets();
+                    keyboard[0] = insets != null &&
+                        insets.isVisible(android.view.WindowInsets.Type.ime());
+                });
+                return keyboard[0];
+            });
+        }
+        screenshot("review-editor-keyboard.png");
+        onView(withId(id("menu_save"))).check(matches(isDisplayed())).perform(click());
+        await(() -> count() == 1);
+        String reviewId = reviewId(content);
+        try (Cursor cursor = db().rawQuery("select content from book_reviews where id = ?",
+                new String[]{reviewId})) {
+            assertTrue(cursor.moveToFirst());
+            assertEquals(content, cursor.getString(0));
+        }
+    }
+
     @Test public void informationPanelCollapsesAndRestoresItsState() throws Exception {
         editor(); // Initialize the app database before inserting an isolated fixture.
         scenario.onActivity(activity -> {
