@@ -16,6 +16,12 @@
     <string name="book_review_score">%1$.1f / 5</string>
     <string name="book_review_current_score">Current rating: %1$s</string>
     <string name="book_review_no_score">Keep the previous rating</string>
+    <string name="book_review_unrated">Not rated</string>
+    <string name="book_review_delete">Delete review</string>
+    <string name="book_review_delete_confirm">Delete this review? This cannot be undone.</string>
+    <string name="book_review_delete_initial_confirm">Delete this initial review? The earliest remaining follow-up will become the initial review. Removing every review returns the book to “No review yet”. This cannot be undone.</string>
+    <string name="book_review_deleted">Review deleted</string>
+    <string name="book_review_delete_failed">Couldn’t delete the review. Please try again.</string>
     <string name="book_review_rating">Rating</string>
     <string name="book_review_date">Review date</string>
     <string name="book_review_content">Written review</string>

@@ -52,6 +52,13 @@ class BookReviewUiTest {
             assertEquals(android.view.View.VISIBLE, binding.tvReviewDate.visibility)
             assertTrue(binding.tvReviewDate.text.contains("2026-10-15"))
             assertTrue(binding.tvReviewRating.text.contains("4.5"))
+            view.submitReviews(emptyList())
+            assertEquals(android.view.View.GONE, binding.llReviewDetails.visibility)
+            assertEquals(android.view.View.GONE, binding.tvReviewDate.visibility)
+            assertEquals(context.getString(io.legado.app.R.string.book_review_none),
+                binding.tvReviewRating.text.toString())
+            assertEquals(context.getString(io.legado.app.R.string.book_review_write),
+                binding.tvReviewAdd.text.toString())
         }
     }
 
@@ -72,6 +79,9 @@ class BookReviewUiTest {
                     (it.findViewById<android.view.ViewGroup>(android.R.id.content)).getChildAt(0))
                 assertEquals("重读后仍然喜欢这本书", binding.etContent.text.toString())
                 assertEquals(4.5f, binding.ratingBar.rating)
+                assertEquals(book.name, binding.tvBook.text.toString())
+                assertEquals(book.author, binding.tvAuthor.text.toString())
+                assertTrue(binding.tvAuthor.textSize < binding.tvBook.textSize)
             }
         }
         ActivityScenario.launch<BookReviewEditActivity>(intent).use { scenario ->
@@ -86,6 +96,76 @@ class BookReviewUiTest {
             await { appDb.bookReviewDao.forBook(book.name, book.author).isNotEmpty() }
         }
         assertEquals(9, appDb.bookReviewDao.forBook(book.name, book.author).single().rating)
+    }
+
+    @Test fun archivePlacesScoreBesideTitleAndSmallAuthorBelowIt() {
+        appDb.bookReviewDao.save(BookReview(bookName = book.name, bookAuthor = book.author,
+            rating = 9, content = "Layout", reviewDate = "2026-10-15"))
+        ActivityScenario.launch<BookReviewActivity>(
+            Intent(context, BookReviewActivity::class.java)
+        ).use { scenario ->
+            await {
+                var ready = false
+                scenario.onActivity {
+                    val search = it.findViewById<androidx.appcompat.widget.SearchView>(io.legado.app.R.id.search_view)
+                    search.setQuery(book.name, false)
+                    val list = it.findViewById<androidx.recyclerview.widget.RecyclerView>(io.legado.app.R.id.recycler_view)
+                    val child = list.getChildAt(0)
+                    if (child != null) {
+                        val row = io.legado.app.databinding.ItemBookReviewBinding.bind(child)
+                        ready = row.tvTitle.text.toString() == book.name && row.tvTitle.width > 0
+                        if (ready) {
+                            assertEquals(book.author, row.tvAuthor.text.toString())
+                            assertTrue(row.tvAuthor.textSize < row.tvTitle.textSize)
+                            assertSame(row.tvTitle.parent, row.tvRating.parent)
+                            val titleBounds = android.graphics.Rect()
+                            val ratingBounds = android.graphics.Rect()
+                            val authorBounds = android.graphics.Rect()
+                            row.tvTitle.getGlobalVisibleRect(titleBounds)
+                            row.tvRating.getGlobalVisibleRect(ratingBounds)
+                            row.tvAuthor.getGlobalVisibleRect(authorBounds)
+                            assertTrue(ratingBounds.left >= titleBounds.right)
+                            assertTrue(authorBounds.top >= titleBounds.bottom)
+                        }
+                    }
+                }
+                ready
+            }
+        }
+    }
+
+    @Test fun promotedTextOnlyInitialKeepsOptionalScoreAcrossRecreation() {
+        val initial = appDb.bookReviewDao.save(BookReview(bookName = book.name, bookAuthor = book.author,
+            rating = 9, content = "Initial", reviewDate = "2026-10-14"))
+        val follow = appDb.bookReviewDao.save(initial.copy(id = UUID.randomUUID().toString(),
+            rating = null, content = "Text follow-up", reviewDate = "2026-10-15"))
+        appDb.bookReviewDao.delete(initial)
+        try {
+            ActivityScenario.launch<BookReviewEditActivity>(
+                Intent(context, BookReviewEditActivity::class.java).putExtra("reviewId", follow.id)
+            ).use { scenario ->
+                awaitEditor(scenario)
+                scenario.onActivity {
+                    it.findViewById<android.widget.RatingBar>(io.legado.app.R.id.rating_bar).rating = 3f
+                }
+                scenario.recreate()
+                awaitEditor(scenario)
+                scenario.onActivity {
+                    val binding = ActivityBookReviewEditBinding.bind(
+                        it.findViewById<android.view.ViewGroup>(android.R.id.content).getChildAt(0))
+                    assertEquals(android.view.View.VISIBLE, binding.tvClearRating.visibility)
+                    binding.tvClearRating.performClick()
+                    binding.etContent.setText("Edited after promotion")
+                    binding.titleBar.toolbar.menu.performIdentifierAction(io.legado.app.R.id.menu_save, 0)
+                }
+                await { appDb.bookReviewDao.get(follow.id)?.content == "Edited after promotion" }
+            }
+            assertNull(appDb.bookReviewDao.get(follow.id)?.rating)
+        } finally {
+            appDb.openHelper.writableDatabase.execSQL(
+                "delete from book_review_deletions where id = ?", arrayOf(initial.id))
+            context.getSharedPreferences("bookReviewDrafts", 0).edit().remove("edit:${follow.id}").commit()
+        }
     }
 
     @Test fun perBookHistoryShowsInitialAndFollowUp() {

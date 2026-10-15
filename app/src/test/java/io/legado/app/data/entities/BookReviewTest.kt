@@ -16,8 +16,8 @@ class BookReviewTest {
         assertEquals("2026-10-15", initial.reviewDate)
     }
 
-    @Test fun initialReviewRequiresRatingAndContent() {
-        assertThrows(IllegalArgumentException::class.java) { review(rating = null).validated() }
+    @Test fun promotedInitialMayHaveNoScoreButAlwaysRequiresContent() {
+        assertNull(review(rating = null).validated().rating)
         assertThrows(IllegalArgumentException::class.java) { review().copy(content = " \n").validated() }
     }
 
@@ -85,5 +85,33 @@ class BookReviewTest {
             mergeBookReviews(current, listOf(review("new"), review("bad", rating = 12)))
         }
         assertEquals("initial", current.single().id)
+    }
+
+    @Test fun promotionChoosesEarliestDateThenCreationThenIdWithoutInventingARating() {
+        val follow = review("follow", date = "2026-10-16", followUp = true)
+        val later = review("later", date = "2026-10-17", followUp = true)
+        val first = review("first", date = "2026-10-16", rating = null, followUp = true, created = 1)
+        val sameTime = first.copy(id = "second")
+        val promoted = normalizeBookReviewRoles(listOf(later, follow, sameTime, first), now = 50)
+        assertEquals(listOf("first"), promoted.filterNot { it.isFollowUp }.map { it.id })
+        assertNull(promoted.first { it.id == "first" }.rating)
+        assertEquals(50L, promoted.first { it.id == "first" }.updatedAt)
+        assertEquals(later, promoted.first { it.id == "later" })
+        assertEquals(promoted, normalizeBookReviewRoles(promoted, now = 60))
+    }
+
+    @Test fun backdatedFollowUpDoesNotReplaceSurvivingInitial() {
+        val initial = review()
+        val follow = review("backdated", date = "2026-10-14", followUp = true)
+        assertEquals(listOf(initial, follow), normalizeBookReviewRoles(listOf(initial, follow), 50))
+    }
+
+    @Test fun deletionAlwaysWinsOverOldOrNewerBackupAndKeepsOtherBooks() {
+        val removed = review().copy(updatedAt = 1000)
+        val other = review("other").copy(bookAuthor = "Other author")
+        assertEquals(listOf(other), mergeBookReviews(listOf(removed, other),
+            listOf(removed.copy(updatedAt = 2000)), setOf(removed.id)))
+        assertTrue(archiveBookReviews(mergeBookReviews(listOf(removed),
+            listOf(removed), setOf(removed.id))).isEmpty())
     }
 }

@@ -93,10 +93,12 @@ class BookReviewActivity : BaseActivity<ActivityBookReviewBinding>() {
             getString(R.string.book_review_archive_count, archives.size, reviews.size)
         } else {
             listOfNotNull(
-                getString(R.string.book_review_count, reviews.size),
-                archives.firstOrNull()?.rating?.let {
+                if (reviews.isEmpty()) getString(R.string.book_review_none)
+                else getString(R.string.book_review_count, reviews.size),
+                archives.firstOrNull()?.let { archive ->
                     getString(R.string.book_review_current_score,
-                        getString(R.string.book_review_score, it / 2.0))
+                        archive.rating?.let { getString(R.string.book_review_score, it / 2.0) }
+                            ?: getString(R.string.book_review_unrated))
                 }
             ).joinToString(" · ")
         }
@@ -131,15 +133,19 @@ class BookReviewActivity : BaseActivity<ActivityBookReviewBinding>() {
                 ivCover.isVisible = isArchive
                 if (isArchive) ivCover.load(review.asBook(), false)
                 tvTitle.text = if (isArchive) {
-                    listOf(review.bookName, review.bookAuthor).filter { it.isNotBlank() }
-                        .joinToString(" · ")
+                    review.bookName
                 } else getString(
                     if (review.isFollowUp) R.string.book_review_follow_up_label
                     else R.string.book_review_initial
                 )
+                tvAuthor.isVisible = isArchive && review.bookAuthor.isNotBlank()
+                tvAuthor.text = review.bookAuthor
                 tvRating.text = archive.rating?.let {
                     getString(R.string.book_review_score, it / 2.0)
-                } ?: getString(R.string.book_review_no_score)
+                } ?: getString(
+                    if (!isArchive && review.isFollowUp) R.string.book_review_no_score
+                    else R.string.book_review_unrated
+                )
                 tvContent.maxLines = if (isArchive) 3 else Int.MAX_VALUE
                 tvContent.ellipsize = if (isArchive) android.text.TextUtils.TruncateAt.END else null
                 tvContent.text = review.content
@@ -148,6 +154,8 @@ class BookReviewActivity : BaseActivity<ActivityBookReviewBinding>() {
                 } else review.reviewDate
                 tvEdit.isVisible = !isArchive
                 tvEdit.setOnClickListener { BookReviewEditActivity.edit(this@BookReviewActivity, review.id) }
+                reviewActions.isVisible = !isArchive
+                tvDelete.setOnClickListener { confirmDeleteBookReview(review) }
                 root.setOnClickListener {
                     if (isArchive) open(this@BookReviewActivity, review.asBook())
                     else BookReviewEditActivity.edit(this@BookReviewActivity, review.id)

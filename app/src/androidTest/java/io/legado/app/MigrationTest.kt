@@ -70,6 +70,36 @@ class MigrationTest {
     }
 
     @Test
+    fun migrate112To113KeepsReviewsAndAddsEmptyDeletionMarkers() {
+        val databaseName = "migration-review-deletion"
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        context.deleteDatabase(databaseName)
+        helper.createDatabase(databaseName, 112).apply {
+            execSQL("""insert into book_reviews
+                (id, bookName, bookAuthor, bookUrl, rating, content, reviewDate, isFollowUp, createdAt, updatedAt)
+                values ('initial', 'Book', 'Author', 'review-book', 9, 'Initial', '2026-10-14', 0, 100, 100)""")
+            execSQL("""insert into book_reviews
+                (id, bookName, bookAuthor, bookUrl, rating, content, reviewDate, isFollowUp, createdAt, updatedAt)
+                values ('follow', 'Book', 'Author', 'review-book', null, 'Follow-up', '2026-10-15', 1, 200, 200)""")
+            close()
+        }
+        val db = Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
+            .addMigrations(*ALL_MIGRATIONS).build()
+        try {
+            assertEquals(2, db.bookReviewDao.all().size)
+            assertTrue(db.bookReviewDao.deletions().isEmpty())
+            val initial = requireNotNull(db.bookReviewDao.get("initial"))
+            assertEquals(9, initial.rating)
+            db.bookReviewDao.delete(initial)
+            assertEquals("Follow-up", db.bookReviewDao.get("follow")?.content)
+            assertEquals(false, db.bookReviewDao.get("follow")?.isFollowUp)
+        } finally {
+            db.close()
+            context.deleteDatabase(databaseName)
+        }
+    }
+
+    @Test
     @Throws(IOException::class)
     fun migrateAll() {
         // Create earliest version of the database.

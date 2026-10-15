@@ -43,6 +43,8 @@ class BookReviewEditActivity : BaseActivity<ActivityBookReviewEditBinding>() {
     private var saving = false
     private var saved = false
     private var ready = false
+    private var persisted = false
+    private var requiresRating = true
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         binding.root.setOnApplyWindowInsetsListenerCompat { view, insets ->
@@ -62,10 +64,7 @@ class BookReviewEditActivity : BaseActivity<ActivityBookReviewEditBinding>() {
         binding.ratingBar.setOnRatingBarChangeListener { _, rating, _ ->
             binding.tvRating.text = if (rating > 0f) {
                 getString(R.string.book_review_score, rating.toDouble())
-            } else getString(
-                if (review?.isFollowUp == true) R.string.book_review_no_score
-                else R.string.book_review_required
-            )
+            } else ratingHint()
             persistDraft()
         }
         binding.tvClearRating.setOnClickListener { binding.ratingBar.rating = 0f }
@@ -73,31 +72,39 @@ class BookReviewEditActivity : BaseActivity<ActivityBookReviewEditBinding>() {
         lifecycleScope.launch {
             try {
                 val id = intent.getStringExtra("reviewId")
-                val draft = runCatching {
+                var draft = runCatching {
                     GSON.fromJson(savedInstanceState?.getString("draft")
                         ?: drafts.getString(draftKey, null), BookReview::class.java)
                 }.getOrNull()
                 val loaded = withContext(IO) {
-                    if (id != null) appDb.bookReviewDao.get(id) else {
+                    if (draft?.let { appDb.bookReviewDao.isDeleted(it.id) } == true) {
+                        drafts.edit().remove(draftKey).apply()
+                        draft = null
+                    }
+                    val existing = if (id != null) appDb.bookReviewDao.get(id)
+                        else draft?.let { appDb.bookReviewDao.get(it.id) }
+                    persisted = existing != null
+                    if (id != null) existing else existing ?: run {
                         val book = requireNotNull(intent.reviewBook())
                         // A rotation can interrupt the UI after the transaction has committed.
                         // Reuse that row instead of turning its saved draft into a duplicate.
-                        draft?.let { appDb.bookReviewDao.get(it.id) }
-                            ?: BookReview(bookName = book.name, bookAuthor = book.author,
+                        BookReview(id = draft?.id ?: UUID.randomUUID().toString(),
+                                bookName = book.name, bookAuthor = book.author,
                                 bookUrl = book.bookUrl, coverUrl = book.getDisplayCover(),
                                 isFollowUp = appDb.bookReviewDao.forBook(book.name, book.author).isNotEmpty())
                     }
                 }
                 if (loaded == null) {
+                    drafts.edit().remove(draftKey).apply()
                     toastOnUi(R.string.book_review_missing)
                     finish()
                     return@launch
                 }
+                requiresRating = !loaded.isFollowUp && (!persisted || loaded.rating != null)
                 // Use the freshly loaded identity/version after renames or a restored backup.
-                review = if (draft != null) loaded.copy(
-                    id = if (id == null) draft.id else loaded.id,
-                    rating = draft.rating, content = draft.content, reviewDate = draft.reviewDate,
-                ) else loaded
+                review = draft?.let { loaded.copy(
+                    rating = it.rating, content = it.content, reviewDate = it.reviewDate,
+                ) } ?: loaded
                 showReview(requireNotNull(review))
                 ready = true
                 if (draft != null && savedInstanceState == null) {
@@ -119,14 +126,25 @@ class BookReviewEditActivity : BaseActivity<ActivityBookReviewEditBinding>() {
             value.isFollowUp -> R.string.book_review_follow_up
             else -> R.string.book_review_write
         })
-        tvBook.text = listOf(value.bookName, value.bookAuthor)
-            .filter { it.isNotBlank() }.joinToString(" · ")
+        tvBook.text = value.bookName
+        tvAuthor.text = value.bookAuthor
+        tvAuthor.isVisible = value.bookAuthor.isNotBlank()
         date = LocalDate.parse(value.reviewDate)
         tvDate.text = date.toString()
-        tvClearRating.isVisible = value.isFollowUp
+        tvClearRating.isVisible = !requiresRating
+        tvClearRating.setText(if (value.isFollowUp) R.string.book_review_no_score else R.string.book_review_unrated)
         ratingBar.rating = (value.rating ?: 0) / 2f
+        tvRating.text = if (ratingBar.rating > 0f) {
+            getString(R.string.book_review_score, ratingBar.rating.toDouble())
+        } else ratingHint()
         etContent.setText(value.content)
     }
+
+    private fun ratingHint(): String = getString(when {
+        requiresRating -> R.string.book_review_required
+        review?.isFollowUp == true -> R.string.book_review_no_score
+        else -> R.string.book_review_unrated
+    })
 
     private fun currentDraft(): BookReview? = review?.copy(
         rating = (binding.ratingBar.rating * 2).roundToInt().takeIf { it > 0 },
@@ -153,33 +171,44 @@ class BookReviewEditActivity : BaseActivity<ActivityBookReviewEditBinding>() {
     }
 
     override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.book_info_edit, menu)
+        menuInflater.inflate(R.menu.book_review_edit, menu)
         return super.onCompatCreateOptionsMenu(menu)
     }
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
         menu.findItem(R.id.menu_save)?.isEnabled = ready && !saving
+        menu.findItem(R.id.menu_delete)?.apply {
+            isVisible = ready && persisted
+            isEnabled = !saving
+        }
         return super.onPrepareOptionsMenu(menu)
     }
 
     override fun onCompatOptionsItemSelected(item: MenuItem): Boolean {
-        if (item.itemId == R.id.menu_save) save()
+        when (item.itemId) {
+            R.id.menu_save -> save()
+            R.id.menu_delete -> if (ready && !saving && persisted) {
+                review?.let { value ->
+                    confirmDeleteBookReview(value, onBusy = ::setBusy) {
+                        saved = true
+                        drafts.edit().remove(draftKey).apply()
+                        setResult(RESULT_OK)
+                        finish()
+                    }
+                }
+            }
+        }
         return super.onCompatOptionsItemSelected(item)
     }
 
     private fun save() {
         if (!ready || saving) return
         val value = currentDraft() ?: return
-        if (value.content.isBlank() || (!value.isFollowUp && value.rating == null)) {
+        if (value.content.isBlank() || (requiresRating && value.rating == null)) {
             toastOnUi(R.string.book_review_required)
             return
         }
-        saving = true
-        binding.etContent.isEnabled = false
-        binding.ratingBar.isEnabled = false
-        binding.tvDate.isEnabled = false
-        binding.tvClearRating.isEnabled = false
-        invalidateOptionsMenu()
+        setBusy(true)
         persistDraft()
         lifecycleScope.launch {
             try {
@@ -194,14 +223,18 @@ class BookReviewEditActivity : BaseActivity<ActivityBookReviewEditBinding>() {
             } catch (e: Exception) {
                 toastOnUi(e.localizedMessage ?: getString(R.string.book_review_load_failed))
             } finally {
-                saving = false
-                binding.etContent.isEnabled = true
-                binding.ratingBar.isEnabled = true
-                binding.tvDate.isEnabled = true
-                binding.tvClearRating.isEnabled = true
-                invalidateOptionsMenu()
+                setBusy(false)
             }
         }
+    }
+
+    private fun setBusy(value: Boolean) {
+        saving = value
+        binding.etContent.isEnabled = !value
+        binding.ratingBar.isEnabled = !value
+        binding.tvDate.isEnabled = !value
+        binding.tvClearRating.isEnabled = !value
+        invalidateOptionsMenu()
     }
 
     companion object {

@@ -5,6 +5,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookReview
+import io.legado.app.data.entities.BookReviewDeletion
+import io.legado.app.data.entities.archiveBookReviews
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -87,5 +89,81 @@ class BookReviewDatabaseTest {
         db.saveEditedBook(book.copy(name = "Renamed"), syncMetadata = false)
         assertEquals("Renamed", db.bookReviewDao.save(initial).bookName)
         assertTrue(db.bookReviewDao.forBook("Book", "Author").isEmpty())
+    }
+
+    @Test fun deletingInitialPromotesEarliestTextOnlyFollowUpAndKeepsItsDate() {
+        val first = db.bookReviewDao.save(initial, now = 100)
+        val newer = db.bookReviewDao.save(initial.copy(id = "newer", rating = 6,
+            reviewDate = "2026-10-17"), now = 200)
+        val earlier = db.bookReviewDao.save(initial.copy(id = "earlier", rating = null,
+            content = "Text only", reviewDate = "2026-10-16"), now = 300)
+        assertTrue(db.bookReviewDao.delete(first, now = 400))
+        assertNull(db.bookReviewDao.get(first.id))
+        val promoted = requireNotNull(db.bookReviewDao.get(earlier.id))
+        assertFalse(promoted.isFollowUp)
+        assertEquals(earlier.reviewDate, promoted.reviewDate)
+        assertEquals(earlier.content, promoted.content)
+        assertNull(promoted.rating)
+        assertEquals(earlier.createdAt, promoted.createdAt)
+        assertEquals(6, archiveBookReviews(db.bookReviewDao.all()).single().rating)
+        db.bookReviewDao.save(promoted.copy(content = "Edited text only"), now = 500)
+        assertEquals("Edited text only", db.bookReviewDao.get(earlier.id)?.content)
+        assertTrue(db.bookReviewDao.get(newer.id)!!.isFollowUp)
+    }
+
+    @Test fun deletingLatestScoreFallsBackAndDeletingAllResetsArchiveAndNewInitial() {
+        val first = db.bookReviewDao.save(initial, now = 100)
+        val follow = db.bookReviewDao.save(initial.copy(id = "follow", rating = 6,
+            reviewDate = "2026-10-16"), now = 200)
+        db.bookReviewDao.delete(follow)
+        assertEquals(9, archiveBookReviews(db.bookReviewDao.all()).single().rating)
+        assertFalse(db.bookReviewDao.get(first.id)!!.isFollowUp)
+        db.bookReviewDao.delete(first)
+        assertTrue(archiveBookReviews(db.bookReviewDao.all()).isEmpty())
+        assertFalse(db.bookReviewDao.delete(first))
+        assertThrows(IllegalArgumentException::class.java) {
+            db.bookReviewDao.save(initial.copy(id = "fresh", rating = null))
+        }
+        assertFalse(db.bookReviewDao.save(initial.copy(id = "fresh")).isFollowUp)
+    }
+
+    @Test fun staleEditorAndOldBackupCannotResurrectDeletedReviewOrUndoPromotion() {
+        val first = db.bookReviewDao.save(initial, now = 100)
+        val follow = db.bookReviewDao.save(initial.copy(id = "follow", rating = null,
+            reviewDate = "2026-10-16"), now = 200)
+        db.bookReviewDao.delete(first, now = 300)
+        assertThrows(IllegalStateException::class.java) {
+            db.bookReviewDao.save(first.copy(content = "Stale draft"), now = 400)
+        }
+        repeat(2) { db.bookReviewDao.restore(listOf(first, follow)) }
+        assertEquals(1, db.bookReviewDao.all().size)
+        assertFalse(db.bookReviewDao.get(follow.id)!!.isFollowUp)
+        assertEquals(listOf(BookReviewDeletion(first.id)), db.bookReviewDao.deletions())
+    }
+
+    @Test fun restoringDeletionMarkersDeletesExistingRowsAndRepairsInitialAtomically() {
+        val first = db.bookReviewDao.save(initial, now = 100)
+        val follow = db.bookReviewDao.save(initial.copy(id = "follow", rating = null), now = 200)
+        val other = db.bookReviewDao.save(initial.copy(id = "other", bookAuthor = "Other"), now = 300)
+        repeat(2) {
+            db.bookReviewDao.restore(listOf(first, follow), listOf(BookReviewDeletion(first.id)), now = 400)
+        }
+        assertNull(db.bookReviewDao.get(first.id))
+        assertFalse(db.bookReviewDao.get(follow.id)!!.isFollowUp)
+        assertEquals(other, db.bookReviewDao.get(other.id))
+        assertThrows(IllegalArgumentException::class.java) {
+            db.bookReviewDao.restore(listOf(initial.copy(id = "bad", rating = 12)),
+                listOf(BookReviewDeletion(other.id)))
+        }
+        assertEquals(other, db.bookReviewDao.get(other.id))
+        assertFalse(db.bookReviewDao.isDeleted(other.id))
+    }
+
+    @Test fun staleDeleteConfirmationDoesNotRemoveANewerEdit() {
+        val first = db.bookReviewDao.save(initial, now = 100)
+        val edited = db.bookReviewDao.save(first.copy(content = "New edit"), now = 200)
+        assertThrows(IllegalStateException::class.java) { db.bookReviewDao.delete(first) }
+        assertEquals(edited, db.bookReviewDao.get(first.id))
+        assertTrue(db.bookReviewDao.deletions().isEmpty())
     }
 }

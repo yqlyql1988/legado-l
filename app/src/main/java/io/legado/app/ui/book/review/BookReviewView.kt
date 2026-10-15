@@ -52,6 +52,7 @@ class BookReviewView @JvmOverloads constructor(
 
     fun submitReviews(value: List<BookReview>) {
         if (hasLoaded && reviews.isEmpty() && value.isNotEmpty()) expanded = true
+        if (hasLoaded && reviews.isNotEmpty() && value.isEmpty()) expanded = false
         reviews = value
         if (expanded == null) expanded = value.isNotEmpty()
         hasLoaded = true
@@ -67,7 +68,7 @@ class BookReviewView @JvmOverloads constructor(
         } else {
             BookReviewArchive(reviews).rating?.let {
                 context.getString(R.string.book_review_score, it / 2.0)
-            }
+            } ?: context.getString(R.string.book_review_unrated)
         }
         tvReviewToggle.setText(
             if (isExpanded) R.string.book_review_collapse else R.string.book_review_expand
