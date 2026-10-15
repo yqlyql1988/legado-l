@@ -6,19 +6,50 @@
     android:orientation="horizontal"
     android:padding="16dp">
 
+    <FrameLayout
+        android:id="@+id/timeline_indicator"
+        android:layout_width="22dp"
+        android:layout_height="match_parent"
+        android:visibility="gone">
+
+        <View
+            android:id="@+id/timeline_line"
+            android:layout_width="1dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="3dp"
+            android:layout_marginTop="12dp"
+            android:background="@color/bg_divider_line" />
+
+        <View
+            android:id="@+id/timeline_dot"
+            android:layout_width="7dp"
+            android:layout_height="7dp"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/bg_book_review_dot" />
+    </FrameLayout>
+
     <io.legado.app.ui.widget.image.CoverImageView
         android:id="@+id/iv_cover"
-        android:layout_width="48dp"
-        android:layout_height="64dp"
-        android:layout_marginEnd="12dp"
+        android:layout_width="52dp"
+        android:layout_height="76dp"
+        android:layout_marginEnd="14dp"
         android:importantForAccessibility="no"
         android:scaleType="centerCrop" />
 
     <LinearLayout
+        android:id="@+id/review_body"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tv_history_date"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/secondaryText"
+            android:textSize="12sp"
+            android:visibility="gone" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -31,15 +62,37 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="2"
                 android:paddingEnd="8dp"
                 android:textColor="@color/primaryText"
                 android:textSize="16sp" />
+
+            <androidx.appcompat.widget.AppCompatRatingBar
+                android:id="@+id/review_rating_stars"
+                style="?android:attr/ratingBarStyleSmall"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:isIndicator="true"
+                android:numStars="5"
+                android:stepSize="0.5" />
 
             <io.legado.app.ui.widget.text.AccentTextView
                 android:id="@+id/tv_rating"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textSize="14sp" />
+
+            <ImageButton
+                android:id="@+id/review_more"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/book_review_actions"
+                android:padding="12dp"
+                android:src="@drawable/ic_more"
+                android:tint="@color/secondaryText"
+                android:visibility="gone" />
         </LinearLayout>
 
         <TextView
@@ -56,6 +109,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
+            android:lineSpacingExtra="3dp"
             android:textColor="@color/primaryText"
             android:textSize="14sp" />
 
@@ -67,34 +121,5 @@
             android:textColor="@color/secondaryText"
             android:textSize="12sp" />
 
-        <LinearLayout
-            android:id="@+id/review_actions"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:visibility="gone">
-
-            <io.legado.app.ui.widget.text.AccentTextView
-                android:id="@+id/tv_edit"
-                android:layout_width="wrap_content"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackground"
-                android:gravity="center"
-                android:minWidth="48dp"
-                android:paddingHorizontal="8dp"
-                android:text="@string/edit"
-                android:textSize="14sp" />
-
-            <io.legado.app.ui.widget.text.AccentTextView
-                android:id="@+id/tv_delete"
-                android:layout_width="wrap_content"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackground"
-                android:gravity="center"
-                android:minWidth="48dp"
-                android:paddingHorizontal="8dp"
-                android:text="@string/delete"
-                android:textSize="14sp" />
-        </LinearLayout>
     </LinearLayout>
 </LinearLayout>

@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/review_card"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    app:cardBackgroundColor="@color/background_card"
-    app:cardCornerRadius="8dp"
-    app:cardElevation="0dp"
-    app:contentPadding="0dp">
+    android:orientation="vertical">
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0.5dp"
+        android:background="@color/bg_divider_line" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -16,6 +17,7 @@
         android:paddingHorizontal="10dp">
 
         <LinearLayout
+            android:id="@+id/review_header"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
@@ -23,20 +25,27 @@
 
             <TextView
                 android:id="@+id/tv_review_title"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:paddingEnd="6dp"
                 android:text="@string/book_reviews"
                 android:textColor="@color/primaryText"
                 android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/tv_review_count"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="@color/secondaryText"
+                android:textSize="11sp" />
 
             <io.legado.app.ui.widget.text.AccentTextView
                 android:id="@+id/tv_review_rating"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:paddingHorizontal="4dp"
-                android:textSize="14sp" />
+                android:textSize="12sp" />
 
             <io.legado.app.ui.widget.text.AccentTextView
                 android:id="@+id/tv_review_toggle"
@@ -47,17 +56,37 @@
                 android:minWidth="48dp"
                 android:paddingHorizontal="8dp"
                 android:text="@string/book_review_expand"
-                android:textSize="14sp" />
+                android:textSize="12sp" />
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/tv_review_date"
+        <LinearLayout
+            android:id="@+id/review_summary"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
             android:paddingBottom="6dp"
-            android:textColor="@color/secondaryText"
-            android:textSize="12sp"
-            android:visibility="gone" />
+            android:visibility="gone">
+
+            <androidx.appcompat.widget.AppCompatRatingBar
+                android:id="@+id/review_rating_stars"
+                style="?android:attr/ratingBarStyleSmall"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:isIndicator="true"
+                android:numStars="5"
+                android:stepSize="0.5" />
+
+            <TextView
+                android:id="@+id/tv_review_date"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="end"
+                android:paddingStart="8dp"
+                android:textColor="@color/secondaryText"
+                android:textSize="11sp" />
+        </LinearLayout>
 
         <LinearLayout
             android:id="@+id/ll_review_details"
@@ -71,6 +100,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:paddingTop="6dp"
+                android:lineSpacingExtra="4dp"
                 android:textColor="@color/primaryText"
                 android:textIsSelectable="true"
                 android:textSize="14sp" />
@@ -93,7 +123,7 @@
                     android:text="@string/book_review_all"
                     android:textSize="13sp" />
 
-                <io.legado.app.ui.widget.text.AccentTextView
+                <TextView
                     android:id="@+id/tv_review_edit"
                     android:layout_width="wrap_content"
                     android:layout_height="48dp"
@@ -102,6 +132,7 @@
                     android:minWidth="48dp"
                     android:paddingHorizontal="6dp"
                     android:text="@string/edit"
+                    android:textColor="@color/secondaryText"
                     android:textSize="13sp" />
 
                 <io.legado.app.ui.widget.text.AccentTextView
@@ -117,4 +148,9 @@
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>
-</androidx.cardview.widget.CardView>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0.5dp"
+        android:background="@color/bg_divider_line" />
+</LinearLayout>

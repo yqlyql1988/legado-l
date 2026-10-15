@@ -67,6 +67,26 @@ class BookReviewTest {
         assertEquals("Second book", archiveBookReviews(listOf(review(), recent)).first().latest.bookName)
     }
 
+    @Test fun highestRatingUsesCurrentScoreAndLeavesUnratedLast() {
+        val oldHigh = review("old-high", date = "2026-10-12", rating = 10)
+        val currentLow = review("current-low", date = "2026-10-15", rating = 4, followUp = true)
+        val high = review("high", date = "2026-10-13", rating = 9).copy(bookName = "High")
+        val unrated = review("unrated", date = "2026-10-17", rating = null).copy(bookName = "Unrated")
+        val archives = archiveBookReviews(listOf(unrated, currentLow, oldHigh, high), BookReviewSort.RATING)
+        assertEquals(listOf("High", "Book", "Unrated"), archives.map { it.latest.bookName })
+        assertEquals(4, archives[1].rating)
+    }
+
+    @Test fun equalRatingsUseRecentReviewAndLegacyFollowUpKeepsExplicitScore() {
+        val first = review("first", date = "2026-10-12", rating = 9)
+        val follow = review("follow", date = "2026-10-16", rating = null, followUp = true)
+        val other = review("other", date = "2026-10-15", rating = 9).copy(bookName = "Other")
+        assertEquals(listOf("Book", "Other"),
+            archiveBookReviews(listOf(other, first, follow), BookReviewSort.RATING).map { it.latest.bookName })
+        assertEquals(listOf("follow", "first"),
+            archiveBookReviews(listOf(other, first, follow), BookReviewSort.RATING).first().reviews.map { it.id })
+    }
+
     @Test fun repeatedRestoreDoesNotDuplicateReviews() {
         val backup = listOf(review(), review("follow", followUp = true))
         assertEquals(backup, mergeBookReviews(mergeBookReviews(emptyList(), backup), backup))

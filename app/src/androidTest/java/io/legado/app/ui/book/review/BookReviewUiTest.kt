@@ -51,7 +51,8 @@ class BookReviewUiTest {
             assertEquals(android.view.View.GONE, binding.llReviewDetails.visibility)
             assertEquals(android.view.View.VISIBLE, binding.tvReviewDate.visibility)
             assertTrue(binding.tvReviewDate.text.contains("2026-10-15"))
-            assertTrue(binding.tvReviewRating.text.contains("4.5"))
+            assertEquals(4.5f, binding.reviewRatingStars.rating)
+            assertEquals(android.view.View.VISIBLE, binding.reviewRatingStars.visibility)
             view.submitReviews(emptyList())
             assertEquals(android.view.View.GONE, binding.llReviewDetails.visibility)
             assertEquals(android.view.View.GONE, binding.tvReviewDate.visibility)
@@ -117,12 +118,13 @@ class BookReviewUiTest {
                         if (ready) {
                             assertEquals(book.author, row.tvAuthor.text.toString())
                             assertTrue(row.tvAuthor.textSize < row.tvTitle.textSize)
-                            assertSame(row.tvTitle.parent, row.tvRating.parent)
+                            assertSame(row.tvTitle.parent, row.reviewRatingStars.parent)
+                            assertEquals(2, row.tvTitle.maxLines)
                             val titleBounds = android.graphics.Rect()
                             val ratingBounds = android.graphics.Rect()
                             val authorBounds = android.graphics.Rect()
                             row.tvTitle.getGlobalVisibleRect(titleBounds)
-                            row.tvRating.getGlobalVisibleRect(ratingBounds)
+                            row.reviewRatingStars.getGlobalVisibleRect(ratingBounds)
                             row.tvAuthor.getGlobalVisibleRect(authorBounds)
                             assertTrue(ratingBounds.left >= titleBounds.right)
                             assertTrue(authorBounds.top >= titleBounds.bottom)
@@ -189,7 +191,8 @@ class BookReviewUiTest {
             scenario.onActivity {
                 val binding = ActivityBookReviewBinding.bind(
                     it.findViewById<android.view.ViewGroup>(android.R.id.content).getChildAt(0))
-                assertTrue(binding.tvSummary.text.contains("4.0"))
+                assertEquals(4f, binding.bookRatingStars.rating)
+                assertFalse(binding.tvSort.isShown)
             }
         }
     }
