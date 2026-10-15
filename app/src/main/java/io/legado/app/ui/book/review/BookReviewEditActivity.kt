@@ -3,6 +3,7 @@ package io.legado.app.ui.book.review
 import android.app.DatePickerDialog
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
@@ -16,7 +17,9 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookReview
 import io.legado.app.databinding.ActivityBookReviewEditBinding
+import io.legado.app.lib.theme.accentColor
 import io.legado.app.utils.GSON
+import io.legado.app.utils.getCompatColor
 import io.legado.app.utils.setOnApplyWindowInsetsListenerCompat
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
@@ -62,10 +65,13 @@ class BookReviewEditActivity : BaseActivity<ActivityBookReviewEditBinding>() {
                 persistDraft()
             }, date.year, date.monthValue - 1, date.dayOfMonth).show()
         }
-        binding.ratingBar.setOnRatingBarChangeListener { _, rating, _ ->
-            binding.tvRating.text = if (rating > 0f) {
-                getString(R.string.book_review_score, rating.toDouble())
-            } else ratingHint()
+        binding.ratingBar.apply {
+            progressTintList = ColorStateList.valueOf(accentColor)
+            secondaryProgressTintList = progressTintList
+            progressBackgroundTintList = ColorStateList.valueOf(getCompatColor(R.color.secondaryText))
+        }
+        binding.ratingBar.setOnRatingBarChangeListener { _, _, _ ->
+            updateRatingLabel()
             persistDraft()
         }
         binding.tvClearRating.setOnClickListener {
@@ -73,7 +79,13 @@ class BookReviewEditActivity : BaseActivity<ActivityBookReviewEditBinding>() {
                 (previousRating ?: 0) / 2f
             } else 0f
         }
-        binding.etContent.doAfterTextChanged { persistDraft() }
+        binding.etContent.doAfterTextChanged {
+            val text = it?.toString().orEmpty()
+            binding.tvContentCount.text = getString(
+                R.string.book_review_character_count, text.codePointCount(0, text.length)
+            )
+            persistDraft()
+        }
         lifecycleScope.launch {
             try {
                 val id = intent.getStringExtra("reviewId")
@@ -137,6 +149,7 @@ class BookReviewEditActivity : BaseActivity<ActivityBookReviewEditBinding>() {
         tvBook.text = value.bookName
         tvAuthor.text = value.bookAuthor
         tvAuthor.isVisible = value.bookAuthor.isNotBlank()
+        ivCover.load(value.coverUrl, value.bookName, value.bookAuthor)
         date = LocalDate.parse(value.reviewDate)
         tvDate.text = date.toString()
         tvClearRating.isVisible = !requiresRating
@@ -146,14 +159,23 @@ class BookReviewEditActivity : BaseActivity<ActivityBookReviewEditBinding>() {
             else -> R.string.book_review_unrated
         })
         ratingBar.rating = (value.rating ?: 0) / 2f
-        tvRating.text = if (ratingBar.rating > 0f) {
-            getString(R.string.book_review_score, ratingBar.rating.toDouble())
-        } else ratingHint()
+        updateRatingLabel()
+        etContent.setHint(if (value.isFollowUp) {
+            R.string.book_review_follow_up_hint
+        } else R.string.book_review_content_hint)
         etContent.setText(value.content)
     }
 
+    private fun updateRatingLabel() = binding.run {
+        val rating = ratingBar.rating
+        tvRating.text = if (rating > 0f) {
+            getString(R.string.book_review_score, rating.toDouble())
+        } else ratingHint()
+        tvRating.setTextColor(if (rating > 0f) accentColor else getCompatColor(R.color.secondaryText))
+    }
+
     private fun ratingHint(): String = getString(when {
-        requiresRating -> R.string.book_review_required
+        requiresRating -> R.string.book_review_rating_hint
         review?.isFollowUp == true -> R.string.book_review_no_score
         else -> R.string.book_review_unrated
     })

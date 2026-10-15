@@ -20,92 +20,208 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
             android:orientation="vertical"
             android:padding="20dp">
 
-            <TextView
-                android:id="@+id/tv_book"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textColor="@color/primaryText"
-                android:textSize="18sp" />
-
-            <TextView
-                android:id="@+id/tv_author"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:textColor="@color/secondaryText"
-                android:textSize="12sp"
-                android:visibility="gone" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:labelFor="@id/rating_bar"
-                android:text="@string/book_review_rating"
-                android:textColor="@color/primaryText" />
-
-            <androidx.appcompat.widget.AppCompatRatingBar
-                android:id="@+id/rating_bar"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:isIndicator="false"
-                android:numStars="5"
-                android:rating="0"
-                android:stepSize="0.5" />
-
-            <TextView
-                android:id="@+id/tv_rating"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textColor="@color/secondaryText"
-                android:textSize="13sp" />
-
-            <io.legado.app.ui.widget.text.AccentTextView
-                android:id="@+id/tv_clear_rating"
-                android:layout_width="wrap_content"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackground"
                 android:gravity="center_vertical"
-                android:text="@string/book_review_no_score"
-                android:textSize="14sp" />
+                android:orientation="horizontal">
 
-            <TextView
+                <io.legado.app.ui.widget.image.CoverImageView
+                    android:id="@+id/iv_cover"
+                    android:layout_width="48dp"
+                    android:layout_height="64dp"
+                    android:layout_marginEnd="14dp"
+                    android:importantForAccessibility="no"
+                    android:scaleType="centerCrop" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/tv_book"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="2"
+                        android:textColor="@color/primaryText"
+                        android:textSize="18sp" />
+
+                    <TextView
+                        android:id="@+id/tv_author"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:ellipsize="end"
+                        android:maxLines="2"
+                        android:textColor="@color/secondaryText"
+                        android:textSize="12sp"
+                        android:visibility="gone" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="0.5dp"
+                android:layout_marginTop="20dp"
+                android:background="@color/bg_divider_line" />
+
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:labelFor="@id/tv_date"
-                android:text="@string/book_review_date"
-                android:textColor="@color/primaryText" />
+                android:layout_marginTop="18dp"
+                android:orientation="vertical">
 
-            <io.legado.app.ui.widget.text.AccentTextView
-                android:id="@+id/tv_date"
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:labelFor="@id/rating_bar"
+                        android:text="@string/book_review_rating"
+                        android:textColor="@color/secondaryText"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/tv_rating"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/secondaryText"
+                        android:textSize="13sp" />
+                </LinearLayout>
+
+                <androidx.appcompat.widget.AppCompatRatingBar
+                    android:id="@+id/rating_bar"
+                    style="?android:attr/ratingBarStyleIndicator"
+                    android:layout_width="wrap_content"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="6dp"
+                    android:contentDescription="@string/book_review_rating"
+                    android:isIndicator="false"
+                    android:numStars="5"
+                    android:paddingVertical="6dp"
+                    android:rating="0"
+                    android:stepSize="0.5" />
+
+                <io.legado.app.ui.widget.text.AccentTextView
+                    android:id="@+id/tv_clear_rating"
+                    android:layout_width="wrap_content"
+                    android:layout_height="48dp"
+                    android:background="?attr/selectableItemBackground"
+                    android:gravity="center_vertical"
+                    android:text="@string/book_review_no_score"
+                    android:textSize="12sp"
+                    android:visibility="gone" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="0.5dp"
+                    android:layout_marginTop="6dp"
+                    android:background="@color/bg_divider_line" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:labelFor="@id/tv_date"
+                        android:text="@string/book_review_date"
+                        android:textColor="@color/secondaryText"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/tv_date"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="?attr/selectableItemBackground"
+                        android:drawableEnd="@drawable/ic_arrow_drop_down"
+                        android:drawablePadding="4dp"
+                        android:drawableTint="@color/secondaryText"
+                        android:gravity="center"
+                        android:minHeight="48dp"
+                        android:paddingStart="12dp"
+                        android:textColor="@color/primaryText"
+                        android:textSize="14sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <View
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackground"
+                android:layout_height="0.5dp"
+                android:background="@color/bg_divider_line" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="22dp"
                 android:gravity="center_vertical"
-                android:textSize="16sp" />
+                android:orientation="horizontal">
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:labelFor="@id/et_content"
-                android:text="@string/book_review_content"
-                android:textColor="@color/primaryText" />
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:labelFor="@id/et_content"
+                    android:text="@string/book_review_content"
+                    android:textColor="@color/primaryText"
+                    android:textSize="15sp" />
+
+                <TextView
+                    android:id="@+id/tv_content_count"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/secondaryText"
+                    android:textSize="12sp" />
+            </LinearLayout>
 
             <androidx.appcompat.widget.AppCompatEditText
                 android:id="@+id/et_content"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@android:color/transparent"
                 android:gravity="top"
                 android:hint="@string/book_review_content_hint"
                 android:inputType="textCapSentences|textMultiLine"
+                android:lineSpacingExtra="5dp"
+                android:minHeight="260dp"
                 android:minLines="8"
+                android:paddingHorizontal="0dp"
+                android:paddingVertical="4dp"
                 android:textColor="@color/primaryText"
+                android:textColorHint="@color/secondaryText"
                 android:textSize="16sp" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="0.5dp"
+                android:layout_marginTop="10dp"
+                android:background="@color/bg_divider_line" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/book_review_draft_hint"
+                android:textColor="@color/secondaryText"
+                android:textSize="12sp" />
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 </LinearLayout>

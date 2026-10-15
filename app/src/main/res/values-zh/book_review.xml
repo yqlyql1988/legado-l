@@ -33,6 +33,10 @@
     <string name="book_review_date">书评日期</string>
     <string name="book_review_content">文字评价</string>
     <string name="book_review_content_hint">记下读完这本书的感受……</string>
+    <string name="book_review_follow_up_hint">这次重读，有什么新的感受……</string>
+    <string name="book_review_rating_hint">轻点星星评分</string>
+    <string name="book_review_character_count">%1$d 字</string>
+    <string name="book_review_draft_hint">未完成的内容会自动保留为草稿</string>
     <string name="book_review_empty">还没有书评，可以从书籍信息页开始写。</string>
     <string name="book_review_book_empty">还没有给这本书写过书评。</string>
     <string name="book_review_search_hint">搜索书名、作者或书评内容</string>

@@ -33,6 +33,10 @@
     <string name="book_review_date">Review date</string>
     <string name="book_review_content">Written review</string>
     <string name="book_review_content_hint">What did you think of this book?</string>
+    <string name="book_review_follow_up_hint">What stayed with you this time? Any new thoughts?</string>
+    <string name="book_review_rating_hint">Tap the stars to rate</string>
+    <string name="book_review_character_count">%1$d characters</string>
+    <string name="book_review_draft_hint">Unfinished writing is kept as a draft</string>
     <string name="book_review_empty">No book reviews yet. Open a book’s information page to write one.</string>
     <string name="book_review_book_empty">You haven’t reviewed this book yet.</string>
     <string name="book_review_search_hint">Search title, author or review</string>
