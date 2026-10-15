@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="book_reviews">My book reviews</string>
+    <string name="book_reviews_summary">Ratings, reviews and rereading follow-ups, grouped by book</string>
+    <string name="book_review_none">No review yet</string>
+    <string name="book_review_write">Write a review</string>
+    <string name="book_review_follow_up">Add a follow-up</string>
+    <string name="book_review_initial">Initial review</string>
+    <string name="book_review_follow_up_label">Follow-up</string>
+    <string name="book_review_all">All reviews</string>
+    <string name="book_review_edit">Edit review</string>
+    <string name="book_review_expand">Expand</string>
+    <string name="book_review_collapse">Collapse</string>
+    <string name="book_review_count">%1$d reviews</string>
+    <string name="book_review_archive_count">%1$d books · %2$d reviews</string>
+    <string name="book_review_score">%1$.1f / 5</string>
+    <string name="book_review_current_score">Current rating: %1$s</string>
+    <string name="book_review_no_score">Keep the previous rating</string>
+    <string name="book_review_rating">Rating</string>
+    <string name="book_review_date">Review date</string>
+    <string name="book_review_content">Written review</string>
+    <string name="book_review_content_hint">What did you think of this book?</string>
+    <string name="book_review_empty">No book reviews yet. Open a book’s information page to write one.</string>
+    <string name="book_review_book_empty">You haven’t reviewed this book yet.</string>
+    <string name="book_review_search_hint">Search title, author or review</string>
+    <string name="book_review_search_empty">No matching reviews</string>
+    <string name="book_review_saved">Review saved</string>
+    <string name="book_review_draft_restored">Unfinished draft restored</string>
+    <string name="book_review_load_failed">Couldn’t load reviews. Please try again.</string>
+    <string name="book_review_missing">This review is no longer available.</string>
+    <string name="book_review_required">Please enter a written review and a rating for the initial review.</string>
+</resources>

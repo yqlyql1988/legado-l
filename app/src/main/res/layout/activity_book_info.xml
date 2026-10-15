@@ -355,6 +355,12 @@
                             android:layout_height="wrap_content"
                             android:orientation="vertical">
 
+                            <io.legado.app.ui.book.review.BookReviewView
+                                android:id="@+id/book_review"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginBottom="12dp" />
+
                             <FrameLayout
                                 android:id="@+id/tv_intro_container"
                                 android:layout_width="match_parent"

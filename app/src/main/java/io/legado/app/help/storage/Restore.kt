@@ -17,6 +17,7 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookHighlight
 import io.legado.app.data.entities.BookMemo
+import io.legado.app.data.entities.BookReview
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.data.entities.Cache
@@ -303,6 +304,9 @@ object Restore {
         }
         fileToListT<BookMemo>(path, "bookMemo.json")?.let { memos ->
             appDb.bookMemoDao.restore(memos.filter { it.bookUrl in restoredBookUrls })
+        }
+        fileToListT<BookReview>(path, "bookReview.json")?.let { reviews ->
+            appDb.bookReviewDao.restore(reviews)
         }
         fileToListT<Bookmark>(path, "bookmark.json")?.let {
             appDb.bookmarkDao.insert(*it.toTypedArray())

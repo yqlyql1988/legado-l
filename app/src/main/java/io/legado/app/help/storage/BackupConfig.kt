@@ -32,6 +32,7 @@ object BackupConfig {
     internal const val sourceContentKey = "backupSources"
     internal const val ruleContentKey = "backupRules"
     internal const val historyContentKey = "backupHistory"
+    internal const val bookReviewContentKey = "backupBookReviews"
     internal const val readRecordCoverContentKey = "backupReadRecordCovers"
     internal const val settingContentKey = "backupSettings"
     internal const val persistedCoverContentKey = "backupPersistedCovers"
@@ -48,6 +49,7 @@ object BackupConfig {
         sourceContentKey,
         ruleContentKey,
         historyContentKey,
+        bookReviewContentKey,
         readRecordCoverContentKey,
         settingContentKey,
         persistedCoverContentKey,
@@ -63,6 +65,7 @@ object BackupConfig {
         appCtx.getString(R.string.backup_content_sources),
         appCtx.getString(R.string.backup_content_rules),
         appCtx.getString(R.string.backup_content_history),
+        appCtx.getString(R.string.book_reviews),
         appCtx.getString(R.string.backup_content_read_record_covers),
         appCtx.getString(R.string.backup_content_settings),
         appCtx.getString(R.string.backup_content_persisted_covers),

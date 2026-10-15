@@ -171,6 +171,13 @@
         <activity
             android:name=".ui.book.info.edit.BookInfoEditActivity"
             android:launchMode="singleTask" />
+        <activity
+            android:name=".ui.book.review.BookReviewActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.book.review.BookReviewEditActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
         <!-- 音频播放界面 -->
         <activity
             android:name="io.legado.app.ui.book.audio.AudioPlayActivity"
