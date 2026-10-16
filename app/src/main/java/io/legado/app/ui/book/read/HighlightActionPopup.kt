@@ -37,7 +37,6 @@ class HighlightActionPopup(
 
     private val root = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
-        setPadding(7.dpToPx(), 4.dpToPx(), 7.dpToPx(), 4.dpToPx())
     }
     private val tagRail = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
     private val tagScroll = HorizontalScrollView(context).apply {
@@ -49,6 +48,7 @@ class HighlightActionPopup(
     init {
         contentView = root
         applyMd3PopupStyle()
+        root.setPadding(7.dpToPx(), 4.dpToPx(), 7.dpToPx(), 4.dpToPx())
         isFocusable = true
         isTouchable = true
         isOutsideTouchable = true

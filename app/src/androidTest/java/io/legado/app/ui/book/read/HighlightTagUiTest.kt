@@ -134,7 +134,7 @@ class HighlightTagUiTest {
             assertTrue("Place both rows outside the visible text: $selection",
                 screenY(panel) + panel.height <= selection.top || screenY(panel) >= selection.bottom)
             val density = context.resources.displayMetrics.density
-            assertTrue("Comfortable two-row height",
+            assertTrue("Comfortable two-row height: ${panel.height / density}dp",
                 panel.height in (96 * density).toInt()..(100 * density).toInt())
             assertTrue("Comfortable action target", view.height >= (44 * density).toInt())
             assertEquals("Use the original upstream popup background",
