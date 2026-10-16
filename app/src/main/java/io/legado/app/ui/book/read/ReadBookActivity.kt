@@ -1267,7 +1267,12 @@ class ReadBookActivity : BaseReadBookActivity(),
                     ReadBook.removeHighlight(current)
                     editingHighlight = null
                 }
-                HighlightActionPopup.Action.MANAGE_TAGS -> highlightTagActivity.launch(null)
+                HighlightActionPopup.Action.MANAGE_TAGS -> highlightTagActivity.launch {
+                    putExtra("bookUrl", ReadBook.book?.bookUrl)
+                }
+                HighlightActionPopup.Action.CONFIGURE -> showDialogFragment(
+                    io.legado.app.ui.book.read.config.TextSelectMenuConfigDialog.annotations()
+                )
             }
         }, onTag = { tagId ->
             editingHighlight?.let {
@@ -1276,7 +1281,7 @@ class ReadBookActivity : BaseReadBookActivity(),
             }
         }).apply {
             refreshTags(ReadBook.highlightTags, ReadBook.highlightTagIds(highlight))
-            show(binding.textMenuPosition)
+            show(binding.textMenuPosition, binding.readView.curPage.highlightBounds(highlight))
         }
     }
 

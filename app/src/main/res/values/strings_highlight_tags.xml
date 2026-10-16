@@ -1,4 +1,16 @@
 <resources>
+    <string name="highlight_menu_config">Customize annotation actions</string>
+    <string name="highlight_tag_book">This book</string>
+    <string name="highlight_tag_global">Shared</string>
+    <string name="highlight_tag_scope">Available in</string>
+    <string name="highlight_tag_book_hint">Includes shared and book labels. Drag to set this book’s priority; the first selected label determines the style.</string>
+    <string name="highlight_tag_global_hint">Shared by all books. Drag to set the default priority for books without their own order.</string>
+    <string name="highlight_tag_edit_global_hint">Name and style changes apply to all books.</string>
+    <string name="highlight_tag_edit_book_hint">Only available in this book. Its name and style are independent.</string>
+    <string name="highlight_tag_delete_book_hint">Remove “%1$s” from this book? Annotations, base styles and notes will be kept.</string>
+    <string name="highlight_filter_all">All</string>
+    <string name="highlight_filter_untagged">Unlabeled</string>
+    <string name="highlight_filter_empty">No matching annotations.</string>
     <string name="highlight_tag_manage">Annotation labels</string>
     <string name="highlight_tag_shared">Shared by all books</string>
     <string name="highlight_tag_order_hint">Drag to reorder. Among selected labels, the first determines the style.</string>

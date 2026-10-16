@@ -1,4 +1,16 @@
 <resources>
+    <string name="highlight_menu_config">自定义标注操作栏</string>
+    <string name="highlight_tag_book">本书</string>
+    <string name="highlight_tag_global">通用</string>
+    <string name="highlight_tag_scope">适用范围</string>
+    <string name="highlight_tag_book_hint">包含本书与通用标签。拖动仅调整本书顺序，已选标签中靠前的决定样式。</string>
+    <string name="highlight_tag_global_hint">所有书籍可用。拖动调整默认顺序，已自定义顺序的书籍不受影响。</string>
+    <string name="highlight_tag_edit_global_hint">修改名称和样式后，所有使用此标签的书籍都会更新。</string>
+    <string name="highlight_tag_edit_book_hint">仅在本书中使用，名称和样式独立设置。</string>
+    <string name="highlight_tag_delete_book_hint">从本书中解除“%1$s”标签？标注、基础样式和备注仍然保留。</string>
+    <string name="highlight_filter_all">全部</string>
+    <string name="highlight_filter_untagged">无标签</string>
+    <string name="highlight_filter_empty">没有符合条件的标注。</string>
     <string name="highlight_tag_manage">标注标签管理</string>
     <string name="highlight_tag_shared">所有书籍共用</string>
     <string name="highlight_tag_order_hint">拖动调整顺序，已选标签中靠前的决定样式。</string>

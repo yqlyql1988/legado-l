@@ -16,17 +16,18 @@ import io.legado.app.lib.theme.accentColor
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getCompatColor
 
-internal fun Context.highlightTagChip(tag: HighlightTag, selected: Boolean, click: () -> Unit) =
+internal fun Context.highlightTagChip(tag: HighlightTag, selected: Boolean, compact: Boolean = false, click: () -> Unit) =
     TextView(this).apply {
         text = tag.name
         textSize = 14f
         isSingleLine = true
         gravity = Gravity.CENTER
-        minHeight = 44.dpToPx()
-        setPadding(12.dpToPx(), 6.dpToPx(), 12.dpToPx(), 6.dpToPx())
+        minHeight = (if (compact) 32 else 44).dpToPx()
+        includeFontPadding = !compact
+        setPadding(12.dpToPx(), if (compact) 0 else 6.dpToPx(), 12.dpToPx(), if (compact) 0 else 6.dpToPx())
         setTextColor(context.getCompatColor(R.color.primaryText))
         background = GradientDrawable().apply {
-            cornerRadius = 8f.dpToPx()
+            cornerRadius = 4f.dpToPx()
             setColor(if (selected) ColorUtils.setAlphaComponent(context.accentColor, 55) else Color.TRANSPARENT)
         }
         isSelected = selected

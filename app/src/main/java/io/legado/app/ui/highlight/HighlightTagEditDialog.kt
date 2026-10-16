@@ -3,6 +3,7 @@ package io.legado.app.ui.highlight
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
+import android.view.Menu
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import androidx.appcompat.app.AlertDialog
@@ -14,6 +15,7 @@ import io.legado.app.base.BaseDialogFragment
 import io.legado.app.data.entities.HighlightTag
 import io.legado.app.databinding.DialogHighlightTagEditBinding
 import io.legado.app.help.HighlightStyle
+import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.ui.book.read.UnderlineEditDialog
 import io.legado.app.ui.highlight.edit.HighlightRuleEditDialog
 import io.legado.app.utils.GSON
@@ -35,7 +37,7 @@ class HighlightTagEditDialog : BaseDialogFragment(R.layout.dialog_highlight_tag_
 
     override fun onStart() {
         super.onStart()
-        setLayout(0.95f, ViewGroup.LayoutParams.WRAP_CONTENT)
+        setLayout(1f, ViewGroup.LayoutParams.MATCH_PARENT)
     }
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
@@ -43,9 +45,35 @@ class HighlightTagEditDialog : BaseDialogFragment(R.layout.dialog_highlight_tag_
             savedInstanceState?.getString("tag") ?: arguments?.getString("tag")
         ).getOrNull() ?: HighlightTag()
         style = tag.styleObj()
-        binding.tvTitle.setText(if (arguments?.getBoolean("new") == true)
+        binding.root.setBackgroundColor(requireContext().backgroundColor)
+        binding.titleBar.title = getString(if (arguments?.getBoolean("new") == true)
             R.string.highlight_tag_add else R.string.highlight_tag_edit)
+        binding.titleBar.toolbar.setNavigationOnClickListener { dismiss() }
+        binding.titleBar.menu.add(Menu.NONE, R.id.btn_ok, Menu.NONE, R.string.action_save).apply {
+            setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_ALWAYS)
+            setOnMenuItemClickListener {
+                val name = binding.etName.text.toString().trim()
+                val updated = tag.copy(name = name, style = GSON.toJson(style.normalized()))
+                if (name.isEmpty() || (activity as? Callback)?.saveTag(updated) != true)
+                    binding.etName.error = getString(R.string.highlight_tag_duplicate)
+                else dismiss()
+                true
+            }
+        }
         binding.etName.setText(tag.name)
+        val owner = arguments?.getString("bookUrl").orEmpty()
+        binding.spScope.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item,
+            listOf(getString(R.string.highlight_tag_global), getString(R.string.highlight_tag_book)))
+        binding.spScope.setSelection(if (tag.bookUrl.isEmpty()) 0 else 1)
+        binding.spScope.isEnabled = arguments?.getBoolean("new") == true && owner.isNotEmpty()
+        binding.spScope.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+            override fun onItemSelected(parent: AdapterView<*>?, item: View?, position: Int, id: Long) {
+                if (binding.spScope.isEnabled) tag = tag.copy(bookUrl = if (position == 0) "" else owner)
+                binding.tvScopeHint.setText(if (tag.bookUrl.isEmpty())
+                    R.string.highlight_tag_edit_global_hint else R.string.highlight_tag_edit_book_hint)
+            }
+        }
         binding.spKind.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item,
             HighlightStyle.Kind.entries.map { getString(it.labelRes()) })
         binding.spKind.setSelection(underline.kind.ordinal)
@@ -64,19 +92,12 @@ class HighlightTagEditDialog : BaseDialogFragment(R.layout.dialog_highlight_tag_
         (childFragmentManager.findFragmentByTag(COLOR_TAG) as? ColorPickerDialog)
             ?.setColorPickerDialogListener(this)
         binding.btnWidth.setOnClickListener { UnderlineEditDialog.show(childFragmentManager, underline) }
-        binding.btnCancel.setOnClickListener { dismiss() }
-        binding.btnOk.setOnClickListener {
-            val name = binding.etName.text.toString().trim()
-            val updated = tag.copy(name = name, style = GSON.toJson(style.normalized()))
-            if (name.isEmpty() || (activity as? Callback)?.saveTag(updated) != true) {
-                binding.etName.error = getString(R.string.highlight_tag_duplicate)
-            } else dismiss()
-        }
         binding.btnDelete.isVisible = arguments?.getBoolean("new") != true
         binding.btnDelete.setOnClickListener {
             AlertDialog.Builder(requireContext())
                 .setTitle(R.string.highlight_tag_delete_title)
-                .setMessage(getString(R.string.highlight_tag_delete_hint, tag.name))
+                .setMessage(getString(if (tag.bookUrl.isEmpty()) R.string.highlight_tag_delete_hint
+                    else R.string.highlight_tag_delete_book_hint, tag.name))
                 .setNegativeButton(R.string.cancel, null)
                 .setPositiveButton(R.string.delete) { _, _ ->
                     (activity as? Callback)?.deleteTag(tag.id)
@@ -114,10 +135,11 @@ class HighlightTagEditDialog : BaseDialogFragment(R.layout.dialog_highlight_tag_
     companion object {
         private const val COLOR_ID = 8401
         private const val COLOR_TAG = "highlight-tag-color"
-        fun create(tag: HighlightTag, isNew: Boolean) = HighlightTagEditDialog().apply {
+        fun create(tag: HighlightTag, isNew: Boolean, bookUrl: String = "") = HighlightTagEditDialog().apply {
             arguments = Bundle().apply {
                 putString("tag", GSON.toJson(tag))
                 putBoolean("new", isNew)
+                putString("bookUrl", bookUrl)
             }
         }
     }

@@ -55,7 +55,7 @@ internal fun selectedBackupFileNames(isEnabled: (String) -> Boolean): List<Strin
         }
         if (isEnabled(BackupConfig.annotationContentKey)) {
             addAll(listOf("bookmark.json", "highlight.json", "highlightRule.json",
-                "highlightTag.json", "highlightTagLink.json"))
+                "highlightTag.json", "highlightTagLink.json", "highlightTagOrder.json"))
         }
         if (isEnabled(BackupConfig.sourceContentKey)) {
             addAll(listOf("bookSource.json", "rssSources.json", "rssStar.json", "sourceSub.json"))
@@ -280,12 +280,15 @@ object Backup {
         )
         writeListToJson(memos, "bookMemo.json", backupPath, writeEmpty = true)
         writeListToJson(appDb.bookmarkDao.all, "bookmark.json", backupPath)
-        val (highlights, highlightTags, highlightTagLinks) = appDb.runInTransaction(Callable {
-            Triple(appDb.bookHighlightDao.all, appDb.highlightTagDao.all(), appDb.highlightTagDao.links())
+        val (annotations, highlightTagOrders) = appDb.runInTransaction(Callable {
+            Triple(appDb.bookHighlightDao.all, appDb.highlightTagDao.all(), appDb.highlightTagDao.links()) to
+                appDb.highlightTagDao.orders()
         })
+        val (highlights, highlightTags, highlightTagLinks) = annotations
         writeListToJson(highlights, "highlight.json", backupPath, writeEmpty = true)
         writeListToJson(highlightTags, "highlightTag.json", backupPath, writeEmpty = true)
         writeListToJson(highlightTagLinks, "highlightTagLink.json", backupPath, writeEmpty = true)
+        writeListToJson(highlightTagOrders, "highlightTagOrder.json", backupPath, writeEmpty = true)
         writeListToJson(
             appDb.highlightRuleDao.all,
             "highlightRule.json",

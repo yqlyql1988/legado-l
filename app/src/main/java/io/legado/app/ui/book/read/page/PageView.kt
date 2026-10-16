@@ -569,6 +569,8 @@ class PageView(context: Context) : FrameLayout(context) {
         return binding.contentTextView.createHighlight(style)
     }
 
+    fun highlightBounds(highlight: BookHighlight) = binding.contentTextView.highlightBounds(highlight)
+
     fun relativePage(relativePagePos: Int): TextPage {
         return binding.contentTextView.relativePage(relativePagePos)
     }

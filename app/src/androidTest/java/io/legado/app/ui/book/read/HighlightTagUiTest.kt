@@ -16,6 +16,7 @@ import androidx.test.espresso.UiController
 import androidx.test.espresso.ViewAction
 import androidx.test.espresso.action.ViewActions.*
 import androidx.test.espresso.assertion.ViewAssertions.matches
+import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
 import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.RootMatchers.isPlatformPopup
 import androidx.test.espresso.matcher.ViewMatchers.*
@@ -56,10 +57,11 @@ class HighlightTagUiTest {
     private val prefs = context.defaultSharedPreferences
     private val savedPrefs = listOf(PreferKey.textSelectAble, PreferKey.longPressSelectParagraph,
         PreferKey.highlightLastStyle, PreferKey.preDownloadNum,
-        PreferKey.textSelectMenuConfig).associateWith { prefs.all[it] }
+        PreferKey.textSelectMenuConfig, PreferKey.highlightMenuConfig).associateWith { prefs.all[it] }
     private val savedHelp = listOf("readHelpVersion", "readMenuHelpVersion").associateWith { LocalConfig.all[it] }
     private val savedTags = appDb.highlightTagDao.all()
     private val savedLinks = appDb.highlightTagDao.links()
+    private val savedOrders = appDb.highlightTagDao.orders()
     private val savedTimes = appDb.bookHighlightDao.all.map { it.time }
     private val id = UUID.randomUUID().toString()
     private val source = BookSource(bookSourceUrl = "https://example.invalid/tag-source/$id")
@@ -79,6 +81,7 @@ class HighlightTagUiTest {
         prefs.edit().putBoolean(PreferKey.textSelectAble, true)
             .putBoolean(PreferKey.longPressSelectParagraph, true)
             .putString(PreferKey.textSelectMenuConfig, TextSelectMenuConfig.default().toJson())
+            .remove(PreferKey.highlightMenuConfig)
             .putInt(PreferKey.preDownloadNum, 0).commit()
         LocalConfig.edit().putInt("readHelpVersion", 1).putInt("readMenuHelpVersion", 1).commit()
         appDb.highlightTagDao.saveTags(tags)
@@ -99,7 +102,7 @@ class HighlightTagUiTest {
         BookHelp.clearCache(book)
         appDb.bookDao.delete(book)
         appDb.bookSourceDao.delete(source)
-        appDb.highlightTagDao.restore(savedTags, savedLinks, savedTimes)
+        appDb.highlightTagDao.restore(savedTags, savedLinks, savedTimes, savedOrders)
         prefs.edit().apply {
             savedPrefs.forEach { (key, value) -> when (value) {
                 null -> remove(key)
@@ -119,15 +122,28 @@ class HighlightTagUiTest {
         var actionY = 0
         var labelY = 0
         var labelWidth = 0
+        var textBounds: android.graphics.Rect? = null
+        scenario!!.onActivity { textBounds = it.findViewById<ReadView>(R.id.read_view).curPage.highlightBounds(highlight) }
         onView(withText(R.string.highlight_note)).inRoot(isPlatformPopup()).check { view, _ ->
             actionY = screenY(view)
+            val panel = view.parent.parent.parent.parent as View
+            val selection = requireNotNull(textBounds)
+            assertTrue("Place both rows outside the visible text: $selection",
+                screenY(panel) + panel.height <= selection.top || screenY(panel) >= selection.bottom)
+            assertTrue("Two rows should remain compact",
+                panel.height <= (70 * context.resources.displayMetrics.density).toInt())
         }
         onView(withText("赞")).inRoot(isPlatformPopup()).check { view, _ ->
             labelY = screenY(view); labelWidth = view.width
         }
         assertTrue("Labels are the second row", labelY > actionY)
+        assertTrue("Compact rows have little vertical padding",
+            labelY - actionY <= (36 * context.resources.displayMetrics.density).toInt())
         popupLabel("伏笔").perform(click())
         popupLabel("赞").perform(click())
+        onView(withText(R.string.highlight_note)).inRoot(isPlatformPopup()).check { view, _ ->
+            assertEquals("Toggling labels keeps the popup stable", actionY, screenY(view))
+        }
         popupLabel("赞").check { view, _ ->
             assertTrue(view.isSelected)
             assertEquals("赞", (view as TextView).text.toString())
@@ -167,6 +183,7 @@ class HighlightTagUiTest {
         assertEquals(appDb.bookHighlightDao.getByBook(book.bookUrl).single().styleObj(),
             ReadBook.effectiveHighlightStyle(highlight))
         assertEquals("这条备注跟着标注保留", appDb.bookHighlightDao.getByBook(book.bookUrl).single().note)
+        more()
         onView(withText(R.string.highlight_create_rule)).inRoot(isPlatformPopup()).perform(click())
         scenario!!.onActivity {
             assertTrue(it.supportFragmentManager.fragments.any { fragment ->
@@ -176,12 +193,13 @@ class HighlightTagUiTest {
         onView(withId(R.id.btn_cancel)).inRoot(isDialog()).perform(click())
         reopen()
         popupLabel("赞").perform(click())
+        more()
         onView(withText(R.string.delete)).inRoot(isPlatformPopup()).perform(click())
         assertTrue(appDb.bookHighlightDao.getByBook(book.bookUrl).isEmpty())
         assertTrue(appDb.highlightTagDao.idsForHighlight(highlight.time).isEmpty())
     }
 
-    @Test fun globalManagerCanEditAddDeleteAndReturnToTheAnnotation() {
+    @Test fun bookManagerEditsSharedLabelsAndKeepsItsOwnOrderAndNewLabelScope() {
         selectAndHighlight()
         popupLabel("伏笔").perform(click())
         onView(withContentDescription(R.string.highlight_tag_manage)).inRoot(isPlatformPopup()).perform(click())
@@ -234,10 +252,10 @@ class HighlightTagUiTest {
             isDescendantOfA(withId(R.id.recycler_view)))).perform(click())
         onView(withId(R.id.et_name)).inRoot(isDialog()).perform(replaceText("喜欢"), closeSoftKeyboard())
         screenshot("edit-label")
-        onView(withId(R.id.btn_ok)).inRoot(isDialog()).perform(scrollTo(), click())
+        onView(withId(R.id.btn_ok)).inRoot(isDialog()).perform(click())
         onView(withId(R.id.tv_add)).perform(click())
         onView(withId(R.id.et_name)).inRoot(isDialog()).perform(replaceText("情节"), closeSoftKeyboard())
-        onView(withId(R.id.btn_ok)).inRoot(isDialog()).perform(scrollTo(), click())
+        onView(withId(R.id.btn_ok)).inRoot(isDialog()).perform(click())
         onView(org.hamcrest.Matchers.allOf(withText("伏笔"),
             isDescendantOfA(withId(R.id.recycler_view)))).perform(click())
         onView(withId(R.id.btn_delete)).inRoot(isDialog()).perform(scrollTo(), click())
@@ -249,12 +267,103 @@ class HighlightTagUiTest {
         onView(withId(android.R.id.button3)).inRoot(isDialog()).perform(click())
         onView(withId(R.id.btn_save)).perform(click())
         popupLabel("喜欢").check(matches(isDisplayed()))
-        assertEquals("外貌", appDb.highlightTagDao.all().first().name)
+        assertEquals("外貌", appDb.highlightTagDao.forBook(book.bookUrl).first().name)
+        assertEquals("喜欢", appDb.highlightTagDao.forBook("another-book").first().name)
         assertTrue(appDb.highlightTagDao.all().any { it.id == tags.first().id && it.name == "喜欢" })
-        assertTrue(appDb.highlightTagDao.all().any { it.name == "情节" })
+        assertTrue(appDb.highlightTagDao.all().any { it.name == "情节" && it.bookUrl == book.bookUrl })
+        assertFalse(appDb.highlightTagDao.forBook("another-book").any { it.name == "情节" })
         assertFalse(appDb.highlightTagDao.all().any { it.name == "伏笔" })
         assertTrue(appDb.highlightTagDao.idsForHighlight(highlight.time).isEmpty())
         assertEquals(highlight.styleObj(), ReadBook.effectiveHighlightStyle(highlight))
+    }
+
+    @Test fun tocFiltersSecondaryLabelsLocalLabelsAndUntaggedAnnotationsAlongsideSearch() {
+        val first = BookHighlight(bookUrl = book.bookUrl, chapterUrl = chapter.url,
+            bookText = "标注甲", note = "保留备注", chapterPosEnd = 3)
+        val second = first.copy(time = first.time + 1, bookText = "旧版无标签", note = "")
+        val third = first.copy(time = first.time + 2, bookText = "本书线索", note = "")
+        val local = HighlightTag(id = "fixture-local-$id", name = "嫌疑人", bookUrl = book.bookUrl)
+        appDb.highlightTagDao.saveTag(local)
+        appDb.bookHighlightDao.insert(first, second, third)
+        appDb.highlightTagDao.toggle(first.time, tags[0].id)
+        appDb.highlightTagDao.toggle(first.time, tags[2].id)
+        appDb.highlightTagDao.toggle(third.time, local.id)
+        val toc = ActivityScenario.launch<io.legado.app.ui.book.toc.TocActivity>(
+            Intent(context, io.legado.app.ui.book.toc.TocActivity::class.java).putExtra("bookUrl", book.bookUrl))
+        try {
+            toc.onActivity { it.findViewById<androidx.viewpager.widget.ViewPager>(R.id.view_pager).setCurrentItem(2, false) }
+            fun awaitCount(expected: Int) {
+                val deadline = SystemClock.uptimeMillis() + 5000
+                do {
+                    var count = -1
+                    toc.onActivity { activity ->
+                        val fragments = activity.supportFragmentManager.fragments
+                        val highlightView = fragments.firstOrNull { it is io.legado.app.ui.book.toc.HighlightFragment }?.view
+                        count = highlightView?.findViewById<RecyclerView>(R.id.recycler_view)?.adapter?.itemCount ?: -1
+                    }
+                    if (count == expected) return
+                    SystemClock.sleep(60)
+                } while (SystemClock.uptimeMillis() < deadline)
+                error("Expected $expected filtered annotations")
+            }
+            fun filter(name: String) = onView(org.hamcrest.Matchers.allOf(withText(name),
+                isDescendantOfA(withId(R.id.filter_tags)))).perform(click())
+            awaitCount(3)
+            onView(org.hamcrest.Matchers.allOf(withText("外貌"), isDescendantOfA(withId(R.id.filter_tags))))
+                .check(doesNotExist())
+            filter("伏笔")
+            awaitCount(1)
+            onView(withText("标注甲")).check(matches(isDisplayed()))
+            filter("嫌疑人")
+            awaitCount(1)
+            onView(withText("本书线索")).check(matches(isDisplayed()))
+            filter(context.getString(R.string.highlight_filter_untagged))
+            awaitCount(1)
+            onView(withText("旧版无标签")).check(matches(isDisplayed()))
+            onView(withId(R.id.filter_all)).perform(click())
+            awaitCount(3)
+            filter("伏笔")
+            toc.onActivity {
+                val model = androidx.lifecycle.ViewModelProvider(it)[io.legado.app.ui.book.toc.TocViewModel::class.java]
+                model.searchKey = "不匹配的文字"
+                model.startHighlightSearch(model.searchKey)
+            }
+            awaitCount(0)
+            toc.onActivity {
+                val model = androidx.lifecycle.ViewModelProvider(it)[io.legado.app.ui.book.toc.TocViewModel::class.java]
+                model.searchKey = "保留备注"
+                model.startHighlightSearch(model.searchKey)
+            }
+            awaitCount(1)
+            screenshot("toc-label-filter")
+            toc.recreate()
+            awaitCount(1)
+        } finally { toc.close() }
+    }
+
+    @Test fun annotationActionsCanBeFoldedAndCustomOrderIsUsed() {
+        selectAndHighlight()
+        more()
+        onView(withText(R.string.highlight_menu_config)).inRoot(isPlatformPopup()).perform(click())
+        onView(org.hamcrest.Matchers.allOf(withId(R.id.iv_move), hasSibling(withText(R.string.highlight_note))))
+            .inRoot(isDialog()).perform(click())
+        androidx.test.espresso.Espresso.pressBack()
+        reopen()
+        onView(withText(R.string.highlight_note)).inRoot(isPlatformPopup()).check(doesNotExist())
+        more()
+        onView(withText(R.string.highlight_note)).inRoot(isPlatformPopup()).check(matches(isDisplayed()))
+        androidx.test.espresso.Espresso.pressBack()
+        androidx.test.espresso.Espresso.pressBack()
+        scenario!!.onActivity {
+            io.legado.app.help.HighlightMenuConfig.save(it,
+                TextSelectMenuConfig(listOf("COPY", "STYLE", "NOTE"), listOf("DELETE", "CREATE_RULE")))
+        }
+        reopen()
+        var copyX = 0
+        var styleX = 0
+        onView(withText(android.R.string.copy)).inRoot(isPlatformPopup()).check { view, _ -> copyX = screenX(view) }
+        onView(withText(R.string.highlight_style)).inRoot(isPlatformPopup()).check { view, _ -> styleX = screenX(view) }
+        assertTrue(copyX < styleX)
     }
 
     private fun selectAndHighlight() {
@@ -297,6 +406,7 @@ class HighlightTagUiTest {
         }
         instrumentation.waitForIdleSync()
     }
+    private fun more() = onView(withContentDescription(R.string.text_menu_zone_more)).inRoot(isPlatformPopup()).perform(click())
     private fun popupLabel(name: String) = onView(withText(name)).inRoot(isPlatformPopup())
     private fun screenY(view: View) = IntArray(2).also(view::getLocationOnScreen)[1]
     private fun screenX(view: View) = IntArray(2).also(view::getLocationOnScreen)[0]
