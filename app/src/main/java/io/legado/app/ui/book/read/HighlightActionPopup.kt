@@ -98,9 +98,9 @@ class HighlightActionPopup(
         text = title
         textSize = 14f
         gravity = Gravity.CENTER
-        minHeight = 44.dpToPx()
         includeFontPadding = false
         isSingleLine = true
+        minHeight = 44.dpToPx()
         setTextColor(context.getCompatColor(R.color.primaryText))
         setPadding(12.dpToPx(), 0, 12.dpToPx(), 0)
         val background = android.util.TypedValue()
