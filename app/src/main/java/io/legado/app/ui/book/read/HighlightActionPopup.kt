@@ -3,7 +3,7 @@ package io.legado.app.ui.book.read
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Rect
-import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.InsetDrawable
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -12,12 +12,10 @@ import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
 import androidx.appcompat.widget.AppCompatImageButton
-import androidx.core.graphics.ColorUtils
 import io.legado.app.R
 import io.legado.app.data.entities.HighlightTag
 import io.legado.app.help.HighlightMenuConfig
 import io.legado.app.help.HighlightPopupPosition
-import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.ui.highlight.highlightTagChip
 import io.legado.app.ui.widget.PopupAction
 import io.legado.app.ui.widget.popupActionMenu
@@ -25,7 +23,7 @@ import io.legado.app.utils.applyMd3PopupStyle
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getCompatColor
 
-/** Compact actions and an independently scrolling label row, anchored to the visible annotation. */
+/** Comfortable actions and an independently scrolling label row, anchored to the visible annotation. */
 class HighlightActionPopup(
     private val context: Context,
     private val onAction: (Action) -> Unit,
@@ -39,7 +37,6 @@ class HighlightActionPopup(
 
     private val root = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
-        setPadding(6.dpToPx(), 1.dpToPx(), 6.dpToPx(), 1.dpToPx())
     }
     private val tagRail = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
     private val tagScroll = HorizontalScrollView(context).apply {
@@ -51,12 +48,7 @@ class HighlightActionPopup(
     init {
         contentView = root
         applyMd3PopupStyle()
-        root.background = GradientDrawable().apply {
-            cornerRadius = 8f.dpToPx()
-            setColor(context.backgroundColor)
-            setStroke(1.dpToPx(), ColorUtils.setAlphaComponent(context.getCompatColor(R.color.primaryText), 22))
-        }
-        elevation = 6f.dpToPx()
+        root.setPadding(7.dpToPx(), 4.dpToPx(), 7.dpToPx(), 4.dpToPx())
         isFocusable = true
         isTouchable = true
         isOutsideTouchable = true
@@ -75,7 +67,7 @@ class HighlightActionPopup(
                 onAction(action)
             })
         }
-        firstRow.addView(actionView("⋯") { anchor ->
+        firstRow.addView(actionView("⋮") { anchor ->
             morePopup?.dismiss()
             morePopup = popupActionMenu(context) {
                 config.more.forEach { key -> item(context.getString(Action.valueOf(key).titleRes), key) }
@@ -84,13 +76,11 @@ class HighlightActionPopup(
             }.show(anchor) { key -> dismiss(); onAction(Action.valueOf(key)) }
         }.apply {
             contentDescription = context.getString(R.string.text_menu_zone_more)
+            textSize = 20f
             setPadding(0, 0, 0, 0)
         },
-            LinearLayout.LayoutParams(32.dpToPx(), -2))
+            LinearLayout.LayoutParams(44.dpToPx(), -2))
         root.addView(firstRow, LinearLayout.LayoutParams(-1, -2))
-        root.addView(View(context).apply {
-            setBackgroundColor(ColorUtils.setAlphaComponent(context.getCompatColor(R.color.primaryText), 22))
-        }, LinearLayout.LayoutParams(-1, 1.dpToPx()))
         val secondRow = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
         secondRow.addView(tagScroll, LinearLayout.LayoutParams(0, -2, 1f))
         secondRow.addView(AppCompatImageButton(context).apply {
@@ -100,7 +90,7 @@ class HighlightActionPopup(
             setBackgroundColor(android.graphics.Color.TRANSPARENT)
             setPadding(8.dpToPx(), 8.dpToPx(), 8.dpToPx(), 8.dpToPx())
             setOnClickListener { dismiss(); onAction(Action.MANAGE_TAGS) }
-        }, LinearLayout.LayoutParams(32.dpToPx(), 32.dpToPx()))
+        }, LinearLayout.LayoutParams(44.dpToPx(), 44.dpToPx()))
         root.addView(secondRow, LinearLayout.LayoutParams(-1, -2))
     }
 
@@ -108,9 +98,9 @@ class HighlightActionPopup(
         text = title
         textSize = 14f
         gravity = Gravity.CENTER
-        minHeight = 32.dpToPx()
         includeFontPadding = false
         isSingleLine = true
+        minHeight = 44.dpToPx()
         setTextColor(context.getCompatColor(R.color.primaryText))
         setPadding(12.dpToPx(), 0, 12.dpToPx(), 0)
         val background = android.util.TypedValue()
@@ -126,7 +116,13 @@ class HighlightActionPopup(
             dismiss(); onAction(Action.MANAGE_TAGS)
         })
         tags.forEach { tag ->
-            tagRail.addView(context.highlightTagChip(tag, tag.id in selectedIds, compact = true) { onTag(tag.id) })
+            tagRail.addView(
+                context.highlightTagChip(tag, tag.id in selectedIds, compact = true) { onTag(tag.id) }.apply {
+                    minHeight = 44.dpToPx()
+                    background = InsetDrawable(background, 0, 8.dpToPx(), 0, 8.dpToPx())
+                    setPadding(12.dpToPx(), 0, 12.dpToPx(), 0)
+                }
+            )
         }
         tagScroll.post { tagScroll.scrollTo(scroll, 0) }
     }
