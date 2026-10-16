@@ -32,10 +32,12 @@ class ReadRecordDeviceScopeTest {
         val restore = projectFile("src/main/java/io/legado/app/help/storage/Restore.kt")
         assertTrue(restore.contains("readRecord.deviceId.isBlank()"))
         assertTrue(restore.contains("readRecord.copy(deviceId = androidId)"))
-        assertTrue(restore.contains("restoredRecord.deviceId == androidId"))
+        assertTrue(restore.contains("readRecordDao.restoreStatistics("))
+        val dao = projectFile("src/main/java/io/legado/app/data/dao/ReadRecordDao.kt")
+        assertTrue(dao.contains("incoming.deviceId == localDeviceId"))
         assertTrue(
-            restore.contains(
-                "getRecord(restoredRecord.deviceId, restoredRecord.bookName, restoredRecord.author)"
+            dao.contains(
+                "getRecord(incoming.deviceId, incoming.bookName, incoming.author)"
             )
         )
     }

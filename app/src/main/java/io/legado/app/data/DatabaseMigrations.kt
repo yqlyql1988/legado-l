@@ -31,8 +31,24 @@ object DatabaseMigrations {
             migration_35_36, migration_36_37, migration_37_38, migration_38_39,
             migration_39_40, migration_40_41, migration_41_42, migration_42_43,
             migration_100_101, migration_104_105, migration_105_106, migration_106_107,
-            migration_107_108, migration_108_109, migration_109_110,
+            migration_107_108, migration_108_109, migration_109_110, migration_115_116,
         )
+    }
+
+    private val migration_115_116 = object : Migration(115, 116) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""CREATE TABLE IF NOT EXISTS readRecordDaily (
+                deviceId TEXT NOT NULL, bookName TEXT NOT NULL, author TEXT NOT NULL,
+                date TEXT NOT NULL, readTime INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY(deviceId, bookName, author, date))""")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_readRecordDaily_date ON readRecordDaily(date)")
+            db.execSQL("""CREATE TABLE IF NOT EXISTS readStatisticsState (
+                deviceId TEXT NOT NULL, startedAt INTEGER NOT NULL, PRIMARY KEY(deviceId))""")
+            db.execSQL("""CREATE TABLE IF NOT EXISTS readRecordHistory (
+                deviceId TEXT NOT NULL, bookName TEXT NOT NULL, author TEXT NOT NULL,
+                readTime INTEGER NOT NULL, PRIMARY KEY(deviceId, bookName, author))""")
+            db.execSQL("INSERT INTO readRecordHistory SELECT deviceId, bookName, author, max(readTime, 0) FROM readRecord")
+        }
     }
 
     private val migration_109_110 = object : Migration(109, 110) {

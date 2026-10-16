@@ -83,6 +83,8 @@ internal fun selectedBackupFileNames(isEnabled: (String) -> Boolean): List<Strin
         }
         if (isEnabled(BackupConfig.historyContentKey)) {
             addAll(listOf("readRecord.json", "searchHistory.json"))
+            addAll(listOf("readRecordDaily.json", "readStatisticsState.json"))
+            add("readRecordHistory.json")
         }
         if (isEnabled(BackupConfig.bookReviewContentKey)) {
             add("bookReview.json")
@@ -306,10 +308,21 @@ object Backup {
         )
         val includeReadRecordCovers = BackupConfig.readRecordCoverContentKey in enabledContentKeys &&
             BackupConfig.historyContentKey in enabledContentKeys
+        val history = appDb.runInTransaction(java.util.concurrent.Callable {
+            io.legado.app.help.book.ReadStatisticsBackup(
+                appDb.readRecordDao.all,
+                appDb.readRecordDao.allDaily(),
+                appDb.readRecordDao.statisticsStates(),
+                appDb.readRecordDao.allHistory(),
+            )
+        })
         writeListToJson(
-            prepareReadRecordBackup(appDb.readRecordDao.all, appCtx.externalFiles, File(backupPath), includeReadRecordCovers),
-            "readRecord.json", backupPath,
+            prepareReadRecordBackup(history.records, appCtx.externalFiles, File(backupPath), includeReadRecordCovers),
+            "readRecord.json", backupPath, writeEmpty = true,
         )
+        writeListToJson(history.daily, "readRecordDaily.json", backupPath, writeEmpty = true)
+        writeListToJson(history.states, "readStatisticsState.json", backupPath, writeEmpty = true)
+        writeListToJson(history.history, "readRecordHistory.json", backupPath, writeEmpty = true)
         writeListToJson(appDb.searchKeywordDao.all, "searchHistory.json", backupPath)
         writeListToJson(appDb.bookReviewDao.all(), "bookReview.json", backupPath, writeEmpty = true)
         writeListToJson(appDb.bookReviewDao.deletions(), "bookReviewDeletion.json", backupPath, writeEmpty = true)

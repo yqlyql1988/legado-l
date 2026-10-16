@@ -4,6 +4,9 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_margin="16dp"
+    android:foreground="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true"
     app:cardBackgroundColor="@color/background_card"
     app:cardCornerRadius="16dp"
     app:cardElevation="2dp">
@@ -45,9 +48,30 @@
             android:textSize="13sp"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toStartOf="@id/cover_stack"
-            app:layout_constraintTop_toBottomOf="@id/tv_book_count"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintVertical_bias="0" />
+            app:layout_constraintTop_toBottomOf="@id/tv_book_count" />
+
+        <TextView
+            android:id="@+id/tv_year_duration"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textColor="@color/secondaryText"
+            android:textSize="13sp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/cover_stack"
+            app:layout_constraintTop_toBottomOf="@id/tv_total_duration" />
+
+        <TextView
+            android:id="@+id/tv_statistics"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/read_statistics_open"
+            android:textColor="@color/primaryText"
+            android:textSize="14sp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tv_year_duration"
+            app:layout_constraintBottom_toBottomOf="parent" />
 
         <FrameLayout
             android:id="@+id/cover_stack"
@@ -58,7 +82,7 @@
             android:clipToPadding="false"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent">
+            app:layout_constraintBottom_toTopOf="@id/tv_statistics">
 
             <ImageView
                 android:id="@+id/cover_third"
