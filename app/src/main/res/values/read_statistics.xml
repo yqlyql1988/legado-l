@@ -18,6 +18,7 @@
     <string name="read_statistics_day_count">%1$d天</string>
     <string name="read_statistics_book_count">%1$d本</string>
     <string name="read_statistics_history">历史未分期时长：%1$s</string>
+    <string name="read_statistics_help">统计说明</string>
     <string name="read_statistics_coverage">按日明细自 %1$s 起提供，仅统计开启阅读记录期间的时间；此前的时长保留在累计中，起始年、月的明细可能不完整。</string>
     <string name="read_statistics_years_chart">每年的阅读足迹</string>
     <string name="read_statistics_months_chart">每月阅读时长</string>

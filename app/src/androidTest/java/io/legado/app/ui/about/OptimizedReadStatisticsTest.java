@@ -22,6 +22,11 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import static androidx.test.espresso.Espresso.*;
+import static androidx.test.espresso.action.ViewActions.click;
+import static androidx.test.espresso.assertion.ViewAssertions.*;
+import static androidx.test.espresso.matcher.RootMatchers.*;
+import static androidx.test.espresso.matcher.ViewMatchers.*;
 import static org.junit.Assert.*;
 
 /** Uses Android UI and SQL so the same checks run against the optimized release APK. */
@@ -35,6 +40,21 @@ public class OptimizedReadStatisticsTest {
     }
     private Intent intent(String activity) {
         return new Intent().setClassName(context.getPackageName(), "io.legado.app.ui.about." + activity);
+    }
+    private String string(String name, Object... args) {
+        int value = context.getResources().getIdentifier(name, "string", context.getPackageName());
+        assertTrue("Missing string: " + name, value != 0);
+        return context.getString(value, args);
+    }
+    private void checkStatisticsHelp(String expectedDate, String screenshotName) throws Exception {
+        String explanation = string("read_statistics_coverage", expectedDate);
+        onView(withText(explanation)).check(doesNotExist());
+        openActionBarOverflowOrOptionsMenu(context);
+        onView(withText(string("read_statistics_help"))).inRoot(isPlatformPopup()).perform(click());
+        onView(withText(explanation)).inRoot(isDialog()).check(matches(isDisplayed()));
+        screenshot(screenshotName);
+        onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click());
+        onView(withText(explanation)).check(doesNotExist());
     }
     private void screenshot(String name) throws Exception {
         InstrumentationRegistry.getInstrumentation().waitForIdleSync();
@@ -114,6 +134,7 @@ public class OptimizedReadStatisticsTest {
     @Test public void optimizedStatisticsRetainsHistoryAndRendersInteractiveCalendar() throws Exception {
         String device = "statistics-release-" + UUID.randomUUID();
         LocalDate today = LocalDate.now();
+        LocalDate firstDetail = today.minusMonths(2).withDayOfMonth(1);
         Map<String, Object> saved = savePrefs("readRecordUseDays", "readRecordShowSeconds", "themeMode");
         // Open the real activity once so Room creates/migrates the database first.
         try (ActivityScenario<Activity> initial = ActivityScenario.launch(intent("ReadStatisticsActivity"))) {
@@ -123,12 +144,29 @@ public class OptimizedReadStatisticsTest {
             null, SQLiteDatabase.OPEN_READWRITE);
         try {
             assertEquals(116, db.getVersion());
+            // Include device start dates and existing details, just like the real coverage calculation.
+            try (android.database.Cursor cursor = db.rawQuery(
+                "SELECT startedAt FROM readStatisticsState WHERE startedAt > 0", null)) {
+                while (cursor.moveToNext()) {
+                    LocalDate date = java.time.Instant.ofEpochMilli(cursor.getLong(0))
+                        .atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+                    if (date.isBefore(firstDetail)) firstDetail = date;
+                }
+            }
+            try (android.database.Cursor cursor = db.rawQuery("SELECT MIN(date) FROM readRecordDaily", null)) {
+                if (cursor.moveToFirst() && !cursor.isNull(0)) {
+                    LocalDate date = LocalDate.parse(cursor.getString(0));
+                    if (date.isBefore(firstDetail)) firstDetail = date;
+                }
+            }
             db.execSQL("INSERT INTO readRecord(deviceId,bookName,author,readTime,lastRead) VALUES(?,?,?,?,?)",
                 new Object[]{device, "山茶文具店", "小川糸", 7200000L, System.currentTimeMillis()});
             db.execSQL("INSERT INTO readRecord(deviceId,bookName,author,readTime,lastRead) VALUES(?,?,?,?,?)",
                 new Object[]{device, "昨日的世界", "茨威格", 3600000L, System.currentTimeMillis()});
             db.execSQL("INSERT INTO readRecordDaily(deviceId,bookName,author,date,readTime) VALUES(?,?,?,?,?)",
                 new Object[]{device, "山茶文具店", "小川糸", today.toString(), 1800000L});
+            db.execSQL("INSERT INTO readRecordDaily(deviceId,bookName,author,date,readTime) VALUES(?,?,?,?,?)",
+                new Object[]{device, "山茶文具店", "小川糸", firstDetail.toString(), 600000L});
             prefs().edit().putBoolean("readRecordUseDays", false).putBoolean("readRecordShowSeconds", false).commit();
             for (String theme : new String[]{"1", "2"}) {
                 prefs().edit().putString("themeMode", theme).commit();
@@ -145,8 +183,10 @@ public class OptimizedReadStatisticsTest {
                         ViewGroupRoot.assertWidth(header, content);
                     });
                     screenshot("all-" + suffix);
+                    checkStatisticsHelp(firstDetail.toString(), "help-" + suffix);
                     scenario.onActivity(activity -> activity.findViewById(id("tab_year")).performClick());
                     screenshot("year-" + suffix);
+                    checkStatisticsHelp(firstDetail.toString(), "help-year-" + suffix);
                     scenario.onActivity(activity -> {
                         activity.findViewById(id("tab_month")).performClick();
                         assertEquals(View.GONE, activity.findViewById(id("chart")).getVisibility());
@@ -172,6 +212,7 @@ public class OptimizedReadStatisticsTest {
                     screenshot("calendar-" + suffix);
                     scenario.recreate();
                     await(scenario, "tv_selected_day");
+                    checkStatisticsHelp(firstDetail.toString(), "help-month-" + suffix);
                     scenario.onActivity(activity -> assertTrue(((TextView)activity.findViewById(id("tv_selected_day")))
                         .getText().toString().startsWith(today.toString())));
                 }
