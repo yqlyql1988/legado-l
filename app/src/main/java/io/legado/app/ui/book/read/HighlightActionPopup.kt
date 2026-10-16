@@ -120,6 +120,7 @@ class HighlightActionPopup(
                 context.highlightTagChip(tag, tag.id in selectedIds, compact = true) { onTag(tag.id) }.apply {
                     minHeight = 44.dpToPx()
                     background = InsetDrawable(background, 0, 8.dpToPx(), 0, 8.dpToPx())
+                    setPadding(12.dpToPx(), 0, 12.dpToPx(), 0)
                 }
             )
         }

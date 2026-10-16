@@ -144,6 +144,8 @@ class HighlightTagUiTest {
         }
         onView(withText("赞")).inRoot(isPlatformPopup()).check { view, _ ->
             labelY = screenY(view); labelWidth = view.width
+            assertTrue("Labels retain readable horizontal spacing",
+                view.paddingLeft >= (12 * context.resources.displayMetrics.density).toInt())
         }
         assertTrue("Labels are the second row", labelY > actionY)
         assertEquals("Both rows use comfortable 44dp targets",
