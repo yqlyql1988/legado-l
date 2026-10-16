@@ -1,0 +1,26 @@
+<resources>
+    <string name="highlight_tag_manage">标注标签管理</string>
+    <string name="highlight_tag_shared">所有书籍共用</string>
+    <string name="highlight_tag_order_hint">拖动调整顺序，已选标签中靠前的决定样式。</string>
+    <string name="highlight_tag_add">新增标签</string>
+    <string name="highlight_tag_edit">编辑标签</string>
+    <string name="highlight_tag_name">标签名称</string>
+    <string name="highlight_tag_line_color">划线颜色</string>
+    <string name="highlight_tag_duplicate">请填写名称，且不能与已有标签重名。</string>
+    <string name="highlight_tag_empty">暂无标签，点击新增标签开始设置。</string>
+    <string name="highlight_tag_preview">多标签预览</string>
+    <string name="highlight_tag_preview_text">她袖口缝着一小片蓝色丝线。</string>
+    <string name="highlight_tag_primary">主标签：%1$s</string>
+    <string name="highlight_tag_preview_empty">选择标签，预览正文样式。</string>
+    <string name="highlight_tag_save">保存并应用到全部书籍</string>
+    <string name="highlight_tag_save_hint">保存后，已有标注同步采用新的标签样式。</string>
+    <string name="highlight_tag_delete_title">删除标签？</string>
+    <string name="highlight_tag_delete_hint">从所有书籍中解除“%1$s”标签？标注、基础样式和备注仍然保留。</string>
+    <string name="highlight_tag_style_hint">这里修改的是这条标注的基础样式，未选择标签时使用。</string>
+    <string name="highlight_tag_unsaved">是否保存标签修改？</string>
+    <string name="highlight_tag_discard">放弃修改</string>
+    <string name="highlight_tag_drag">移动%1$s，可拖动或使用上下方向键。</string>
+    <string name="highlight_tag_style_description">%1$s · 粗细 %2$.1f · 距离 %3$.1f</string>
+    <string name="highlight_tag_save_failed">标签保存失败，已保留当前修改。</string>
+    <string name="highlight_tag_details">标签：%1$s</string>
+</resources>

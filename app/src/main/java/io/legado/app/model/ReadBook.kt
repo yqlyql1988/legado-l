@@ -15,6 +15,8 @@ import io.legado.app.data.entities.BookHighlight
 import io.legado.app.data.entities.BookProgress
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.HighlightRule
+import io.legado.app.data.entities.HighlightTag
+import io.legado.app.data.entities.HighlightTagLink
 import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.data.entities.ReadRecord
 import io.legado.app.data.entities.updateSnapshot
@@ -24,6 +26,7 @@ import io.legado.app.help.HighlightAnchor
 import io.legado.app.help.HighlightMatcher
 import io.legado.app.help.HighlightRuleMatcher
 import io.legado.app.help.HighlightStyle
+import io.legado.app.help.HighlightTags
 import io.legado.app.help.HighlightTextBuilder
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentSaveToken
@@ -167,6 +170,9 @@ object ReadBook : CoroutineScope by MainScope() {
     var callBack: CallBack? = null
     var highlights: List<BookHighlight> = emptyList()
         private set
+    var highlightTags: List<HighlightTag> = emptyList()
+        private set
+    private var highlightTagLinks: Map<Long, List<HighlightTagLink>> = emptyMap()
     @Volatile
     private var highlightsVersion = 0L
     var highlightRules: List<HighlightRule> = emptyList()
@@ -285,7 +291,31 @@ object ReadBook : CoroutineScope by MainScope() {
     fun loadHighlights(book: Book) {
         invalidateHighlightSpacing()
         highlights = appDb.bookHighlightDao.getByBook(book.bookUrl)
+        loadHighlightTags(book.bookUrl)
         highlightsVersion++
+    }
+
+    private fun loadHighlightTags(bookUrl: String) {
+        highlightTags = appDb.highlightTagDao.all()
+        highlightTagLinks = appDb.highlightTagDao.linksForBook(bookUrl).groupBy { it.highlightTime }
+    }
+
+    fun highlightTagIds(highlight: BookHighlight): List<String> =
+        highlightTagLinks[highlight.time].orEmpty().map { it.tagId }
+
+    fun effectiveHighlightStyle(highlight: BookHighlight): HighlightStyle =
+        HighlightTags.effectiveStyle(highlight, highlightTags, highlightTagIds(highlight))
+
+    fun upHighlightTags() {
+        book?.let { loadHighlightTags(it.bookUrl) }
+        highlightsVersion++
+        invalidateHighlightSpacing()
+        callBack?.upContent(resetPageOffset = false)
+    }
+
+    fun toggleHighlightTag(highlight: BookHighlight, tagId: String) {
+        appDb.highlightTagDao.toggle(highlight.time, tagId)
+        upHighlightTags()
     }
 
     fun loadHighlightRules(book: Book) {
@@ -417,7 +447,7 @@ object ReadBook : CoroutineScope by MainScope() {
         val manual = if (titleLength >= 0) {
             anchoredHighlightsOfChapter(chapter, titleLength).map { (highlight, anchor) ->
                 HighlightMatcher.Range(anchor.start + titleLength, anchor.end + titleLength,
-                    highlight.styleObj())
+                    effectiveHighlightStyle(highlight))
             }
         } else emptyList()
         return rules + manual

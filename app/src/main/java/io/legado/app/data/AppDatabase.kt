@@ -24,6 +24,7 @@ import io.legado.app.data.dao.CookieDao
 import io.legado.app.data.dao.DictRuleDao
 import io.legado.app.data.dao.HttpTTSDao
 import io.legado.app.data.dao.HighlightRuleDao
+import io.legado.app.data.dao.HighlightTagDao
 import io.legado.app.data.dao.KeyboardAssistsDao
 import io.legado.app.data.dao.ReadRecordDao
 import io.legado.app.data.dao.ReplaceRuleDao
@@ -53,6 +54,8 @@ import io.legado.app.data.entities.Cookie
 import io.legado.app.data.entities.DictRule
 import io.legado.app.data.entities.HttpTTS
 import io.legado.app.data.entities.HighlightRule
+import io.legado.app.data.entities.HighlightTag
+import io.legado.app.data.entities.HighlightTagLink
 import io.legado.app.data.entities.KeyboardAssist
 import io.legado.app.data.entities.ReadRecord
 import io.legado.app.data.entities.ReplaceRule
@@ -66,6 +69,7 @@ import io.legado.app.data.entities.SearchKeyword
 import io.legado.app.data.entities.Server
 import io.legado.app.data.entities.TxtTocRule
 import io.legado.app.help.DefaultData
+import io.legado.app.help.HighlightTags
 import org.intellij.lang.annotations.Language
 import splitties.init.appCtx
 import java.util.Locale
@@ -80,7 +84,7 @@ val appDb by lazy {
 }
 
 @Database(
-    version = 113,
+    version = 114,
     exportSchema = true,
     entities = [Book::class, BookGroup::class, BookSource::class, BookChapter::class,
         ReplaceRule::class, SearchBook::class, SearchKeyword::class, Cookie::class,
@@ -88,7 +92,8 @@ val appDb by lazy {
         RssStar::class, TxtTocRule::class, ReadRecord::class, HttpTTS::class, Cache::class,
         RuleSub::class, DictRule::class, KeyboardAssist::class, Server::class,
         AutoTaskRule::class, BookHighlight::class, HighlightRule::class, BookSourceCheckState::class,
-        BookMemo::class, BookReview::class, BookReviewDeletion::class],
+        BookMemo::class, BookReview::class, BookReviewDeletion::class,
+        HighlightTag::class, HighlightTagLink::class],
     views = [BookSourcePart::class],
     autoMigrations = [
         AutoMigration(from = 43, to = 44),
@@ -153,7 +158,8 @@ val appDb by lazy {
         AutoMigration(from = 103, to = 104),
         AutoMigration(from = 110, to = 111),
         AutoMigration(from = 111, to = 112),
-        AutoMigration(from = 112, to = 113)
+        AutoMigration(from = 112, to = 113),
+        AutoMigration(from = 113, to = 114, spec = DatabaseMigrations.Migration_113_114::class)
     ]
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -165,6 +171,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract val bookMemoDao: BookMemoDao
     abstract val bookReviewDao: BookReviewDao
     abstract val highlightRuleDao: HighlightRuleDao
+    abstract val highlightTagDao: HighlightTagDao
     abstract val bookSourceDao: BookSourceDao
     abstract val bookChapterDao: BookChapterDao
     abstract val replaceRuleDao: ReplaceRuleDao
@@ -197,6 +204,7 @@ abstract class AppDatabase : RoomDatabase() {
         val dbCallback = object : Callback() {
 
             override fun onCreate(db: SupportSQLiteDatabase) {
+                HighlightTags.seedDefaults(db)
                 // 只在 API 级别 23 (Marshmallow) 及以上版本尝试设置区域设置
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     try {

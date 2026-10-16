@@ -125,6 +125,7 @@ import io.legado.app.ui.browser.WebViewActivity
 import io.legado.app.ui.dict.DictDialog
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.highlight.HighlightRuleActivity
+import io.legado.app.ui.highlight.HighlightTagManageActivity
 import io.legado.app.ui.highlight.edit.HighlightRuleEditDialog
 import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.replace.ReplaceRuleActivity
@@ -224,6 +225,17 @@ class ReadBookActivity : BaseReadBookActivity(),
                     resetReviewSummaryState()
                     ReadBook.loadContent(resetPageOffset = false)
                     upMenuView()
+                }
+            }
+        }
+    private val highlightTagActivity =
+        registerForActivityResult(StartActivityContract(HighlightTagManageActivity::class.java)) {
+            ReadBook.upHighlightTags()
+            editingHighlight?.let { highlight ->
+                binding.root.post {
+                    if (!isFinishing && !isDestroyed) showHighlightActionMenu(
+                        highlight, binding.textMenuPosition.x, binding.textMenuPosition.y
+                    )
                 }
             }
         }
@@ -1222,41 +1234,49 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
     private var highlightStyleDialog: HighlightStyleDialog? = null
     private var highlightPopup: PopupAction? = null
+    private var highlightActionPopup: HighlightActionPopup? = null
 
     private fun showHighlightActionMenu(highlight: BookHighlight, x: Float, y: Float) {
         editingHighlight = highlight
         binding.textMenuPosition.x = x
         binding.textMenuPosition.y = y
+        textActionMenu.dismiss()
         highlightPopup?.dismiss()
-        highlightPopup = popupActionMenu(this) {
-            item(getString(R.string.highlight_style), ACTION_HIGHLIGHT_STYLE)
-            item(getString(R.string.highlight_note), ACTION_HIGHLIGHT_NOTE)
-            item(getString(R.string.highlight_create_rule), ACTION_HIGHLIGHT_CREATE_RULE)
-            item(getString(android.R.string.copy), ACTION_HIGHLIGHT_COPY)
-            item(getString(R.string.delete), ACTION_HIGHLIGHT_DELETE)
-            danger(ACTION_HIGHLIGHT_DELETE)
-        }.show(binding.textMenuPosition) { action ->
+        highlightActionPopup?.dismiss()
+        highlightActionPopup = HighlightActionPopup(this, onAction = { action ->
+            val current = editingHighlight ?: return@HighlightActionPopup
             when (action) {
-                ACTION_HIGHLIGHT_STYLE -> {
+                HighlightActionPopup.Action.STYLE -> {
+                    if (ReadBook.highlightTagIds(current).isNotEmpty())
+                        toastOnUi(R.string.highlight_tag_style_hint)
                     val dialog = HighlightStyleDialog()
                     highlightStyleDialog = dialog
                     showDialogFragment(dialog)
                 }
 
-                ACTION_HIGHLIGHT_NOTE -> showDialogFragment(HighlightNoteDialog(highlight))
-                ACTION_HIGHLIGHT_CREATE_RULE -> showDialogFragment(
+                HighlightActionPopup.Action.NOTE -> showDialogFragment(HighlightNoteDialog(current))
+                HighlightActionPopup.Action.CREATE_RULE -> showDialogFragment(
                     HighlightRuleEditDialog.create(
-                        pattern = highlight.bookText,
+                        pattern = current.bookText,
                         scope = ReadBook.book?.name,
-                        style = highlight.style
+                        style = GSON.toJson(ReadBook.effectiveHighlightStyle(current))
                     )
                 )
-                ACTION_HIGHLIGHT_COPY -> sendToClip(highlight.bookText)
-                ACTION_HIGHLIGHT_DELETE -> {
-                    ReadBook.removeHighlight(highlight)
-                    if (editingHighlight?.time == highlight.time) editingHighlight = null
+                HighlightActionPopup.Action.COPY -> sendToClip(current.bookText)
+                HighlightActionPopup.Action.DELETE -> {
+                    ReadBook.removeHighlight(current)
+                    editingHighlight = null
                 }
+                HighlightActionPopup.Action.MANAGE_TAGS -> highlightTagActivity.launch(null)
             }
+        }, onTag = { tagId ->
+            editingHighlight?.let {
+                ReadBook.toggleHighlightTag(it, tagId)
+                highlightActionPopup?.refreshTags(ReadBook.highlightTags, ReadBook.highlightTagIds(it))
+            }
+        }).apply {
+            refreshTags(ReadBook.highlightTags, ReadBook.highlightTagIds(highlight))
+            show(binding.textMenuPosition)
         }
     }
 
@@ -1268,6 +1288,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         binding.textMenuPosition.x = x
         binding.textMenuPosition.y = y
         highlightPopup?.dismiss()
+        highlightActionPopup?.dismiss()
         highlightPopup = popupActionMenu(this) {
             item(getString(R.string.edit), ACTION_HIGHLIGHT_RULE_EDIT)
             item(getString(R.string.highlight_rule), ACTION_HIGHLIGHT_RULE_MANAGE)
@@ -1617,6 +1638,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         if (!isScroll) aloudControls.onMovement(100f)
         binding.readView.onPageChange()
         highlightPopup?.dismiss()
+        highlightActionPopup?.dismiss()
         handler.post {
             upBookmarkIndicator()
             upSeekBarProgress()
@@ -2942,6 +2964,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         popupAction.dismiss()
         readerOverflowPopup?.dismiss()
         highlightPopup?.dismiss()
+        highlightActionPopup?.dismiss()
         binding.readView.onDestroy()
         ReadBook.unregister(this)
         handler.removeCallbacksAndMessages(null) // 清理Handler消息
@@ -3102,11 +3125,6 @@ class ReadBookActivity : BaseReadBookActivity(),
         private const val ACTION_READER_ITEM_PREFIX = "readerItem:"
         private const val ACTION_READER_MORE = "readerMore"
         private const val ACTION_READER_CONFIG = "readerConfig"
-        private const val ACTION_HIGHLIGHT_STYLE = "highlightStyle"
-        private const val ACTION_HIGHLIGHT_NOTE = "highlightNote"
-        private const val ACTION_HIGHLIGHT_CREATE_RULE = "highlightCreateRule"
-        private const val ACTION_HIGHLIGHT_COPY = "highlightCopy"
-        private const val ACTION_HIGHLIGHT_DELETE = "highlightDelete"
         private const val ACTION_HIGHLIGHT_RULE_EDIT = "highlightRuleEdit"
         private const val ACTION_HIGHLIGHT_RULE_MANAGE = "highlightRuleManage"
         private const val ACTION_HIGHLIGHT_RULE_DISABLE = "highlightRuleDisable"

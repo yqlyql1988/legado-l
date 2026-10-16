@@ -5,12 +5,19 @@ import android.view.ViewGroup
 import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.data.entities.BookHighlight
+import io.legado.app.data.entities.HighlightTag
+import io.legado.app.data.entities.HighlightTagLink
+import io.legado.app.help.HighlightTags
+import io.legado.app.R
 import io.legado.app.databinding.ItemHighlightBinding
 import io.legado.app.utils.gone
 import splitties.views.onLongClick
 
 class HighlightAdapter(context: Context, private val callback: Callback) :
     RecyclerAdapter<BookHighlight, ItemHighlightBinding>(context) {
+
+    var tags: List<HighlightTag> = emptyList()
+    var tagLinks: Map<Long, List<HighlightTagLink>> = emptyMap()
 
     override fun getViewBinding(parent: ViewGroup): ItemHighlightBinding {
         return ItemHighlightBinding.inflate(inflater, parent, false)
@@ -27,7 +34,11 @@ class HighlightAdapter(context: Context, private val callback: Callback) :
         binding.tvBookText.text = item.bookText
         binding.tvNote.gone(item.note.isEmpty())
         binding.tvNote.text = item.note
-        val style = item.styleObj()
+        val ids = tagLinks[item.time].orEmpty().map { it.tagId }
+        val names = tags.filter { it.id in ids }.joinToString("、") { it.name }
+        binding.tvTags.gone(names.isEmpty())
+        binding.tvTags.text = context.getString(R.string.highlight_tag_details, names)
+        val style = HighlightTags.effectiveStyle(item, tags, ids)
         val color = style.fill.takeIf { it != 0 }
             ?: style.textColor.takeIf { it != 0 }
             ?: style.underline?.color?.takeIf { it != 0 }

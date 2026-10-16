@@ -5,6 +5,7 @@ import android.app.Instrumentation
 import android.content.Intent
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.pm.ActivityInfo
 import android.graphics.Bitmap
 import android.os.Handler
 import android.os.Looper
@@ -90,6 +91,7 @@ class HighlightGroupUiTest {
         dao.deleteAll()
         dao.insert(*fixtures.toTypedArray())
         scenario = ActivityScenario.launch(HighlightRuleActivity::class.java)
+        scenario!!.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
         awaitRules(dao.all)
     }
 
@@ -184,16 +186,33 @@ class HighlightGroupUiTest {
                 loaded
             }
             onView(withId(R.id.btn_style)).inRoot(isDialog()).perform(click())
+            instrumentation.runOnMainSync {
+                val sheet = WindowInspector.getGlobalWindowViews().single { it.hasWindowFocus() }
+                    .findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+                com.google.android.material.bottomsheet.BottomSheetBehavior.from(sheet).state =
+                    com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
+            }
+            await {
+                var expanded = false
+                instrumentation.runOnMainSync {
+                    val sheet = WindowInspector.getGlobalWindowViews().single { it.hasWindowFocus() }
+                        .findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+                    expanded = !sheet.isLayoutRequested &&
+                        com.google.android.material.bottomsheet.BottomSheetBehavior.from(sheet).state ==
+                        com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
+                }
+                expanded
+            }
         }
         fun saveStyle() {
             onView(withText(R.string.highlight_bg_color)).inRoot(isDialog()).perform(backAction())
             onView(withId(R.id.btn_ok)).inRoot(isDialog()).perform(click())
         }
         openStyle()
-        onView(withText(margin(125))).inRoot(isDialog()).perform(click())
-        instrumentation.runOnMainSync {
-            val picker = WindowInspector.getGlobalWindowViews().single { it.hasWindowFocus() }
-                .findViewById<NumberPicker>(R.id.number_picker)
+        onView(withText(margin(125))).inRoot(isDialog()).perform(scrollTo(), click())
+        onView(withId(R.id.number_picker)).inRoot(isDialog()).check { view, error ->
+            if (error != null) throw error
+            val picker = view as NumberPicker
             assertEquals(25, picker.minValue)
             assertEquals(200, picker.maxValue)
             picker.value = 150
@@ -212,7 +231,7 @@ class HighlightGroupUiTest {
         scenario!!.recreate()
         awaitRules(dao.all)
         openStyle()
-        onView(withText(margin(150))).inRoot(isDialog()).perform(click())
+        onView(withText(margin(150))).inRoot(isDialog()).perform(scrollTo(), click())
         onView(withId(android.R.id.button3)).inRoot(isDialog()).perform(click())
         onView(withText(margin(100))).inRoot(isDialog()).check(matches(isDisplayed()))
         saveStyle()

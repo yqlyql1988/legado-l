@@ -13,6 +13,13 @@ import java.util.UUID
 
 object DatabaseMigrations {
 
+    @Suppress("ClassName")
+    class Migration_113_114 : AutoMigrationSpec {
+        override fun onPostMigrate(db: SupportSQLiteDatabase) {
+            io.legado.app.help.HighlightTags.seedDefaults(db)
+        }
+    }
+
     val migrations: Array<Migration> by lazy {
         arrayOf(
             migration_10_11, migration_11_12, migration_12_13, migration_13_14,

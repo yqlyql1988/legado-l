@@ -196,7 +196,7 @@ class HighlightTocIntegrationTest {
             .map { it.androidAttribute("id") }
             .toSet()
         assertEquals(
-            setOf("@+id/tv_chapter_name", "@+id/tv_book_text", "@+id/tv_note"),
+            setOf("@+id/tv_chapter_name", "@+id/tv_book_text", "@+id/tv_tags", "@+id/tv_note"),
             ids
         )
     }
