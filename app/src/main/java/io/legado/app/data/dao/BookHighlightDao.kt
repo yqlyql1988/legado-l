@@ -2,8 +2,7 @@ package io.legado.app.data.dao
 
 import androidx.room.Dao
 import androidx.room.Delete
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
+import androidx.room.Upsert
 import androidx.room.Query
 import androidx.room.Update
 import io.legado.app.data.entities.BookHighlight
@@ -43,7 +42,8 @@ interface BookHighlightDao {
     )
     fun flowSearch(bookUrl: String, key: String): Flow<List<BookHighlight>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    // Updating an existing annotation must preserve its tag associations.
+    @Upsert
     fun insert(vararg highlight: BookHighlight)
 
     @Query(

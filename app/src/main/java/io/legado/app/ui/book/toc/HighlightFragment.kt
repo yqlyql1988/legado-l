@@ -29,6 +29,7 @@ import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -110,9 +111,14 @@ class HighlightFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmar
                     appDb.bookHighlightDao.flowByBook(book.bookUrl)
 
                 else -> appDb.bookHighlightDao.flowSearch(book.bookUrl, searchKey)
-            }.flowOn(IO).catch {
+            }.combine(appDb.highlightTagDao.flowAll()) { highlights, tags -> highlights to tags }
+                .combine(appDb.highlightTagDao.flowLinksForBook(book.bookUrl)) { (highlights, tags), links ->
+                    Triple(highlights, tags, links)
+                }.flowOn(IO).catch {
                 AppLog.put("目录界面获取标注数据失败\n${it.localizedMessage}", it)
-            }.collect { highlights ->
+            }.collect { (highlights, tags, links) ->
+                adapter?.tags = tags
+                adapter?.tagLinks = links.groupBy { it.highlightTime }
                 chapterIndexes = withContext(IO) {
                     appDb.bookChapterDao.getChapterList(book.bookUrl)
                         .associate { it.url to it.index }

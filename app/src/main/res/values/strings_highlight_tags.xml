@@ -1,0 +1,26 @@
+<resources>
+    <string name="highlight_tag_manage">Annotation labels</string>
+    <string name="highlight_tag_shared">Shared by all books</string>
+    <string name="highlight_tag_order_hint">Drag to reorder. Among selected labels, the first determines the style.</string>
+    <string name="highlight_tag_add">New label</string>
+    <string name="highlight_tag_edit">Edit label</string>
+    <string name="highlight_tag_name">Label name</string>
+    <string name="highlight_tag_line_color">Line color</string>
+    <string name="highlight_tag_duplicate">Enter a unique label name.</string>
+    <string name="highlight_tag_empty">No labels. Add one to get started.</string>
+    <string name="highlight_tag_preview">Preview with multiple labels</string>
+    <string name="highlight_tag_preview_text">A small piece of blue thread was sewn into her cuff.</string>
+    <string name="highlight_tag_primary">Primary label: %1$s</string>
+    <string name="highlight_tag_preview_empty">Choose labels to preview their style.</string>
+    <string name="highlight_tag_save">Save and apply to all books</string>
+    <string name="highlight_tag_save_hint">Existing annotations will use the updated label styles.</string>
+    <string name="highlight_tag_delete_title">Delete label?</string>
+    <string name="highlight_tag_delete_hint">Remove “%1$s” from all books? Annotations, their base styles and notes will be kept.</string>
+    <string name="highlight_tag_style_hint">This edits the annotation’s base style, used when no labels are selected.</string>
+    <string name="highlight_tag_unsaved">Save changes to labels?</string>
+    <string name="highlight_tag_discard">Discard</string>
+    <string name="highlight_tag_drag">Move %1$s. Drag, or use the up and down keys.</string>
+    <string name="highlight_tag_style_description">%1$s · width %2$.1f · distance %3$.1f</string>
+    <string name="highlight_tag_save_failed">Could not save labels. Your changes have been kept.</string>
+    <string name="highlight_tag_details">Labels: %1$s</string>
+</resources>

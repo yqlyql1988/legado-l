@@ -9,6 +9,11 @@
         app:entries="@array/language"
         app:entryValues="@array/language_value" />
 
+    <io.legado.app.lib.prefs.Preference
+        android:key="highlightTagManage"
+        android:title="@string/highlight_tag_manage"
+        android:summary="@string/highlight_tag_shared" />
+
     <io.legado.app.lib.prefs.PreferenceCategory
         android:title="@string/main_activity"
         app:allowDividerAbove="false"

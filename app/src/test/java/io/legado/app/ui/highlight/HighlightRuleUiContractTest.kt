@@ -29,7 +29,11 @@ class HighlightRuleUiContractTest {
             "src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt"
         ).readText()
 
-        assertTrue(activity.contains("ACTION_HIGHLIGHT_CREATE_RULE"))
+        val annotationPopup = projectFile(
+            "src/main/java/io/legado/app/ui/book/read/HighlightActionPopup.kt"
+        ).readText()
+        assertTrue(activity.contains("HighlightActionPopup.Action.CREATE_RULE"))
+        assertTrue(annotationPopup.contains("applyMd3PopupStyle()"))
         assertTrue(activity.contains("popupActionMenu(this)"))
         assertFalse(activity.contains("private var highlightActionMenu:"))
         assertFalse(activity.contains("HighlightRulePopup(this"))

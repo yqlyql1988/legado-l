@@ -315,11 +315,24 @@ object Restore {
         fileToListT<Bookmark>(path, "bookmark.json")?.let {
             appDb.bookmarkDao.insert(*it.toTypedArray())
         }
-        fileToListT<BookHighlight>(path, "highlight.json")?.let { highlights ->
+        val highlights = fileToListT<BookHighlight>(path, "highlight.json")
+        val highlightTags = fileToListT<io.legado.app.data.entities.HighlightTag>(path, "highlightTag.json")
+        val highlightTagLinks = fileToListT<io.legado.app.data.entities.HighlightTagLink>(path, "highlightTagLink.json")
+        if (highlights != null || highlightTags != null && highlightTagLinks != null) {
             kotlin.runCatching {
-                applyLegacyHighlightStyles(File(path, "highlight.json").readText(), highlights)
-                applyLegacyHighlightOwners(highlights)
-                appDb.bookHighlightDao.insert(*highlights.toTypedArray())
+                appDb.runInTransaction {
+                    highlights?.let {
+                        applyLegacyHighlightStyles(File(path, "highlight.json").readText(), it)
+                        applyLegacyHighlightOwners(it)
+                        appDb.bookHighlightDao.insert(*it.toTypedArray())
+                    }
+                    // Missing extension files identify an older backup: keep local tags intact.
+                    if (highlightTags != null && highlightTagLinks != null) {
+                        appDb.highlightTagDao.restore(
+                            highlightTags, highlightTagLinks, highlights.orEmpty().map { it.time }
+                        )
+                    }
+                }
             }.onFailure {
                 AppLog.put("恢复高亮出错\n${it.localizedMessage}", it)
             }

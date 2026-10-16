@@ -35,6 +35,7 @@ import io.legado.app.receiver.SharedReceiverActivity
 import io.legado.app.service.McpService
 import io.legado.app.service.WebService
 import io.legado.app.ui.file.HandleFileContract
+import io.legado.app.ui.highlight.HighlightTagManageActivity
 import io.legado.app.ui.video.config.SettingsDialog
 import io.legado.app.ui.widget.code.addJsonPattern
 import io.legado.app.ui.widget.number.NumberPickerDialog
@@ -136,6 +137,7 @@ class OtherConfigFragment : PreferenceFragment(),
 
     override fun onPreferenceTreeClick(preference: Preference): Boolean {
         when (preference.key) {
+            "highlightTagManage" -> startActivity(Intent(requireContext(), HighlightTagManageActivity::class.java))
             PreferKey.userAgent -> showUserAgentDialog()
             PreferKey.customHosts -> showCustomHostsDialog()
             PreferKey.videoSetting -> showDialogFragment(SettingsDialog(requireActivity()))
