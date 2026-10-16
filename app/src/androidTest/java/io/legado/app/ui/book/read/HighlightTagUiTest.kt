@@ -2,6 +2,7 @@ package io.legado.app.ui.book.read
 
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.drawable.GradientDrawable
 import android.os.SystemClock
 import android.view.InputDevice
 import android.view.MotionEvent
@@ -38,6 +39,8 @@ import io.legado.app.help.TextSelectMenuConfig
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.model.ReadBook
+import io.legado.app.lib.theme.bottomBackground
+import io.legado.app.utils.getCompatColor
 import io.legado.app.ui.book.read.page.ReadView
 import io.legado.app.ui.book.read.page.entities.column.TextBaseColumn
 import io.legado.app.utils.defaultSharedPreferences
@@ -130,15 +133,23 @@ class HighlightTagUiTest {
             val selection = requireNotNull(textBounds)
             assertTrue("Place both rows outside the visible text: $selection",
                 screenY(panel) + panel.height <= selection.top || screenY(panel) >= selection.bottom)
-            assertTrue("Two rows should remain compact",
-                panel.height <= (70 * context.resources.displayMetrics.density).toInt())
+            val density = context.resources.displayMetrics.density
+            assertTrue("Comfortable two-row height",
+                panel.height in (96 * density).toInt()..(100 * density).toInt())
+            assertTrue("Comfortable action target", view.height >= (44 * density).toInt())
+            assertEquals("Use the original upstream popup background",
+                context.bottomBackground, (panel.background as GradientDrawable).color?.defaultColor)
+            assertEquals("Use upstream primary text",
+                context.getCompatColor(R.color.primaryText), (view as TextView).currentTextColor)
         }
         onView(withText("赞")).inRoot(isPlatformPopup()).check { view, _ ->
             labelY = screenY(view); labelWidth = view.width
         }
         assertTrue("Labels are the second row", labelY > actionY)
-        assertTrue("Compact rows have little vertical padding",
-            labelY - actionY <= (36 * context.resources.displayMetrics.density).toInt())
+        assertEquals("Both rows use comfortable 44dp targets",
+            (44 * context.resources.displayMetrics.density).toInt(), labelY - actionY)
+        onView(withContentDescription(R.string.text_menu_zone_more)).inRoot(isPlatformPopup())
+            .check(matches(withText("⋮")))
         popupLabel("伏笔").perform(click())
         popupLabel("赞").perform(click())
         onView(withText(R.string.highlight_note)).inRoot(isPlatformPopup()).check { view, _ ->
