@@ -1,0 +1,336 @@
+package io.legado.app.ui.about
+
+import android.content.Context
+import android.content.res.ColorStateList
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
+import android.os.Bundle
+import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
+import android.widget.GridLayout
+import android.widget.TextView
+import androidx.appcompat.widget.AppCompatButton
+import androidx.core.view.isVisible
+import androidx.lifecycle.lifecycleScope
+import io.legado.app.R
+import io.legado.app.base.BaseActivity
+import io.legado.app.base.adapter.ItemViewHolder
+import io.legado.app.base.adapter.RecyclerAdapter
+import io.legado.app.data.appDb
+import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.ReadRecordShow
+import io.legado.app.databinding.ActivityReadStatisticsBinding
+import io.legado.app.databinding.ItemReadStatisticsBinding
+import io.legado.app.databinding.ViewReadStatisticsHeaderBinding
+import io.legado.app.help.book.ReadStatisticsPeriod
+import io.legado.app.help.book.ReadStatisticsSnapshot
+import io.legado.app.help.book.ReadStatisticsSummary
+import io.legado.app.help.config.AppConfig
+import io.legado.app.lib.theme.accentColor
+import io.legado.app.lib.theme.backgroundColor
+import io.legado.app.utils.ColorUtils
+import io.legado.app.utils.applyNavigationBarPadding
+import io.legado.app.utils.dpToPx
+import io.legado.app.utils.getCompatColor
+import io.legado.app.utils.viewbindingdelegate.viewBinding
+import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.time.Instant
+import java.time.LocalDate
+import java.time.YearMonth
+import java.time.ZoneId
+import java.util.concurrent.Callable
+
+class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
+    override val binding by viewBinding(ActivityReadStatisticsBinding::inflate)
+    private val header by lazy {
+        ViewReadStatisticsHeaderBinding.inflate(layoutInflater, binding.recyclerView, false)
+    }
+    private val contentPrimary get() = getCompatColor(R.color.primaryText)
+    private val contentSecondary get() = getCompatColor(R.color.secondaryText)
+    private val adapter by lazy { StatisticsAdapter(this) }
+    private var dataJob: Job? = null
+    private var snapshot = ReadStatisticsSnapshot(emptyList(), emptyList(), 0)
+    private var bookshelf: Map<Pair<String, String>, Book> = emptyMap()
+    private var period = ReadStatisticsPeriod.ALL
+    private var year = LocalDate.now().year
+    private var month = LocalDate.now().monthValue
+    private var selectedDay = LocalDate.now().toString()
+
+    override fun onActivityCreated(savedInstanceState: Bundle?) {
+        savedInstanceState?.let {
+            period = ReadStatisticsPeriod.entries.getOrElse(it.getInt("period")) { ReadStatisticsPeriod.ALL }
+            year = it.getInt("year", year)
+            month = it.getInt("month", month).coerceIn(1, 12)
+            selectedDay = it.getString("day") ?: selectedDay
+        }
+        adapter.addHeaderView { header }
+        binding.recyclerView.adapter = adapter
+        binding.recyclerView.applyNavigationBarPadding()
+        header.tabAll.setOnClickListener { selectPeriod(ReadStatisticsPeriod.ALL) }
+        header.tabYear.setOnClickListener { selectPeriod(ReadStatisticsPeriod.YEAR) }
+        header.tabMonth.setOnClickListener { selectPeriod(ReadStatisticsPeriod.MONTH) }
+        header.previousPeriod.setOnClickListener { movePeriod(-1) }
+        header.nextPeriod.setOnClickListener { movePeriod(1) }
+        val surface = ColorUtils.blendColors(backgroundColor, accentColor, .06f)
+        header.summary.background = rounded(surface)
+        header.trendPanel.background = rounded(surface)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        dataJob?.cancel()
+        dataJob = lifecycleScope.launch {
+            val loaded = withContext(IO) {
+                val stats = appDb.runInTransaction(Callable {
+                    val dao = appDb.readRecordDao
+                    ReadStatisticsSnapshot(
+                        dao.allShow, dao.dailyShow(),
+                        dao.statisticsStates().map { it.startedAt }.filter { it > 0 }.minOrNull() ?: 0,
+                    )
+                })
+                stats to appDb.bookDao.all.sortedBy { it.durChapterTime }.associateBy { it.name to it.author }
+            }
+            snapshot = loaded.first
+            bookshelf = loaded.second
+            clampPeriod()
+            render()
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putInt("period", period.ordinal)
+        outState.putInt("year", year)
+        outState.putInt("month", month)
+        outState.putString("day", selectedDay)
+        super.onSaveInstanceState(outState)
+    }
+
+    private fun earliestDate(): LocalDate {
+        val start = snapshot.startedAt.takeIf { it > 0 }?.let {
+            Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate()
+        } ?: LocalDate.now()
+        val firstDetail = snapshot.daily.minOfOrNull { it.date }?.let { LocalDate.parse(it) }
+        return minOf(start, firstDetail ?: start, LocalDate.now())
+    }
+
+    private fun clampPeriod() {
+        val today = LocalDate.now()
+        year = year.coerceIn(earliestDate().year, today.year)
+        if (period == ReadStatisticsPeriod.MONTH) {
+            val selected = YearMonth.of(year, month)
+                .coerceIn(YearMonth.from(earliestDate()), YearMonth.from(today))
+            year = selected.year
+            month = selected.monthValue
+        }
+    }
+
+    private fun selectPeriod(value: ReadStatisticsPeriod) {
+        period = value
+        clampPeriod()
+        render()
+        binding.recyclerView.scrollToPosition(0)
+    }
+
+    private fun movePeriod(offset: Long) {
+        if (period == ReadStatisticsPeriod.MONTH) {
+            val selected = YearMonth.of(year, month).plusMonths(offset)
+            year = selected.year
+            month = selected.monthValue
+        } else year += offset.toInt()
+        clampPeriod()
+        render()
+    }
+
+    private fun duration(value: Long) = formatDuring(
+        value, AppConfig.readRecordUseDays, AppConfig.readRecordShowSeconds,
+    )
+
+    private fun render() {
+        val summary = snapshot.summary(period, year, month)
+        val buttons = listOf(header.tabAll, header.tabYear, header.tabMonth)
+        buttons.forEachIndexed { index, button ->
+            val selected = index == period.ordinal
+            button.isSelected = selected
+            button.backgroundTintList = ColorStateList.valueOf(
+                ColorUtils.blendColors(backgroundColor, accentColor, if (selected) .20f else .04f),
+            )
+            button.setTextColor(if (selected) accentColor else contentPrimary)
+        }
+        val today = LocalDate.now()
+        val first = earliestDate()
+        with(header) {
+            tvPeriod.text = when (period) {
+                ReadStatisticsPeriod.ALL -> getString(R.string.read_statistics_all_period)
+                ReadStatisticsPeriod.YEAR -> getString(R.string.read_statistics_year_period, year)
+                ReadStatisticsPeriod.MONTH -> getString(R.string.read_statistics_month_period, year, month)
+            }
+            previousPeriod.isVisible = period != ReadStatisticsPeriod.ALL
+            nextPeriod.isVisible = period != ReadStatisticsPeriod.ALL
+            previousPeriod.isEnabled = if (period == ReadStatisticsPeriod.MONTH)
+                YearMonth.of(year, month) > YearMonth.from(first) else year > first.year
+            nextPeriod.isEnabled = if (period == ReadStatisticsPeriod.MONTH)
+                YearMonth.of(year, month) < YearMonth.from(today) else year < today.year
+            previousPeriod.contentDescription = getString(if (period == ReadStatisticsPeriod.MONTH)
+                R.string.read_statistics_previous_month else R.string.read_statistics_previous_year)
+            nextPeriod.contentDescription = getString(if (period == ReadStatisticsPeriod.MONTH)
+                R.string.read_statistics_next_month else R.string.read_statistics_next_year)
+            tvDurationLabel.setText(when (period) {
+                ReadStatisticsPeriod.ALL -> R.string.read_statistics_total_duration
+                ReadStatisticsPeriod.YEAR -> R.string.read_statistics_year_duration
+                ReadStatisticsPeriod.MONTH -> R.string.read_statistics_month_duration
+            })
+            tvDuration.text = duration(summary.duration)
+            tvDays.text = "${getString(R.string.read_statistics_day_count, summary.days.size)}\n${getString(R.string.read_statistics_days)}"
+            tvBooks.text = "${getString(R.string.read_statistics_book_count, summary.books.size)}\n${getString(R.string.read_statistics_books)}"
+            tvAverage.text = "${duration(summary.average)}\n${getString(R.string.read_statistics_average)}"
+            tvHistory.isVisible = period == ReadStatisticsPeriod.ALL && summary.historyDuration > 0
+            tvHistory.text = getString(R.string.read_statistics_history, duration(summary.historyDuration))
+            tvCoverage.text = getString(R.string.read_statistics_coverage, first.toString())
+            tvRankTitle.setText(when (period) {
+                ReadStatisticsPeriod.ALL -> R.string.read_statistics_all_books
+                ReadStatisticsPeriod.YEAR -> R.string.read_statistics_year_books
+                ReadStatisticsPeriod.MONTH -> R.string.read_statistics_month_books
+            })
+            tvEmpty.isVisible = summary.books.isEmpty()
+            calendarPanel.isVisible = period == ReadStatisticsPeriod.MONTH
+            chart.isVisible = period != ReadStatisticsPeriod.MONTH
+            tvPeak.isVisible = period != ReadStatisticsPeriod.MONTH
+        }
+        if (period == ReadStatisticsPeriod.MONTH) {
+            header.tvTrendTitle.setText(R.string.read_statistics_calendar)
+            renderCalendar(summary)
+        } else renderChart(summary)
+        adapter.setItems(summary.books)
+    }
+
+    private fun renderChart(summary: ReadStatisticsSummary) {
+        val bars = if (period == ReadStatisticsPeriod.ALL) {
+            header.tvTrendTitle.setText(R.string.read_statistics_years_chart)
+            (earliestDate().year..LocalDate.now().year).map { value ->
+                ReadStatisticsBar(value.toString(), summary.days.filterKeys { it.startsWith("$value-") }.values.sum())
+            }
+        } else {
+            header.tvTrendTitle.setText(R.string.read_statistics_months_chart)
+            (1..12).map { value ->
+                val prefix = YearMonth.of(year, value).toString()
+                ReadStatisticsBar(value.toString(), summary.days.filterKeys { it.startsWith(prefix) }.values.sum())
+            }
+        }
+        header.chart.bars = bars
+        val peak = bars.maxByOrNull { it.duration }
+        header.tvPeak.text = peak?.takeIf { it.duration > 0 }?.let {
+            val label = if (period == ReadStatisticsPeriod.ALL) getString(R.string.read_statistics_year_period, it.label.toInt())
+                else getString(R.string.read_statistics_month_period, year, it.label.toInt())
+            getString(R.string.read_statistics_peak, label, duration(it.duration))
+        }.orEmpty()
+    }
+
+    private fun renderCalendar(summary: ReadStatisticsSummary) {
+        val grid = header.calendarGrid
+        grid.removeAllViews()
+        val selectedMonth = YearMonth.of(year, month)
+        if (!selectedDay.startsWith("$selectedMonth-")) {
+            selectedDay = summary.days.keys.maxOrNull()
+                ?: if (selectedMonth == YearMonth.now()) LocalDate.now().toString()
+                else selectedMonth.atDay(1).toString()
+        }
+        fun addCell(view: View, height: Int) {
+            grid.addView(view, GridLayout.LayoutParams().apply {
+                width = 0
+                this.height = height.dpToPx()
+                columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
+            })
+        }
+        resources.getStringArray(R.array.read_statistics_weekdays).forEach { day ->
+            addCell(TextView(this).apply {
+                text = day
+                gravity = Gravity.CENTER
+                setTextColor(contentSecondary)
+                textSize = 12f
+            }, 32)
+        }
+        repeat(selectedMonth.atDay(1).dayOfWeek.value - 1) { addCell(View(this), 44) }
+        val max = summary.days.values.maxOrNull()?.coerceAtLeast(1) ?: 1
+        for (day in 1..selectedMonth.lengthOfMonth()) {
+            val date = selectedMonth.atDay(day)
+            val key = date.toString()
+            val elapsed = summary.days[key] ?: 0L
+            addCell(AppCompatButton(this).apply {
+                text = day.toString()
+                textSize = 13f
+                minWidth = 0
+                minimumWidth = 0
+                minHeight = 0
+                minimumHeight = 0
+                setPadding(0, 0, 0, 0)
+                isEnabled = date <= LocalDate.now()
+                isSelected = key == selectedDay
+                setTextColor(if (isEnabled) contentPrimary else contentSecondary)
+                alpha = if (isEnabled) 1f else .35f
+                val strength = if (elapsed <= 0) .03f else .15f + .50f * elapsed.toFloat() / max
+                background = rounded(ColorUtils.blendColors(backgroundColor, accentColor, strength), key == selectedDay)
+                contentDescription = getString(R.string.read_statistics_day_accessibility, key, duration(elapsed))
+                setOnClickListener {
+                    selectedDay = key
+                    renderCalendar(summary)
+                }
+            }, 44)
+        }
+        header.tvSelectedDay.text = getString(
+            R.string.read_statistics_selected_day, selectedDay, duration(summary.days[selectedDay] ?: 0),
+        )
+        header.dayBooks.removeAllViews()
+        val times = snapshot.daily.filter { it.date == selectedDay }
+            .associate { (it.bookName to it.author) to it.readTime }
+        val books = snapshot.records.mapNotNull { record ->
+            times[record.bookName to record.author]?.takeIf { it > 0 }?.let { record.copy(readTime = it) }
+        }.sortedByDescending { it.readTime }
+        if (books.isEmpty()) {
+            header.dayBooks.addView(TextView(this).apply {
+                setText(R.string.read_statistics_day_empty)
+                setTextColor(contentSecondary)
+                setPadding(0, 16.dpToPx(), 0, 8.dpToPx())
+            })
+        } else books.forEachIndexed { index, record ->
+            val row = ItemReadStatisticsBinding.inflate(layoutInflater, header.dayBooks, false)
+            bindBook(row, record, index, books.first().readTime)
+            row.root.setOnClickListener { openRecordedBook(record) }
+            header.dayBooks.addView(row.root)
+        }
+    }
+
+    private fun rounded(color: Int, selected: Boolean = false) = GradientDrawable().apply {
+        setColor(color)
+        cornerRadius = 12.dpToPx().toFloat()
+        if (selected) setStroke(2.dpToPx(), accentColor) else setStroke(2.dpToPx(), Color.TRANSPARENT)
+    }
+
+    private fun bindBook(row: ItemReadStatisticsBinding, item: ReadRecordShow, index: Int, maximum: Long) {
+        row.tvRank.text = (index + 1).toString()
+        row.tvBookName.text = item.bookName
+        row.tvAuthor.text = item.displayAuthor.ifBlank { getString(R.string.read_record_no_author) }
+        row.tvReadingTime.text = duration(item.readTime)
+        row.progress.progress = (1000.0 * item.readTime / maximum.coerceAtLeast(1)).toInt()
+        row.progress.progressTintList = ColorStateList.valueOf(accentColor)
+        loadReadRecordCover(row.ivCover, item, bookshelf[item.bookName to item.author])
+    }
+
+    private inner class StatisticsAdapter(context: Context) :
+        RecyclerAdapter<ReadRecordShow, ItemReadStatisticsBinding>(context) {
+        override fun getViewBinding(parent: ViewGroup) = ItemReadStatisticsBinding.inflate(inflater, parent, false)
+
+        override fun convert(holder: ItemViewHolder, binding: ItemReadStatisticsBinding, item: ReadRecordShow, payloads: MutableList<Any>) {
+            bindBook(binding, item, holder.layoutPosition - getHeaderCount(), getItem(0)?.readTime ?: 1)
+        }
+
+        override fun registerListener(holder: ItemViewHolder, binding: ItemReadStatisticsBinding) {
+            binding.root.setOnClickListener {
+                getItemByLayoutPosition(holder.layoutPosition)?.let { openRecordedBook(it) }
+            }
+        }
+    }
+}

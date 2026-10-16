@@ -27,7 +27,6 @@ import io.legado.app.data.entities.HttpTTS
 import io.legado.app.data.entities.HighlightRule
 import io.legado.app.data.entities.KeyboardAssist
 import io.legado.app.data.entities.ReadRecord
-import io.legado.app.data.entities.mergeRestoredReadRecord
 import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.data.entities.RssSource
 import io.legado.app.data.entities.RssStar
@@ -393,7 +392,7 @@ object Restore {
             appDb.keyboardAssistsDao.insert(*it.toTypedArray())
         }
         fileToListT<ReadRecord>(path, "readRecord.json")?.let {
-            it.forEach { readRecord ->
+            val records = it.map { readRecord ->
                 // Older backups omitted the device id; treat them as local records.
                 val normalizedRecord = if (readRecord.deviceId.isBlank()) {
                     readRecord.copy(deviceId = androidId)
@@ -404,13 +403,15 @@ object Restore {
                     normalizedRecord.coverUrl?.let { remapRestoredCoverPath(it, File(path), appCtx.externalFiles) },
                     File(path), appCtx.externalFiles,
                 ))
-                appDb.runInTransaction {
-                    val current = appDb.readRecordDao.getRecord(restoredRecord.deviceId, restoredRecord.bookName, restoredRecord.author)
-                    appDb.readRecordDao.insert(mergeRestoredReadRecord(
-                        current, restoredRecord, restoredRecord.deviceId == androidId,
-                    ))
-                }
+                restoredRecord
             }
+            appDb.readRecordDao.restoreStatistics(
+                records,
+                fileToListT<io.legado.app.data.entities.ReadRecordDaily>(path, "readRecordDaily.json"),
+                fileToListT<io.legado.app.data.entities.ReadStatisticsState>(path, "readStatisticsState.json"),
+                androidId,
+                fileToListT<io.legado.app.data.entities.ReadRecordHistory>(path, "readRecordHistory.json"),
+            )
         }
         File(path, "servers.json").takeIf {
             !lanTransfer && it.exists()

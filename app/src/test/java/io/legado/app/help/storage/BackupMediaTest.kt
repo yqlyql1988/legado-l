@@ -42,6 +42,9 @@ class BackupMediaTest {
                 "bookMemo.json",
                 "readRecord.json",
                 "searchHistory.json",
+                "readRecordDaily.json",
+                "readStatisticsState.json",
+                "readRecordHistory.json",
             ),
             selectedBackupFileNames {
                 it == "backupBookshelf" || it == "backupHistory"
@@ -77,6 +80,9 @@ class BackupMediaTest {
                 "coverRule.json",
                 "readRecord.json",
                 "searchHistory.json",
+                "readRecordDaily.json",
+                "readStatisticsState.json",
+                "readRecordHistory.json",
                 "bookReview.json",
                 "bookReviewDeletion.json",
                 "readConfig.json",
