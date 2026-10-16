@@ -82,7 +82,10 @@ class HighlightActionPopup(
                 item(context.getString(R.string.highlight_menu_config), Action.CONFIGURE.name)
                 danger(Action.DELETE.name)
             }.show(anchor) { key -> dismiss(); onAction(Action.valueOf(key)) }
-        }.apply { contentDescription = context.getString(R.string.text_menu_zone_more) },
+        }.apply {
+            contentDescription = context.getString(R.string.text_menu_zone_more)
+            setPadding(0, 0, 0, 0)
+        },
             LinearLayout.LayoutParams(32.dpToPx(), -2))
         root.addView(firstRow, LinearLayout.LayoutParams(-1, -2))
         root.addView(View(context).apply {
