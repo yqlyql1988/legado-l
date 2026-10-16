@@ -1,4 +1,4 @@
-"""阅读L source checks, verified Git backups and private-repository sync (Python 3.10+)."""
+"""阅读L source checks, verified Git backups and repository sync (Python 3.10+)."""
 
 from datetime import datetime
 from pathlib import Path, PurePosixPath
@@ -131,9 +131,9 @@ def sync():
     if git("branch", "--show-current") != "main":
         raise ManagementError("仅在 main 分支执行同步；功能分支请先通过 PR 合入")
     if git("remote", "get-url", "origin") != ORIGIN:
-        raise ManagementError("origin 与阅读L私有仓库不一致")
+        raise ManagementError("origin 与阅读L仓库不一致")
     if git("remote", "get-url", "--push", "--all", "origin").splitlines() != [ORIGIN]:
-        raise ManagementError("origin 推送地址与阅读L私有仓库不一致")
+        raise ManagementError("origin 推送地址与阅读L仓库不一致")
     git("fetch", "--no-tags", "origin", *BRANCHES)
     for branch in BRANCHES:
         git("merge-base", "--is-ancestor", f"refs/remotes/origin/{branch}", branch)

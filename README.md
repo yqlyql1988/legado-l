@@ -2,7 +2,7 @@
 
 [![阅读L检查](https://github.com/yqlyql1988/reading-l/actions/workflows/reading-l-check.yml/badge.svg)](https://github.com/yqlyql1988/reading-l/actions/workflows/reading-l-check.yml)
 
-阅读L是基于 [LegadoTeam/legado](https://github.com/LegadoTeam/legado) 的个人 Android 阅读器，源码和发布文件保存在本 GitHub 私有仓库。
+阅读L是基于 [LegadoTeam/legado](https://github.com/LegadoTeam/legado) 的个人 Android 阅读器，源码和发布文件保存在本 GitHub 公开仓库。
 
 保留上游阅读、书源、朗读、漫画、Web 服务、备份与恢复功能；个人版本提供全局书籍信息同步，可在修改书名或作者后更新书签及各设备的阅读记录，保留位置、时长和进度。
 
@@ -18,7 +18,7 @@
 | 自动检查与测试报告 | [Actions](https://github.com/yqlyql1988/reading-l/actions) |
 | 上游项目介绍与鸣谢 | [原 README](docs/UPSTREAM_README.md) |
 
-私有仓库的徽章、问题和发布页面需要登录具有访问权限的 GitHub 账号。
+源码、问题和发布页面可公开浏览，最新安装包见 [最新版本](https://github.com/yqlyql1988/reading-l/releases/latest)。
 
 ## 精简版本
 
