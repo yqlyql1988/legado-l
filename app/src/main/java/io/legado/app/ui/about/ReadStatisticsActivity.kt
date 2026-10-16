@@ -6,6 +6,8 @@ import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.Gravity
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.GridLayout
@@ -27,6 +29,7 @@ import io.legado.app.help.book.ReadStatisticsPeriod
 import io.legado.app.help.book.ReadStatisticsSnapshot
 import io.legado.app.help.book.ReadStatisticsSummary
 import io.legado.app.help.config.AppConfig
+import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.utils.ColorUtils
@@ -99,6 +102,22 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
             clampPeriod()
             render()
         }
+    }
+
+    override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.read_statistics, menu)
+        return super.onCompatCreateOptionsMenu(menu)
+    }
+
+    override fun onCompatOptionsItemSelected(item: MenuItem): Boolean {
+        if (item.itemId == R.id.menu_statistics_help) {
+            alert(R.string.read_statistics_help) {
+                setMessage(getString(R.string.read_statistics_coverage, earliestDate().toString()))
+                okButton()
+            }
+            return true
+        }
+        return super.onCompatOptionsItemSelected(item)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -189,7 +208,6 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
             tvAverage.text = "${duration(summary.average)}\n${getString(R.string.read_statistics_average)}"
             tvHistory.isVisible = period == ReadStatisticsPeriod.ALL && summary.historyDuration > 0
             tvHistory.text = getString(R.string.read_statistics_history, duration(summary.historyDuration))
-            tvCoverage.text = getString(R.string.read_statistics_coverage, first.toString())
             tvRankTitle.setText(when (period) {
                 ReadStatisticsPeriod.ALL -> R.string.read_statistics_all_books
                 ReadStatisticsPeriod.YEAR -> R.string.read_statistics_year_books
