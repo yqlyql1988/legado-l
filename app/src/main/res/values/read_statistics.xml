@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="read_statistics">阅读统计</string>
+    <string name="read_statistics_open">查看统计 ›</string>
+    <string name="read_statistics_all">累计</string>
+    <string name="read_statistics_year">年度</string>
+    <string name="read_statistics_month">月度</string>
+    <string name="read_statistics_all_period">全部阅读时光</string>
+    <string name="read_statistics_year_period">%1$d年</string>
+    <string name="read_statistics_month_period">%1$d年%2$d月</string>
+    <string name="read_statistics_this_year">今年已记录 %1$s</string>
+    <string name="read_statistics_total_duration">累计阅读时长</string>
+    <string name="read_statistics_year_duration">这一年，留给阅读的时间</string>
+    <string name="read_statistics_month_duration">这个月，留给阅读的时间</string>
+    <string name="read_statistics_days">已记录天数</string>
+    <string name="read_statistics_books">读过的书</string>
+    <string name="read_statistics_average">明细日均</string>
+    <string name="read_statistics_day_count">%1$d天</string>
+    <string name="read_statistics_book_count">%1$d本</string>
+    <string name="read_statistics_history">历史未分期时长：%1$s</string>
+    <string name="read_statistics_coverage">按日明细自 %1$s 起提供，仅统计开启阅读记录期间的时间；此前的时长保留在累计中，起始年、月的明细可能不完整。</string>
+    <string name="read_statistics_years_chart">每年的阅读足迹</string>
+    <string name="read_statistics_months_chart">每月阅读时长</string>
+    <string name="read_statistics_calendar">阅读日历</string>
+    <string name="read_statistics_hours">小时</string>
+    <string name="read_statistics_previous_year">上一年</string>
+    <string name="read_statistics_next_year">下一年</string>
+    <string name="read_statistics_previous_month">上一月</string>
+    <string name="read_statistics_next_month">下一月</string>
+    <string name="read_statistics_less">少</string>
+    <string name="read_statistics_more">多</string>
+    <string name="read_statistics_calendar_legend">底色越深，阅读时长越多；点击日期查看当天书籍</string>
+    <string name="read_statistics_selected_day">%1$s · %2$s</string>
+    <string name="read_statistics_day_accessibility">%1$s，阅读%2$s</string>
+    <string name="read_statistics_all_books">陪伴最久的书</string>
+    <string name="read_statistics_year_books">年度阅读书籍</string>
+    <string name="read_statistics_month_books">月度阅读书籍</string>
+    <string name="read_statistics_rank_hint">按阅读时长排序 · 点击继续阅读</string>
+    <string name="read_statistics_empty">这个时段还没有按日阅读记录</string>
+    <string name="read_statistics_day_empty">这一天还没有阅读记录</string>
+    <string name="read_statistics_peak">阅读最多：%1$s · %2$s</string>
+    <string-array name="read_statistics_weekdays">
+        <item>一</item><item>二</item><item>三</item><item>四</item><item>五</item><item>六</item><item>日</item>
+    </string-array>
+</resources>

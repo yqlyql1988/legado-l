@@ -87,7 +87,7 @@ class ReadRecordAuthorIdentityTest {
                 .build()
             try {
                 val dao = database.readRecordDao
-                assertEquals(111, database.openHelper.writableDatabase.version)
+                assertEquals(116, database.openHelper.writableDatabase.version)
                 assertEquals(legacy.toSet(), dao.all.toSet())
                 assertEquals(1350L, dao.allTime)
                 assertNull(dao.getRecord("phone", "Same", "Author A"))
@@ -165,7 +165,7 @@ class ReadRecordAuthorIdentityTest {
                 }, Executor { it.run() }).build()
             try {
                 val sqlite = database.openHelper.writableDatabase
-                assertEquals(111, sqlite.version)
+                assertEquals(116, sqlite.version)
                 assertEquals(records.toSet(), database.readRecordDao.all.toSet())
                 for (search in listOf(false, true)) {
                     val start = android.os.SystemClock.elapsedRealtime()
@@ -247,6 +247,8 @@ class ReadRecordAuthorIdentityTest {
     fun backupRestoreMergesExactAuthorAndDeviceWithoutAbsorbingUnknownHistory() {
         val dao = appDb.readRecordDao
         val saved = dao.all
+        val savedDaily = dao.allDaily()
+        val savedHistory = dao.allHistory()
         val directory = File(context.cacheDir, "read-record-author-backup-${UUID.randomUUID()}").apply { mkdirs() }
         val localId = AppConst.androidId
         val first = ReadRecord(deviceId = localId, bookName = "Same", author = "Author A", readTime = 1000,
@@ -289,6 +291,8 @@ class ReadRecordAuthorIdentityTest {
         } finally {
             dao.clear()
             dao.insert(*saved.toTypedArray())
+            dao.insertDaily(*savedDaily.toTypedArray())
+            dao.insertHistory(*savedHistory.toTypedArray())
             ReadRecordCoverCache.prune()
             directory.deleteRecursively()
         }
@@ -298,6 +302,8 @@ class ReadRecordAuthorIdentityTest {
     fun firstKnownAuthorReadingMergesUnknownDevicesOnceAndKeepsOtherIdentities() {
         val dao = appDb.readRecordDao
         val saved = dao.all
+        val savedDaily = dao.allDaily()
+        val savedHistory = dao.allHistory()
         val name = "Unknown author ${UUID.randomUUID()}"
         val known = ReadRecord(deviceId = AppConst.androidId, bookName = name, author = "A",
             readTime = 2000, lastRead = 20, lastChapterTitle = "Known", lastChapterIndex = 2)
@@ -340,6 +346,8 @@ class ReadRecordAuthorIdentityTest {
         } finally {
             dao.clear()
             dao.insert(*saved.toTypedArray())
+            dao.insertDaily(*savedDaily.toTypedArray())
+            dao.insertHistory(*savedHistory.toTypedArray())
         }
     }
 
@@ -347,6 +355,8 @@ class ReadRecordAuthorIdentityTest {
     fun authorAttributionSurvivesRepeatedOldBackupRestoreWithoutRecountingTime() {
         val dao = appDb.readRecordDao
         val saved = dao.all
+        val savedDaily = dao.allDaily()
+        val savedHistory = dao.allHistory()
         val name = "Author restore ${UUID.randomUUID()}"
         val directory = File(context.cacheDir, "author-attribution-${UUID.randomUUID()}").apply { mkdirs() }
         val local = ReadRecord(deviceId = AppConst.androidId, bookName = name, readTime = 7000,
@@ -405,6 +415,8 @@ class ReadRecordAuthorIdentityTest {
         } finally {
             dao.clear()
             dao.insert(*saved.toTypedArray())
+            dao.insertDaily(*savedDaily.toTypedArray())
+            dao.insertHistory(*savedHistory.toTypedArray())
             directory.deleteRecursively()
         }
     }
@@ -413,6 +425,8 @@ class ReadRecordAuthorIdentityTest {
     fun actualReadersResumeAndWriteOnlyTheirDeviceAndAuthor() {
         val dao = appDb.readRecordDao
         val saved = dao.all
+        val savedDaily = dao.allDaily()
+        val savedHistory = dao.allHistory()
         val enabled = AppConfig.enableReadRecord
         val name = "Reader identity ${UUID.randomUUID()}"
         val first = ReadRecord(deviceId = AppConst.androidId, bookName = name, author = "Author A", readTime = 10_000)
@@ -446,6 +460,8 @@ class ReadRecordAuthorIdentityTest {
                         val written = dao.getRecord(AppConst.androidId, name, baseline.author)!!
                         assertTrue("${type.simpleName}: author duration", written.readTime in (baseline.readTime + 1000)..(baseline.readTime + 10_000))
                         assertEquals(untouched, dao.all.filter { it.author != baseline.author || it.deviceId != AppConst.androidId }.toSet())
+                    assertEquals(written.readTime - baseline.readTime,
+                        dao.getDaily(AppConst.androidId, name, baseline.author).sumOf { it.readTime })
                     }
                     // BookInfo fills missing identity fields in place, without calling upData.
                     val unknownBook = Book(bookUrl = "identity:pending", name = name, author = "")
@@ -489,6 +505,8 @@ class ReadRecordAuthorIdentityTest {
                     val written = dao.getRecord(AppConst.androidId, name, baseline.author)!!
                     assertTrue("Audio: author duration", written.readTime in (baseline.readTime + 1)..(baseline.readTime + 10_000))
                     assertEquals(untouched, dao.all.filter { it.author != baseline.author || it.deviceId != AppConst.androidId }.toSet())
+                    assertEquals(written.readTime - baseline.readTime,
+                        dao.getDaily(AppConst.androidId, name, baseline.author).sumOf { it.readTime })
                 }
             } finally {
                 AudioPlay.upReadTime()
@@ -499,6 +517,8 @@ class ReadRecordAuthorIdentityTest {
             awaitWrites()
             dao.clear()
             dao.insert(*saved.toTypedArray())
+            dao.insertDaily(*savedDaily.toTypedArray())
+            dao.insertHistory(*savedHistory.toTypedArray())
             AppConfig.enableReadRecord = enabled
         }
     }
@@ -513,6 +533,8 @@ class ReadRecordAuthorIdentityTest {
         val remote = first.copy(deviceId = "remote", readTime = 900_000)
         val unknown = first.copy(author = "", readTime = 7000)
         val saved = dao.all
+        val savedDaily = dao.allDaily()
+        val savedHistory = dao.allHistory()
         try {
             AppConfig.enableReadRecord = true
             for (model in listOf(ReadBook, ReadManga, AudioPlay)) {
@@ -580,6 +602,8 @@ class ReadRecordAuthorIdentityTest {
         } finally {
             dao.clear()
             dao.insert(*saved.toTypedArray())
+            dao.insertDaily(*savedDaily.toTypedArray())
+            dao.insertHistory(*savedHistory.toTypedArray())
             AppConfig.enableReadRecord = enabled
         }
     }

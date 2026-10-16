@@ -1,0 +1,159 @@
+package io.legado.app.help.book
+
+import io.legado.app.data.entities.ReadRecord
+import io.legado.app.data.entities.ReadRecordDaily
+import io.legado.app.data.entities.ReadRecordDailyShow
+import io.legado.app.data.entities.ReadRecordShow
+import org.junit.Assert.*
+import org.junit.Test
+import java.time.ZonedDateTime
+import java.util.TimeZone
+
+class ReadStatisticsTest {
+    private fun time(value: String) = ZonedDateTime.parse(value).toInstant().toEpochMilli()
+    private fun split(end: String, elapsed: Long, zone: String = "Asia/Shanghai") =
+        splitReadInterval(time(end), elapsed, TimeZone.getTimeZone(zone))
+
+    @Test fun midnightKeepsBothDaysAndEveryMillisecond() {
+        assertEquals(listOf(ReadDayDuration("2026-10-16", 60_000), ReadDayDuration("2026-10-17", 90_001)),
+            split("2026-10-17T00:01:30.001+08:00", 150_001))
+        assertEquals(listOf(ReadDayDuration("2026-10-16", 60_000)),
+            split("2026-10-17T00:00:00+08:00", 60_000))
+    }
+
+    @Test fun monthAndYearBoundariesAreSplit() {
+        assertEquals(listOf("2026-12-31", "2027-01-01"),
+            split("2027-01-01T00:01:00+08:00", 120_000).map { it.date })
+        assertEquals(listOf("2028-02-29", "2028-03-01"),
+            split("2028-03-01T00:01:00+08:00", 120_000).map { it.date })
+    }
+
+    @Test fun daylightSavingDaysUseTheirActualLength() {
+        val spring = split("2026-03-09T00:00:00-04:00", 23 * 3_600_000L, "America/New_York")
+        val fall = split("2026-11-02T00:00:00-05:00", 25 * 3_600_000L, "America/New_York")
+        assertEquals(listOf(ReadDayDuration("2026-03-08", 23 * 3_600_000L)), spring)
+        assertEquals(listOf(ReadDayDuration("2026-11-01", 25 * 3_600_000L)), fall)
+    }
+
+    @Test fun emptyIntervalsDoNotCreateReadingDays() {
+        assertTrue(splitReadInterval(100, 0).isEmpty())
+        assertTrue(splitReadInterval(100, -1).isEmpty())
+        assertTrue(splitReadInterval(0, 100).isEmpty())
+        assertEquals(100L, splitReadInterval(100, 200, TimeZone.getTimeZone("UTC")).sumOf { it.duration })
+    }
+
+    @Test fun longIntervalsRetainTotalsAcrossManyDays() {
+        val elapsed = 370 * 86_400_000L + 12345
+        val days = split("2027-02-12T15:00:00+08:00", elapsed)
+        assertEquals(elapsed, days.sumOf { it.duration })
+        assertEquals(days.size, days.map { it.date }.distinct().size)
+    }
+
+    @Test fun malformedDatesCannotEnterStatistics() {
+        assertTrue(isReadStatisticsDate("2028-02-29"))
+        listOf("2026-02-29", "2026-13-01", "2026-10-32", "2026-1-01", "2026-01-01x", "").forEach {
+            assertFalse(it, isReadStatisticsDate(it))
+        }
+    }
+
+    private fun daily(date: String, duration: Long) = ReadRecordDaily("phone", "Book", "A", date, duration)
+    private val parent = ReadRecord("phone", "Book", "A", 1000, 100, lastChapterTitle = "Saved chapter", lastChapterIndex = 7)
+
+    @Test fun restoringNewBackupTwiceKeepsHistoryAndDatesOnce() {
+        val rows = listOf(daily("2026-10-16", 200), daily("2026-10-17", 300))
+        val first = mergeReadStatistics(null, parent, emptyList(), rows, true)
+        val second = mergeReadStatistics(first.record, parent, first.daily, rows, true)
+        assertEquals(parent, first.record)
+        assertEquals(first, second)
+        assertEquals(500L, first.record.readTime - first.daily.sumOf { it.readTime })
+    }
+
+    @Test fun differentDaysFromDivergentBackupsMergeWithoutDuplicatingOldTotal() {
+        val current = parent.copy(readTime = 1200, lastRead = 200)
+        val incoming = parent.copy(readTime = 1300, lastRead = 300, lastChapterIndex = 9)
+        val merged = mergeReadStatistics(current, incoming,
+            listOf(daily("2026-10-16", 200)), listOf(daily("2026-10-17", 300)), true, 1000, 1000)
+        assertEquals(1500L, merged.record.readTime)
+        assertEquals(9, merged.record.lastChapterIndex)
+        assertEquals(500L, merged.daily.sumOf { it.readTime })
+        assertEquals(merged, mergeReadStatistics(merged.record, incoming, merged.daily,
+            listOf(daily("2026-10-17", 300)), true, 1000, 1000))
+    }
+
+    @Test fun addingDetailsAfterAnOldFormatRestoreNeverCountsThoseDetailsTwice() {
+        val oldOnly = mergeReadStatistics(null, parent, emptyList(), null, true)
+        val enriched = mergeReadStatistics(oldOnly.record, parent, emptyList(),
+            listOf(daily("2026-10-16", 200)), true, incomingHistory = 800)
+        assertEquals(1000L, enriched.record.readTime)
+        val more = parent.copy(readTime = 2000)
+        val complete = mergeReadStatistics(enriched.record, more, enriched.daily,
+            listOf(daily("2026-10-16", 200), daily("2026-10-17", 1000)), true,
+            enriched.historyTime, 800)
+        assertEquals(2000L, complete.record.readTime)
+        assertEquals(800L, complete.historyTime)
+    }
+
+    @Test fun oldFormatTotalRemainsAFloorUntilItsMissingDailyCoverageArrives() {
+        val oldOnly = parent.copy(readTime = 2000)
+        val partial = mergeReadStatistics(oldOnly, parent, emptyList(),
+            listOf(daily("2026-10-16", 200)), true, incomingHistory = 800)
+        assertEquals(2000L, partial.record.readTime)
+        val complete = mergeReadStatistics(partial.record, oldOnly, partial.daily,
+            listOf(daily("2026-10-16", 200), daily("2026-10-17", 1000)), true,
+            partial.historyTime, 800)
+        assertEquals(2000L, complete.record.readTime)
+    }
+    @Test fun sameDayCounterUsesMaximumAndRetainsNewerPosition() {
+        val current = parent.copy(readTime = 1400, lastRead = 300)
+        val merged = mergeReadStatistics(current, parent.copy(readTime = 1200),
+            listOf(daily("2026-10-17", 400)), listOf(daily("2026-10-17", 200)), false)
+        assertEquals(current, merged.record)
+        assertEquals(listOf(daily("2026-10-17", 400)), merged.daily)
+    }
+
+    @Test fun oldBackupKeepsKnownDatesAndExistingDeviceMergeRules() {
+        val current = parent.copy(readTime = 1200)
+        val rows = listOf(daily("2026-10-17", 200))
+        val local = mergeReadStatistics(current, parent, rows, null, true)
+        assertEquals(current, local.record)
+        assertEquals(rows, local.daily)
+        val remote = mergeReadStatistics(current, parent, rows, null, false)
+        assertEquals(parent, remote.record)
+        assertEquals(rows, remote.daily)
+    }
+
+    @Test fun cumulativeKeepsOldBooksWhilePeriodsOnlyUseDatedDetails() {
+        val records = listOf(ReadRecordShow("Book", 1000, 100, "A", lastChapterIndex = 8),
+            ReadRecordShow("Old only", 9000, 10, "B"))
+        val rows = listOf(ReadRecordDailyShow("Book", "A", "2025-12-31", 100),
+            ReadRecordDailyShow("Book", "A", "2026-09-01", 200),
+            ReadRecordDailyShow("Book", "A", "2026-10-17", 300))
+        val snapshot = ReadStatisticsSnapshot(records, rows, 1)
+        val all = snapshot.summary(ReadStatisticsPeriod.ALL, 2026, 10)
+        assertEquals(10000L, all.duration)
+        assertEquals(9400L, all.historyDuration)
+        assertEquals(200L, all.average)
+        assertEquals("Old only", all.books.first().bookName)
+        val year = snapshot.summary(ReadStatisticsPeriod.YEAR, 2026, 10)
+        assertEquals(500L, year.duration)
+        assertEquals(0L, year.historyDuration)
+        assertEquals(2, year.days.size)
+        assertEquals(8, year.books.single().lastChapterIndex)
+        val month = snapshot.summary(ReadStatisticsPeriod.MONTH, 2026, 10)
+        assertEquals(300L, month.duration)
+        assertEquals(listOf("2026-10-17"), month.days.keys.toList())
+        assertTrue(snapshot.summary(ReadStatisticsPeriod.YEAR, 2024, 10).books.isEmpty())
+    }
+
+    @Test fun sameTitleDifferentAuthorsRemainSeparateInPeriodRanking() {
+        val snapshot = ReadStatisticsSnapshot(
+            listOf(ReadRecordShow("Same", 1000, 0, "A"), ReadRecordShow("Same", 2000, 0, "B")),
+            listOf(ReadRecordDailyShow("Same", "A", "2026-10-17", 100),
+                ReadRecordDailyShow("Same", "B", "2026-10-17", 200)), 1,
+        )
+        val summary = snapshot.summary(ReadStatisticsPeriod.MONTH, 2026, 10)
+        assertEquals(listOf("B", "A"), summary.books.map { it.author })
+        assertEquals(300L, summary.duration)
+        assertEquals(1, summary.days.size)
+    }
+}

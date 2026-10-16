@@ -59,6 +59,9 @@ import io.legado.app.data.entities.HighlightTagLink
 import io.legado.app.data.entities.HighlightTagOrder
 import io.legado.app.data.entities.KeyboardAssist
 import io.legado.app.data.entities.ReadRecord
+import io.legado.app.data.entities.ReadRecordDaily
+import io.legado.app.data.entities.ReadRecordHistory
+import io.legado.app.data.entities.ReadStatisticsState
 import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.data.entities.RssArticle
 import io.legado.app.data.entities.RssReadRecord
@@ -85,7 +88,7 @@ val appDb by lazy {
 }
 
 @Database(
-    version = 115,
+    version = 116,
     exportSchema = true,
     entities = [Book::class, BookGroup::class, BookSource::class, BookChapter::class,
         ReplaceRule::class, SearchBook::class, SearchKeyword::class, Cookie::class,
@@ -94,7 +97,8 @@ val appDb by lazy {
         RuleSub::class, DictRule::class, KeyboardAssist::class, Server::class,
         AutoTaskRule::class, BookHighlight::class, HighlightRule::class, BookSourceCheckState::class,
         BookMemo::class, BookReview::class, BookReviewDeletion::class,
-        HighlightTag::class, HighlightTagLink::class, HighlightTagOrder::class],
+        HighlightTag::class, HighlightTagLink::class, HighlightTagOrder::class,
+        ReadRecordDaily::class, ReadStatisticsState::class, ReadRecordHistory::class],
     views = [BookSourcePart::class],
     autoMigrations = [
         AutoMigration(from = 43, to = 44),
@@ -223,6 +227,10 @@ abstract class AppDatabase : RoomDatabase() {
             }
 
             override fun onOpen(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "INSERT OR IGNORE INTO readStatisticsState(deviceId, startedAt) VALUES (?, ?)",
+                    arrayOf<Any>(io.legado.app.constant.AppConst.androidId, System.currentTimeMillis()),
+                )
                 @Language("sql")
                 val insertBookGroupAllSql = """
                     insert into book_groups(groupId, groupName, 'order', show) 

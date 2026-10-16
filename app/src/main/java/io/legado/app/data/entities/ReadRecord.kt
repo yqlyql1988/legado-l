@@ -7,6 +7,8 @@ import io.legado.app.constant.AppConst
 import io.legado.app.data.appDb
 import io.legado.app.help.book.ReadRecordCoverCache
 import io.legado.app.help.book.ContentProcessor
+import io.legado.app.help.book.ReadDayDuration
+import io.legado.app.help.book.splitReadInterval
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonArray
 
@@ -55,19 +57,21 @@ fun ReadRecord.updateSnapshot(
 }
 
 fun ReadRecord.saveWithCover(book: Book?, elapsed: Long? = null) {
-    saveWithCover(book, elapsed, null)
+    saveWithCover(book, elapsed, null, elapsed?.let { splitReadInterval(lastRead, it) }.orEmpty())
 }
 
 /** Capture routing while the reader still holds its record lock, before submitting the write. */
 fun ReadRecord.prepareSaveWithCover(book: Book?, elapsed: Long): () -> Unit {
     val ticket = book?.let { readRecordMetadataRoutes.capture(it.bookUrl, bookName, author) }
-    return { saveWithCover(book, elapsed, ticket) }
+    val intervals = splitReadInterval(lastRead, elapsed)
+    return { saveWithCover(book, elapsed, ticket, intervals) }
 }
 
 private fun ReadRecord.saveWithCover(
     book: Book?,
     elapsed: Long?,
     ticket: ReadRecordMetadataRoutes.Ticket?,
+    intervals: List<ReadDayDuration>,
 ) {
     ticket?.let {
         val identity = readRecordMetadataRoutes.resolve(it)
@@ -84,6 +88,9 @@ private fun ReadRecord.saveWithCover(
     appDb.runInTransaction {
         if (elapsed != null && snapshotBook != null) appDb.readRecordDao.resolveUnknownAuthor(bookName, author)
         val current = appDb.readRecordDao.getRecord(deviceId, bookName, author)
+        if (current == null && elapsed != null) {
+            appDb.readRecordDao.insertHistory(ReadRecordHistory(deviceId, bookName, author, 0))
+        }
         if (elapsed != null) {
             // A reader can revisit this identity before an earlier interval reaches the queue.
             // Add the interval to the stored total instead of replacing it with a stale total.
@@ -94,6 +101,7 @@ private fun ReadRecord.saveWithCover(
         }
         saved = saved.copy(resolvedAuthor = current?.resolvedAuthor ?: saved.resolvedAuthor)
         appDb.readRecordDao.insert(saved)
+        appDb.readRecordDao.addDaily(saved, intervals, lastRead)
     }
     ReadRecordCoverCache.request(saved.copy(), snapshotBook?.getCoverSourceOrigin())
 }

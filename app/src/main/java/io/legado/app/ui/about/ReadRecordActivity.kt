@@ -1,5 +1,6 @@
 package io.legado.app.ui.about
 
+import android.content.Intent
 import android.content.Context
 import android.graphics.Color
 import android.os.Bundle
@@ -14,11 +15,7 @@ import android.widget.ImageView
 import androidx.appcompat.widget.SearchView
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
-import com.bumptech.glide.load.resource.bitmap.CenterCrop
-import com.bumptech.glide.load.resource.bitmap.RoundedCorners
-import com.bumptech.glide.request.RequestOptions
 import io.legado.app.R
-import io.legado.app.constant.PreferKey
 import io.legado.app.base.BaseActivity
 import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.base.adapter.RecyclerAdapter
@@ -31,23 +28,16 @@ import io.legado.app.databinding.ItemReadRecordDisplayBinding
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.book.ReadRecordCoverCache
-import io.legado.app.help.glide.ImageLoader
-import io.legado.app.help.glide.OkHttpModelLoader
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.backgroundColor
-import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.cnCompare
 import io.legado.app.utils.ColorUtils
-import io.legado.app.utils.dpToPx
-import io.legado.app.utils.getCompatDrawable
 import io.legado.app.utils.getInt
-import io.legado.app.utils.getPrefString
 import io.legado.app.utils.putInt
-import io.legado.app.utils.startActivityForBook
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Job
@@ -55,6 +45,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Locale
+import java.time.LocalDate
 
 internal fun formatDuring(mss: Long, useDays: Boolean = false, showSeconds: Boolean = true): String {
     val totalHours = mss / (1000 * 60 * 60)
@@ -168,6 +159,10 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
             if (ColorUtils.isColorLight(background)) background
             else ColorUtils.blendColors(background, Color.WHITE, 0.08f),
         )
+        binding.compactSummary.setOnClickListener { openStatistics() }
+        binding.enhancedSummary.root.setOnClickListener { openStatistics() }
+        binding.tvStatistics.setTextColor(accentColor)
+        binding.enhancedSummary.tvStatistics.setTextColor(accentColor)
         initSearchView()
         binding.tvBookName.setText(R.string.all_read_time)
         binding.tvRemove.setOnClickListener {
@@ -201,7 +196,7 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
     private fun initData(searchKey: String? = searchView.query?.toString()) {
         dataJob?.cancel()
         dataJob = lifecycleScope.launch {
-            val (allRecords, readRecords, books) = withContext(IO) {
+            val (allRecords, readRecords, books, yearDuration) = withContext(IO) {
                 val bookshelf = appDb.bookDao.all.sortedBy { it.durChapterTime }
                     .associateBy { it.name to it.author }
                 val all = appDb.readRecordDao.allShow
@@ -217,7 +212,9 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
                         }
                     }
                 }
-                Triple(all, sorted, bookshelf)
+                val prefix = "${LocalDate.now().year}-"
+                val yearTime = appDb.readRecordDao.dailyShow().filter { it.date.startsWith(prefix) }.sumOf { it.readTime }
+                RecordData(all, sorted, bookshelf, yearTime)
             }
             booksByIdentity = books
             val simple = AppConfig.readRecordSimpleLayout
@@ -227,6 +224,11 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
                 allRecords.sumOf { it.readTime }, AppConfig.readRecordUseDays, AppConfig.readRecordShowSeconds,
             )
             binding.tvEmpty.isVisible = readRecords.isEmpty()
+            val yearLabel = getString(R.string.read_statistics_this_year, formatDuring(
+                yearDuration, AppConfig.readRecordUseDays, AppConfig.readRecordShowSeconds,
+            ))
+            binding.tvYearDuration.text = yearLabel
+            binding.enhancedSummary.tvYearDuration.text = yearLabel
             bindSummary(allRecords)
             adapter.setItems(readRecords)
         }
@@ -256,30 +258,17 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
         }
     }
 
+    private data class RecordData(
+        val all: List<ReadRecordShow>, val filtered: List<ReadRecordShow>,
+        val books: Map<Pair<String, String>, Book>, val yearDuration: Long,
+    )
+
+    private fun openStatistics() {
+        startActivity(Intent(this, ReadStatisticsActivity::class.java))
+    }
+
     private fun loadCover(image: ImageView, record: ReadRecordShow) {
-        val placeholder = getCompatDrawable(R.drawable.read_record_cover_placeholder)
-        val fallback = getPrefString(if (AppConfig.isNightTheme) PreferKey.readRecordCoverDark else PreferKey.readRecordCover)
-        val fallbackRequest = ImageLoader.load(this, fallback)
-            .error(placeholder)
-            .transform(CenterCrop(), RoundedCorners(4.dpToPx()))
-        val book = booksByIdentity[record.bookName to record.author]
-        val cover = book?.getDisplayCover()?.takeIf { it.isNotBlank() } ?: record.coverUrl
-        var options = RequestOptions().set(
-            OkHttpModelLoader.loadOnlyWifiOption, AppConfig.loadCoverOnlyWifi,
-        )
-        book?.getCoverSourceOrigin()?.let {
-            options = options.set(OkHttpModelLoader.sourceOriginOption, it)
-        }
-        image.contentDescription = record.bookName
-        ImageLoader.load(this, cover)
-            .apply(options)
-            .placeholder(placeholder)
-            .error(ImageLoader.load(this, record.coverUrl)
-                .apply(options)
-                .error(fallbackRequest)
-                .transform(CenterCrop(), RoundedCorners(4.dpToPx())))
-            .transform(CenterCrop(), RoundedCorners(4.dpToPx()))
-            .into(image)
+        loadReadRecordCover(image, record, booksByIdentity[record.bookName to record.author])
     }
 
     private fun clearRecords() {
@@ -349,18 +338,7 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
             binding.apply {
                 root.setOnClickListener {
                     val item = getItemByLayoutPosition(holder.layoutPosition) ?: return@setOnClickListener
-                    lifecycleScope.launch {
-                        val book = withContext(IO) {
-                            appDb.bookDao.findByName(item.bookName)
-                                .filter { it.author == item.author }
-                                .maxByOrNull { it.durChapterTime }
-                        }
-                        if (book == null) {
-                            SearchActivity.start(this@ReadRecordActivity, item.bookName)
-                        } else {
-                            startActivityForBook(book)
-                        }
-                    }
+                    openRecordedBook(item)
                 }
                 compact.tvRemove.setOnClickListener {
                     getItemByLayoutPosition(holder.layoutPosition)?.let { item ->

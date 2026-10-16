@@ -56,14 +56,15 @@ class ReadRecordSnapshotContractTest {
         assertTrue(dao.contains("fun getNotShelfBooks(): List<Book>"))
 
         val restore = projectFile("src/main/java/io/legado/app/help/storage/Restore.kt")
-        assertTrue(restore.contains("mergeRestoredReadRecord("))
+        assertTrue(restore.contains("readRecordDao.restoreStatistics("))
+        assertTrue(projectFile("src/main/java/io/legado/app/help/book/ReadStatistics.kt").contains("mergeRestoredReadRecord("))
     }
 
     @Test
     fun `history backup keeps read record file enabled`() {
         val backup = projectFile("src/main/java/io/legado/app/help/storage/Backup.kt")
         assertTrue(backup.contains("addAll(listOf(\"readRecord.json\", \"searchHistory.json\"))"))
-        assertTrue(backup.contains("prepareReadRecordBackup(appDb.readRecordDao.all"))
+        assertTrue(backup.contains("prepareReadRecordBackup(history.records"))
         assertTrue(backup.contains("\"readRecord.json\", backupPath"))
     }
 
