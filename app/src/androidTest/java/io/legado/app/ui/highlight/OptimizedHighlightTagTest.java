@@ -19,6 +19,7 @@ import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.Arrays;
 
 import static androidx.test.espresso.Espresso.onData;
 import static androidx.test.espresso.Espresso.onView;
@@ -43,6 +44,15 @@ public class OptimizedHighlightTagTest {
     }
     private int id(String name) { return resource(name, "id"); }
     private String string(String name) { return context.getString(resource(name, "string")); }
+
+    @Test public void optimizedActionSettingsKeepStableBackupFieldNames() throws Exception {
+        Class<?> type = Class.forName("io.legado.app.help.TextSelectMenuConfig");
+        Object value = type.getConstructor(List.class, List.class).newInstance(
+            Arrays.asList("NOTE", "COPY"), Arrays.asList("STYLE", "CREATE_RULE", "DELETE"));
+        JSONObject json = new JSONObject((String) type.getMethod("toJson").invoke(value));
+        assertEquals("NOTE", json.getJSONArray("bar").getString(0));
+        assertEquals("STYLE", json.getJSONArray("more").getString(0));
+    }
 
     private List<ContentValues> snapshot(SQLiteDatabase db, String table) {
         List<ContentValues> rows = new ArrayList<>();

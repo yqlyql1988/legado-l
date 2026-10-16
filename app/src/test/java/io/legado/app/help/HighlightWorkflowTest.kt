@@ -51,6 +51,17 @@ class HighlightWorkflowTest {
         assertEquals(config, HighlightMenuConfig.parse(config.toJson()))
     }
 
+    @Test fun previousOptimizedMenuKeysMigrateToStableBackupNames() {
+        val config = HighlightMenuConfig.parse("""{"a":["COPY","NOTE"],"b":["STYLE","DELETE","CREATE_RULE"]}""")
+        assertEquals(listOf("COPY", "NOTE"), config.bar)
+        assertEquals(listOf("STYLE", "DELETE", "CREATE_RULE"), config.more)
+        assertTrue(config.toJson().contains("\"bar\""))
+        assertTrue(config.toJson().contains("\"more\""))
+        val selection = TextSelectMenuConfig.fromJson("""{"a":["copy"],"b":["highlight"]}""")
+        assertEquals(listOf("copy"), selection.bar)
+        assertEquals(listOf("highlight"), selection.more)
+    }
+
     private val frame = HighlightPopupPosition.Bounds(8, 32, 352, 760)
     private fun place(bounds: HighlightPopupPosition.Bounds, height: Int = 67) =
         HighlightPopupPosition.resolve(frame, bounds, 320, height, 8)

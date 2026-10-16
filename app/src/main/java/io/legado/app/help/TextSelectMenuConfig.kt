@@ -1,9 +1,14 @@
 package io.legado.app.help
 
 import com.google.gson.Gson
+import com.google.gson.annotations.SerializedName
+import androidx.annotation.Keep
 
+@Keep
 data class TextSelectMenuConfig(
+    @SerializedName(value = "bar", alternate = ["a"])
     val bar: List<String> = emptyList(),
+    @SerializedName(value = "more", alternate = ["b"])
     val more: List<String> = emptyList()
 ) {
 
