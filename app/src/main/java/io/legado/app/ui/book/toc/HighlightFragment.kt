@@ -6,13 +6,18 @@ import android.os.Bundle
 import android.view.View
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.core.view.isVisible
 import io.legado.app.R
 import io.legado.app.base.VMBaseFragment
 import io.legado.app.constant.AppLog
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookHighlight
-import io.legado.app.databinding.FragmentBookmarkBinding
+import io.legado.app.databinding.FragmentHighlightBinding
+import io.legado.app.data.entities.HighlightTag
+import io.legado.app.data.entities.HighlightTagLink
+import io.legado.app.help.HighlightTags
+import io.legado.app.ui.highlight.highlightTagChip
 import io.legado.app.help.book.isAudio
 import io.legado.app.help.book.isImage
 import io.legado.app.help.book.isLocal
@@ -50,19 +55,26 @@ internal fun highlightBodyPosition(highlight: BookHighlight): Int {
         .coerceAtLeast(0)
 }
 
-class HighlightFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmark),
+class HighlightFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_highlight),
     HighlightAdapter.Callback,
     TocViewModel.HighlightCallBack {
 
     override val viewModel by activityViewModels<TocViewModel>()
-    private val binding by viewBinding(FragmentBookmarkBinding::bind)
+    private val binding by viewBinding(FragmentHighlightBinding::bind)
     private var layoutManager: UpLinearLayoutManager? = null
     private var adapter: HighlightAdapter? = null
     private var highlightJob: Job? = null
     private var chapterIndexes = emptyMap<String, Int>()
     private var durChapterIndex = 0
+    private var selectedTag: String? = null
+    private var currentHighlights = emptyList<BookHighlight>()
+    private var currentTags = emptyList<HighlightTag>()
+    private var currentLinks = emptyMap<Long, List<HighlightTagLink>>()
+    private var usedTags = emptySet<String>()
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
+        selectedTag = savedInstanceState?.getString("tagFilter")
+        binding.filterAll.setOnClickListener { selectFilter(null) }
         viewModel.highlightCallBack = this
         initRecyclerView()
         viewModel.bookData.observe(viewLifecycleOwner) {
@@ -78,6 +90,9 @@ class HighlightFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmar
         adapter = null
         layoutManager = null
         chapterIndexes = emptyMap()
+        currentHighlights = emptyList()
+        currentTags = emptyList()
+        currentLinks = emptyMap()
         viewModel.highlightCallBack = clearCallbackIfOwned(
             viewModel.highlightCallBack,
             this
@@ -106,19 +121,28 @@ class HighlightFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmar
             return
         }
         highlightJob = viewLifecycleOwner.lifecycleScope.launch {
-            when {
+            val searched = when {
                 searchKey.isNullOrBlank() ->
                     appDb.bookHighlightDao.flowByBook(book.bookUrl)
 
                 else -> appDb.bookHighlightDao.flowSearch(book.bookUrl, searchKey)
-            }.combine(appDb.highlightTagDao.flowAll()) { highlights, tags -> highlights to tags }
-                .combine(appDb.highlightTagDao.flowLinksForBook(book.bookUrl)) { (highlights, tags), links ->
-                    Triple(highlights, tags, links)
-                }.flowOn(IO).catch {
+            }
+            var initial = true
+            combine(appDb.bookHighlightDao.flowByBook(book.bookUrl), searched,
+                appDb.highlightTagDao.flowAll(), appDb.highlightTagDao.flowLinksForBook(book.bookUrl),
+                appDb.highlightTagDao.flowOrdersForBook(book.bookUrl)) { all, highlights, tags, links, orders ->
+                FilterData(all, highlights, HighlightTags.forBook(tags, book.bookUrl, orders), links)
+            }.flowOn(IO).catch {
                 AppLog.put("目录界面获取标注数据失败\n${it.localizedMessage}", it)
-            }.collect { (highlights, tags, links) ->
+            }.collect { (all, highlights, tags, links) ->
                 adapter?.tags = tags
-                adapter?.tagLinks = links.groupBy { it.highlightTime }
+                val tagIds = tags.mapTo(hashSetOf()) { it.id }
+                currentLinks = links.filter { it.tagId in tagIds }.groupBy { it.highlightTime }
+                adapter?.tagLinks = currentLinks
+                currentTags = tags
+                val allTimes = all.mapTo(hashSetOf()) { it.time }
+                usedTags = currentLinks.filterKeys { it in allTimes }.values.flatten().mapTo(hashSetOf()) { it.tagId }
+                if (!selectedTag.isNullOrEmpty() && selectedTag !in usedTags) selectedTag = null
                 chapterIndexes = withContext(IO) {
                     appDb.bookChapterDao.getChapterList(book.bookUrl)
                         .associate { it.url to it.index }
@@ -130,16 +154,64 @@ class HighlightFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmar
                         BookHighlight::time
                     )
                 )
-                adapter?.setItems(orderedHighlights)
-                val scrollPosition = orderedHighlights
+                currentHighlights = orderedHighlights
+                renderFilters()
+                val displayed = renderHighlights()
+                val scrollPosition = displayed
                     .indexOfLast {
                         resolveHighlightChapterIndex(it, chapterIndexes)
                             ?.let { chapterIndex -> chapterIndex < durChapterIndex } == true
                     }
                     .coerceAtLeast(0)
-                layoutManager?.scrollToPositionWithOffset(scrollPosition, 0)
+                if (initial) layoutManager?.scrollToPositionWithOffset(scrollPosition, 0)
+                initial = false
             }
         }
+    }
+
+    private data class FilterData(
+        val all: List<BookHighlight>, val highlights: List<BookHighlight>,
+        val tags: List<HighlightTag>, val links: List<HighlightTagLink>
+    )
+
+    private fun selectFilter(id: String?) {
+        selectedTag = id
+        renderFilters()
+        renderHighlights()
+        layoutManager?.scrollToPositionWithOffset(0, 0)
+    }
+
+    private fun renderHighlights(): List<BookHighlight> {
+        val result = currentHighlights.filter { highlight ->
+            HighlightTags.matchesFilter(selectedTag, currentLinks[highlight.time].orEmpty().map { it.tagId })
+        }
+        adapter?.setItems(result)
+        binding.tvEmpty.isVisible = result.isEmpty()
+        return result
+    }
+
+    private fun renderFilters() {
+        val oldScroll = binding.filterScroll.scrollX
+        binding.filterTags.removeAllViews()
+        binding.filterAll.isSelected = selectedTag == null
+        binding.filterAll.background = requireContext().highlightTagChip(
+            HighlightTag(name = getString(R.string.highlight_filter_all)), selectedTag == null, compact = true
+        ) {}.background
+        currentTags.filter { it.id in usedTags }.forEach { tag ->
+            binding.filterTags.addView(requireContext().highlightTagChip(tag, selectedTag == tag.id, compact = true) {
+                selectFilter(tag.id)
+            })
+        }
+        binding.filterTags.addView(requireContext().highlightTagChip(
+            HighlightTag(id = "", name = getString(R.string.highlight_filter_untagged)),
+            selectedTag == "", compact = true
+        ) { selectFilter("") })
+        binding.filterScroll.post { binding.filterScroll.scrollTo(oldScroll, 0) }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("tagFilter", selectedTag)
+        super.onSaveInstanceState(outState)
     }
 
     override fun onClick(highlight: BookHighlight) {

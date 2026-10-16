@@ -56,6 +56,7 @@ import io.legado.app.data.entities.HttpTTS
 import io.legado.app.data.entities.HighlightRule
 import io.legado.app.data.entities.HighlightTag
 import io.legado.app.data.entities.HighlightTagLink
+import io.legado.app.data.entities.HighlightTagOrder
 import io.legado.app.data.entities.KeyboardAssist
 import io.legado.app.data.entities.ReadRecord
 import io.legado.app.data.entities.ReplaceRule
@@ -84,7 +85,7 @@ val appDb by lazy {
 }
 
 @Database(
-    version = 114,
+    version = 115,
     exportSchema = true,
     entities = [Book::class, BookGroup::class, BookSource::class, BookChapter::class,
         ReplaceRule::class, SearchBook::class, SearchKeyword::class, Cookie::class,
@@ -93,7 +94,7 @@ val appDb by lazy {
         RuleSub::class, DictRule::class, KeyboardAssist::class, Server::class,
         AutoTaskRule::class, BookHighlight::class, HighlightRule::class, BookSourceCheckState::class,
         BookMemo::class, BookReview::class, BookReviewDeletion::class,
-        HighlightTag::class, HighlightTagLink::class],
+        HighlightTag::class, HighlightTagLink::class, HighlightTagOrder::class],
     views = [BookSourcePart::class],
     autoMigrations = [
         AutoMigration(from = 43, to = 44),
@@ -159,7 +160,8 @@ val appDb by lazy {
         AutoMigration(from = 110, to = 111),
         AutoMigration(from = 111, to = 112),
         AutoMigration(from = 112, to = 113),
-        AutoMigration(from = 113, to = 114, spec = DatabaseMigrations.Migration_113_114::class)
+        AutoMigration(from = 113, to = 114, spec = DatabaseMigrations.Migration_113_114::class),
+        AutoMigration(from = 114, to = 115)
     ]
 )
 abstract class AppDatabase : RoomDatabase() {

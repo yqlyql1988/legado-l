@@ -3,6 +3,8 @@ package io.legado.app.ui.book.read.page
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Rect
+import android.graphics.RectF
 import android.os.SystemClock
 import android.util.AttributeSet
 import android.view.MotionEvent
@@ -976,6 +978,39 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
             chapterName = chapter.title,
             bookText = bookText
         ).apply { applyStyle(style) }
+    }
+
+    /** Visible text bounds, using the same anchors and column offsets as painting/hit testing. */
+    fun highlightBounds(highlight: BookHighlight): Rect? {
+        val result = RectF()
+        for (relativePos in 0..if (isScroll) 2 else 0) {
+            if (relativePos == 1 && !pageFactory.hasNext() ||
+                relativePos == 2 && !pageFactory.hasNextPlus()) break
+            val page = relativePage(relativePos)
+            if (page.lines.isEmpty() || page.isMsgPage) continue
+            val chapter = page.getTextChapter()
+            if (!chapter.isForBook(ReadBook.book)) continue
+            val titleLength = chapter.layoutTitleLength.takeIf { it >= 0 } ?: continue
+            val anchor = ReadBook.anchoredHighlightsOfChapter(chapter, titleLength)
+                .firstOrNull { it.first.time == highlight.time }?.second ?: continue
+            val pageBase = chapter.getReadLength(page.index)
+            page.lines.forEachIndexed { lineIndex, line ->
+                if (line.isTitle) return@forEachIndexed
+                line.columns.forEachIndexed columnLoop@{ columnIndex, column ->
+                    if (column !is TextBaseColumn || column.isParagraphIndent) return@columnLoop
+                    val start = pageBase + page.getPosByLineColumn(lineIndex, columnIndex) - titleLength
+                    if (highlightRangeIntersects(start, start + column.positionLength, anchor.start, anchor.end)) {
+                        val bounds = RectF(column.start, line.lineTop + relativeOffset(relativePos),
+                            column.end, line.lineBottom + relativeOffset(relativePos))
+                        if (bounds.intersect(visibleRect)) result.union(bounds)
+                    }
+                }
+            }
+        }
+        if (result.isEmpty) return null
+        val location = IntArray(2).also(::getLocationOnScreen)
+        result.offset(location[0].toFloat(), location[1].toFloat())
+        return Rect().also(result::roundOut)
     }
 
     private fun notifyHighlightClick(

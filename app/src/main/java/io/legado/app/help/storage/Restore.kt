@@ -318,6 +318,7 @@ object Restore {
         val highlights = fileToListT<BookHighlight>(path, "highlight.json")
         val highlightTags = fileToListT<io.legado.app.data.entities.HighlightTag>(path, "highlightTag.json")
         val highlightTagLinks = fileToListT<io.legado.app.data.entities.HighlightTagLink>(path, "highlightTagLink.json")
+        val highlightTagOrders = fileToListT<io.legado.app.data.entities.HighlightTagOrder>(path, "highlightTagOrder.json")
         if (highlights != null || highlightTags != null && highlightTagLinks != null) {
             kotlin.runCatching {
                 appDb.runInTransaction {
@@ -329,7 +330,8 @@ object Restore {
                     // Missing extension files identify an older backup: keep local tags intact.
                     if (highlightTags != null && highlightTagLinks != null) {
                         appDb.highlightTagDao.restore(
-                            highlightTags, highlightTagLinks, highlights.orEmpty().map { it.time }
+                            highlightTags, highlightTagLinks, highlights.orEmpty().map { it.time },
+                            highlightTagOrders
                         )
                     }
                 }

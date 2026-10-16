@@ -296,7 +296,7 @@ object ReadBook : CoroutineScope by MainScope() {
     }
 
     private fun loadHighlightTags(bookUrl: String) {
-        highlightTags = appDb.highlightTagDao.all()
+        highlightTags = appDb.highlightTagDao.forBook(bookUrl)
         highlightTagLinks = appDb.highlightTagDao.linksForBook(bookUrl).groupBy { it.highlightTime }
     }
 

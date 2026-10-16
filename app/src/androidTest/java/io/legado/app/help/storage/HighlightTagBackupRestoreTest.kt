@@ -31,6 +31,7 @@ class HighlightTagBackupRestoreTest {
         val savedIgnore = HashMap(BackupConfig.ignoreConfig)
         val savedTags = appDb.highlightTagDao.all()
         val savedLinks = appDb.highlightTagDao.links()
+        val savedOrders = appDb.highlightTagDao.orders()
         val savedTimes = appDb.bookHighlightDao.all.map { it.time }
         val directory = File(context.cacheDir, "tag-backup-${UUID.randomUUID()}")
         val first = BookHighlight(bookUrl = "fixture-tag-book-a", bookName = "Tag fixture A",
@@ -40,9 +41,12 @@ class HighlightTagBackupRestoreTest {
             bookName = "Tag fixture B", note = "第二本书")
         val tags = HighlightTags.defaults().reversed().mapIndexed { index, tag ->
             tag.copy(name = "${tag.name}测试", sortOrder = index)
-        }
+        } + HighlightTag(id = "local-backup", name = "本书线索", sortOrder = 4, bookUrl = first.bookUrl)
         val links = listOf(HighlightTagLink(first.time, tags.first().id),
             HighlightTagLink(first.time, tags.last().id), HighlightTagLink(second.time, tags.first().id))
+        val orders = tags.reversed().mapIndexed { index, tag ->
+            io.legado.app.data.entities.HighlightTagOrder(first.bookUrl, tag.id, index)
+        }
         val unpacked = File(directory, "unpacked")
         fun restore() = runBlocking(Dispatchers.IO) { Restore.restoreLocked(unpacked.path) }
         fun assertAnnotations() {
@@ -54,14 +58,14 @@ class HighlightTagBackupRestoreTest {
             BackupConfig.contentKeys.forEach { BackupConfig.ignoreConfig[it] = true }
             BackupConfig.ignoreConfig[BackupConfig.annotationContentKey] = false
             appDb.bookHighlightDao.insert(first, second)
-            appDb.highlightTagDao.restore(tags, links, listOf(first.time, second.time))
+            appDb.highlightTagDao.restore(tags, links, listOf(first.time, second.time), orders)
             runBlocking(Dispatchers.IO) {
                 Backup.backupLocked(context, directory.path, uploadWebDav = false)
             }
             unpacked.mkdirs()
             ZipFile(File(directory, "backup.zip")).use { zip ->
                 assertNull("Independent annotation backup", zip.getEntry("bookshelf.json"))
-                for (name in listOf("highlight.json", "highlightTag.json", "highlightTagLink.json")) {
+                for (name in listOf("highlight.json", "highlightTag.json", "highlightTagLink.json", "highlightTagOrder.json")) {
                     val entry = requireNotNull(zip.getEntry(name))
                     File(unpacked, name).writeBytes(zip.getInputStream(entry).use { it.readBytes() })
                 }
@@ -79,12 +83,16 @@ class HighlightTagBackupRestoreTest {
             assertAnnotations()
             assertEquals(tags, appDb.highlightTagDao.all())
             assertEquals(links.toSet(), appDb.highlightTagDao.links().toSet())
+            assertEquals(orders.toSet(), appDb.highlightTagDao.orders().toSet())
+            assertEquals(tags.last().id, appDb.highlightTagDao.forBook(first.bookUrl).first().id)
+            assertFalse(appDb.highlightTagDao.forBook(second.bookUrl).any { it.bookUrl.isNotEmpty() })
             assertEquals(tags.first().styleObj(),
                 HighlightTags.effectiveStyle(first, tags, appDb.highlightTagDao.idsForHighlight(first.time)))
 
             // A pre-label backup has only highlight.json. Upsert must preserve existing label links.
             File(unpacked, "highlightTag.json").delete()
             File(unpacked, "highlightTagLink.json").delete()
+            File(unpacked, "highlightTagOrder.json").delete()
             repeat(2) { restore() }
             assertAnnotations()
             assertEquals(tags, appDb.highlightTagDao.all())
@@ -108,6 +116,7 @@ class HighlightTagBackupRestoreTest {
 
             // Both explicit empty extension files mean the user really removed every label.
             File(unpacked, "highlightTagLink.json").writeText("[]")
+            File(unpacked, "highlightTagOrder.json").writeText("[]")
             restore()
             assertTrue(appDb.highlightTagDao.all().isEmpty())
             assertTrue(appDb.highlightTagDao.links().isEmpty())
@@ -115,7 +124,7 @@ class HighlightTagBackupRestoreTest {
             assertEquals(19, appDb.bookHighlightDao.all.first { it.time == first.time }.styleObj().fill)
         } finally {
             appDb.bookHighlightDao.delete(first, second)
-            appDb.highlightTagDao.restore(savedTags, savedLinks, savedTimes)
+            appDb.highlightTagDao.restore(savedTags, savedLinks, savedTimes, savedOrders)
             BackupConfig.ignoreConfig.clear()
             BackupConfig.ignoreConfig.putAll(savedIgnore)
             preferences.edit().apply {

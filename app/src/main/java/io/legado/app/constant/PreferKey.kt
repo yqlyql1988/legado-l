@@ -288,6 +288,7 @@ object PreferKey {
     const val wallpaperColorBackup = "wallpaperColorBackup"
     const val contentSelectSpeakMod = "contentReadAloudMod"
     const val highlightLastStyle = "highlightLastStyle"
+    const val highlightMenuConfig = "highlightMenuConfig"
     const val editFontScale = "editFontScale"
     const val editNonPrintable = "editNonPrintable"
     const val editAutoWrap = "editAutoWrap"

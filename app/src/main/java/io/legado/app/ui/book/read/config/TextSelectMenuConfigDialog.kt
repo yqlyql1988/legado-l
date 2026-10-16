@@ -18,6 +18,8 @@ import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.databinding.DialogRecyclerViewBinding
 import io.legado.app.databinding.ItemTextSelectMenuConfigBinding
 import io.legado.app.help.TextSelectMenuConfig
+import io.legado.app.help.HighlightMenuConfig
+import io.legado.app.ui.book.read.HighlightActionPopup
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.book.read.TextSelectMenuItem
 import io.legado.app.ui.book.read.loadTextSelectMenuConfig
@@ -36,6 +38,7 @@ class TextSelectMenuConfigDialog : BaseDialogFragment(R.layout.dialog_recycler_v
     private val binding by viewBinding(DialogRecyclerViewBinding::bind)
     private val adapter by lazy { MenuAdapter(requireContext()) }
     private lateinit var itemTouchHelper: ItemTouchHelper
+    private val annotationMode get() = arguments?.getBoolean("annotation") == true
 
     override fun onStart() {
         super.onStart()
@@ -44,7 +47,7 @@ class TextSelectMenuConfigDialog : BaseDialogFragment(R.layout.dialog_recycler_v
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         binding.toolBar.setBackgroundColor(primaryColor)
-        binding.toolBar.setTitle(R.string.text_select_menu_config)
+        binding.toolBar.setTitle(if (annotationMode) R.string.highlight_menu_config else R.string.text_select_menu_config)
         initView()
         initMenu()
         initData()
@@ -68,13 +71,14 @@ class TextSelectMenuConfigDialog : BaseDialogFragment(R.layout.dialog_recycler_v
     }
 
     private fun initData() {
-        val config = loadTextSelectMenuConfig(requireContext()).normalized()
+        val config = if (annotationMode) HighlightMenuConfig.load(requireContext())
+            else loadTextSelectMenuConfig(requireContext()).normalized()
         adapter.setItems(rowsOf(toEntries(config.bar), toEntries(config.more)))
     }
 
     override fun onMenuItemClick(item: MenuItem?): Boolean {
         if (item?.itemId == R.id.menu_reset_text_select) {
-            val config = TextSelectMenuConfig.default()
+            val config = if (annotationMode) HighlightMenuConfig.default() else TextSelectMenuConfig.default()
             commitRows(toEntries(config.bar), toEntries(config.more))
         }
         return true
@@ -82,7 +86,9 @@ class TextSelectMenuConfigDialog : BaseDialogFragment(R.layout.dialog_recycler_v
 
     private fun toEntries(keys: List<String>): MutableList<Row.Entry> {
         return keys.mapNotNull { key ->
-            TextSelectMenuItem.byKey[key]?.let { Row.Entry(it.key, it.titleRes) }
+            if (annotationMode) HighlightActionPopup.Action.entries.firstOrNull { it.name == key }
+                ?.let { Row.Entry(it.name, it.titleRes) }
+            else TextSelectMenuItem.byKey[key]?.let { Row.Entry(it.key, it.titleRes) }
         }.toMutableList()
     }
 
@@ -110,10 +116,9 @@ class TextSelectMenuConfigDialog : BaseDialogFragment(R.layout.dialog_recycler_v
 
     private fun commitRows(bar: List<Row.Entry>, more: List<Row.Entry>) {
         adapter.setItems(rowsOf(bar, more))
-        saveTextSelectMenuConfig(
-            requireContext(),
-            TextSelectMenuConfig(bar.map { it.key }, more.map { it.key })
-        )
+        val config = TextSelectMenuConfig(bar.map { it.key }, more.map { it.key })
+        if (annotationMode) HighlightMenuConfig.save(requireContext(), config)
+        else saveTextSelectMenuConfig(requireContext(), config)
     }
 
     private fun moveAcrossDivider(position: Int) {
@@ -209,6 +214,9 @@ class TextSelectMenuConfigDialog : BaseDialogFragment(R.layout.dialog_recycler_v
     }
 
     companion object {
+        fun annotations() = TextSelectMenuConfigDialog().apply {
+            arguments = Bundle().apply { putBoolean("annotation", true) }
+        }
         private const val ZONE_BAR = 0
         private const val ZONE_MORE = 1
     }
