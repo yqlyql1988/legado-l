@@ -47,7 +47,7 @@ class AllBookmarkViewModel(application: Application) : BaseViewModel(application
                 var name = ""
                 var author = ""
                 appDb.bookmarkDao.all.forEach {
-                    if (it.bookName != name && it.bookAuthor != author) {
+                    if (it.bookName != name || it.bookAuthor != author) {
                         name = it.bookName
                         author = it.bookAuthor
                         outputStream.write("## ${it.bookName} ${it.bookAuthor}\n\n".toByteArray())

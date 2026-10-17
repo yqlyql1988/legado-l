@@ -116,7 +116,7 @@
         <io.legado.app.lib.prefs.Preference
             android:icon="@drawable/ic_bookmark"
             android:key="bookmark"
-            android:summary="@string/all_bookmark"
+            android:summary="@string/book_notes"
             android:title="@string/bookmark"
             app:iconSpaceReserved="false" />
 
