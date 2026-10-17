@@ -300,7 +300,8 @@ public class OptimizedReadStatisticsTest {
 
     private void enterMinimum(String row, String value) {
         onView(allOf(withId(id("minimum")), isDescendantOfA(withId(id(row)))))
-            .inRoot(isDialog()).perform(scrollTo(), replaceText(value), closeSoftKeyboard());
+            .inRoot(isDialog()).perform(scrollTo(), replaceText(value),
+                androidx.test.espresso.action.ViewActions.closeSoftKeyboard());
     }
 
     @Test public void rankingSettingsOnlyHideBooksAndSaveAllFourThresholds() throws Exception {
