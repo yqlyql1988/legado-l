@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.res.ColorStateList
 import android.os.Bundle
+import android.os.Parcelable
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuItem
@@ -14,6 +15,7 @@ import androidx.activity.addCallback
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.SearchView
+import androidx.core.os.BundleCompat
 import androidx.core.view.isVisible
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -73,6 +75,10 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
     private var type = NoteType.ALL
     private var tagId: String? = null
     private var query = ""
+    private var bookListQuery = ""
+    private var bookListSearchVisible = false
+    private var bookListState: Parcelable? = null
+    private var restoreBookListState = false
     private var recent = false
     private var managing = false
     private val selected = linkedSetOf<String>()
@@ -102,8 +108,14 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
-        selectedBook = savedInstanceState?.getString("selectedBook")
-            ?: intent.getStringExtra("bookUrl")?.let { "url:$it" }
+        selectedBook = if (savedInstanceState != null) savedInstanceState.getString("selectedBook")
+            else intent.getStringExtra("bookUrl")?.let { "url:$it" }
+        bookListQuery = savedInstanceState?.getString("bookListQuery").orEmpty()
+        bookListSearchVisible = savedInstanceState?.getBoolean("bookListSearchVisible") == true
+        bookListState = savedInstanceState?.let {
+            BundleCompat.getParcelable(it, "bookListState", Parcelable::class.java)
+        }
+        restoreBookListState = savedInstanceState != null && selectedBook == null
         type = NoteType.entries.firstOrNull { it.name == savedInstanceState?.getString("type") }
             ?: NoteType.ALL
         tagId = savedInstanceState?.getString("tagId")
@@ -165,13 +177,7 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
             when {
                 managing -> { managing = false; selected.clear(); render() }
                 search.isVisible -> { search.setQuery("", false); search.isVisible = false }
-                selectedBook != null -> {
-                    selectedBook = null
-                    type = NoteType.ALL
-                    tagId = null
-                    chapterIndexes = emptyMap()
-                    render()
-                }
+                selectedBook != null -> returnToBookList()
                 else -> { isEnabled = false; onBackPressedDispatcher.onBackPressed() }
             }
         }
@@ -181,11 +187,7 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
                     BookNotesRepository.archives.collect {
                         archives = it
                         if (selectedBook != null && archive == null) {
-                            selectedBook = null
-                            type = NoteType.ALL
-                            tagId = null
-                            managing = false
-                            binding.noteTabs.getTabAt(0)?.select()
+                            returnToBookList()
                         }
                         chapterIndexes = withContext(IO) {
                             archive?.book?.let { book ->
@@ -209,6 +211,10 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
     }
 
     override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {
+        // AppCompat finishes installing the home indicator after this callback.
+        binding.titleBar.post {
+            binding.titleBar.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
+        }
         menuInflater.inflate(R.menu.bookmark, menu)
         menu.findItem(R.id.menu_manage).isVisible = selectedBook != null
         menu.findItem(R.id.menu_manage).setTitle(if (managing) R.string.book_notes_done else R.string.book_notes_manage)
@@ -217,7 +223,6 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
 
     override fun onCompatOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
-            android.R.id.home -> onBackPressedDispatcher.onBackPressed()
             R.id.menu_search -> {
                 search.isVisible = !search.isVisible
                 if (search.isVisible) { search.isIconified = false; search.requestFocus() }
@@ -230,6 +235,20 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
             else -> return super.onCompatOptionsItemSelected(item)
         }
         return true
+    }
+
+    private fun returnToBookList() {
+        selectedBook = null
+        type = NoteType.ALL
+        tagId = null
+        chapterIndexes = emptyMap()
+        managing = false
+        selected.clear()
+        query = bookListQuery
+        restoreBookListState = true
+        search.isVisible = bookListSearchVisible
+        search.setQuery(bookListQuery, false)
+        render()
     }
 
     private fun render() {
@@ -280,6 +299,10 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
                 binding.recyclerView.addItemDecoration(archiveDivider)
             }
             bookAdapter.notifyDataSetChanged()
+            if (restoreBookListState && visibleBooks.isNotEmpty()) {
+                binding.recyclerView.layoutManager?.onRestoreInstanceState(bookListState)
+                restoreBookListState = false
+            }
         }
         binding.tvSort.isClickable = details
         binding.tvEmpty.isVisible = if (details) visibleNotes.isEmpty() else visibleBooks.isEmpty()
@@ -424,6 +447,14 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
+        if (selectedBook == null) {
+            bookListQuery = query
+            bookListSearchVisible = search.isVisible
+            bookListState = binding.recyclerView.layoutManager?.onSaveInstanceState()
+        }
+        outState.putString("bookListQuery", bookListQuery)
+        outState.putBoolean("bookListSearchVisible", bookListSearchVisible)
+        outState.putParcelable("bookListState", bookListState)
         outState.putString("selectedBook", selectedBook)
         outState.putString("type", type.name)
         outState.putString("tagId", tagId)
@@ -450,6 +481,9 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
                 tvCounts.text = getString(R.string.book_notes_book_count, book.bookmarkCount, book.highlightCount)
                 tvDate.text = getString(R.string.book_notes_latest, dateFormat.format(Date(book.latestTime)))
                 root.setOnClickListener {
+                    bookListQuery = query
+                    bookListSearchVisible = search.isVisible
+                    bookListState = binding.recyclerView.layoutManager?.onSaveInstanceState()
                     selectedBook = book.id
                     type = NoteType.ALL
                     tagId = null
@@ -457,10 +491,12 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
                     search.setQuery("", false)
                     search.isVisible = false
                     runTask {
-                        chapterIndexes = withContext(IO) {
+                        val indexes = withContext(IO) {
                             appDb.bookChapterDao.getChapterList(book.bookUrl)
                                 .associate { it.url to it.index }
                         }
+                        if (selectedBook != book.id) return@runTask
+                        chapterIndexes = indexes
                         render()
                         binding.recyclerView.scrollToPosition(0)
                     }

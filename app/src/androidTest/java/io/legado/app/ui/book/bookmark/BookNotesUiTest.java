@@ -18,6 +18,7 @@ import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.TextView;
 import androidx.test.core.app.ActivityScenario;
+import androidx.lifecycle.Lifecycle;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 import org.junit.After;
@@ -36,6 +37,9 @@ import java.nio.file.Files;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import static androidx.test.espresso.Espresso.*;
+import static androidx.test.espresso.Espresso.closeSoftKeyboard;
+import static androidx.test.espresso.Espresso.pressBack;
+import static androidx.test.espresso.Espresso.pressBackUnconditionally;
 import static androidx.test.espresso.action.ViewActions.*;
 import static androidx.test.espresso.assertion.ViewAssertions.*;
 import static androidx.test.espresso.matcher.ViewMatchers.*;
@@ -236,6 +240,112 @@ public class BookNotesUiTest {
             onView(withText(text("export"))).check(matches(isDisplayed()));
             onView(withText(text("export_md"))).check(matches(isDisplayed()));
             onView(withText(text("book_notes_export_markdown"))).check(matches(isDisplayed()));
+        }
+    }
+    private void toolbarBack() {
+        onView(withContentDescription(text("back"))).perform(click());
+    }
+    private void assertListPosition(Activity activity, String name, int top) {
+        ViewGroup list = activity.findViewById(id("recycler_view"));
+        View first = list.getChildAt(0);
+        assertNotNull(first);
+        assertEquals(name, ((TextView) first.findViewById(id("tv_name"))).getText().toString());
+        assertEquals(top, first.getTop());
+    }
+    @Test public void toolbarAndSystemBackReturnToArchiveBeforeFinishing() throws Exception {
+        for (boolean toolbar : new boolean[]{true, false}) {
+            try (ActivityScenario<Activity> scenario = ActivityScenario.launch(intent(false))) {
+                scenario.onActivity(activity -> query(activity, author, false));
+                awaitSummary(scenario, text("book_notes_summary", 2, 2, 2));
+                onView(withText("长夜书店")).perform(click());
+                awaitCount(scenario, 3);
+                if (toolbar) toolbarBack(); else pressBack();
+                awaitSummary(scenario, text("book_notes_summary", 2, 2, 2));
+                scenario.onActivity(activity -> {
+                    assertFalse(activity.isFinishing());
+                    assertEquals(View.GONE, activity.findViewById(id("book_heading")).getVisibility());
+                });
+                if (toolbar) toolbarBack(); else pressBackUnconditionally();
+                for (int i = 0; i < 100 && scenario.getState() != Lifecycle.State.DESTROYED; i++)
+                    SystemClock.sleep(50);
+                assertEquals(Lifecycle.State.DESTROYED, scenario.getState());
+            }
+        }
+    }
+    @Test public void returnRestoresBookListSearchAndScrollAfterRecreation() throws Exception {
+        for (int i = 0; i < 20; i++) {
+            ContentValues bookmark = new ContentValues();
+            bookmark.put("time", time + 100 + i);
+            bookmark.put("bookName", "返回位置验证-" + i);
+            bookmark.put("bookAuthor", author);
+            bookmark.put("bookText", "用于验证书籍列表返回位置");
+            insert("bookmarks", bookmark);
+        }
+        try (ActivityScenario<Activity> scenario = ActivityScenario.launch(intent(false))) {
+            scenario.onActivity(activity -> query(activity, author, true));
+            awaitSummary(scenario, text("book_notes_summary", 22, 22, 2));
+            closeSoftKeyboard();
+            for (int i = 0; i < 6; i++)
+                onView(withId(id("recycler_view"))).perform(swipeUp());
+            AtomicReference<String> firstName = new AtomicReference<>();
+            int[] top = {0};
+            scenario.onActivity(activity -> {
+                ViewGroup list = activity.findViewById(id("recycler_view"));
+                View first = list.getChildAt(0);
+                firstName.set(((TextView) first.findViewById(id("tv_name"))).getText().toString());
+                top[0] = first.getTop();
+                assertNotEquals("返回位置验证-19", firstName.get());
+            });
+            onView(withText("长夜书店")).perform(click());
+            awaitCount(scenario, 3);
+            scenario.recreate();
+            awaitCount(scenario, 3);
+            toolbarBack();
+            awaitSummary(scenario, text("book_notes_summary", 22, 22, 2));
+            instrumentation.waitForIdleSync();
+            scenario.onActivity(activity -> {
+                View search = activity.findViewById(id("search_view"));
+                assertEquals(View.VISIBLE, search.getVisibility());
+                assertEquals(author, input(search).getText().toString());
+                assertListPosition(activity, firstName.get(), top[0]);
+            });
+            scenario.recreate();
+            awaitSummary(scenario, text("book_notes_summary", 22, 22, 2));
+            instrumentation.waitForIdleSync();
+            scenario.onActivity(activity -> assertListPosition(activity, firstName.get(), top[0]));
+            screenshot("navigation-restored");
+        }
+    }
+    @Test public void directBookEntryStaysOnArchiveAfterBackAndRecreation() throws Exception {
+        try (ActivityScenario<Activity> scenario = ActivityScenario.launch(intent(true))) {
+            awaitCount(scenario, 3);
+            toolbarBack();
+            onView(withId(id("book_heading"))).check(matches(withEffectiveVisibility(Visibility.GONE)));
+            scenario.recreate();
+            onView(withId(id("book_heading"))).check(matches(withEffectiveVisibility(Visibility.GONE)));
+            scenario.onActivity(activity -> assertFalse(activity.isFinishing()));
+        }
+    }
+    @Test public void toolbarBackExitsBatchAndSearchBeforeReturningToBooks() throws Exception {
+        try (ActivityScenario<Activity> scenario = ActivityScenario.launch(intent(false))) {
+            scenario.onActivity(activity -> query(activity, author, false));
+            awaitSummary(scenario, text("book_notes_summary", 2, 2, 2));
+            onView(withText("长夜书店")).perform(click());
+            awaitCount(scenario, 3);
+            scenario.onActivity(activity -> activity.findViewById(id("note_body")).performLongClick());
+            onView(withId(id("batch_actions"))).check(matches(isDisplayed()));
+            toolbarBack();
+            onView(withId(id("batch_actions"))).check(matches(withEffectiveVisibility(Visibility.GONE)));
+            onView(withId(id("book_heading"))).check(matches(isDisplayed()));
+            scenario.onActivity(activity -> query(activity, "停靠", true));
+            awaitCount(scenario, 1);
+            closeSoftKeyboard();
+            toolbarBack();
+            awaitCount(scenario, 3);
+            onView(withId(id("search_view"))).check(matches(withEffectiveVisibility(Visibility.GONE)));
+            onView(withId(id("book_heading"))).check(matches(isDisplayed()));
+            toolbarBack();
+            awaitSummary(scenario, text("book_notes_summary", 2, 2, 2));
         }
     }
     @Test public void continueReadingRestoresSavedProgressWhileItemClickCarriesPosition() throws Exception {
