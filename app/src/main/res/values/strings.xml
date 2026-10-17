@@ -846,6 +846,11 @@
     <string name="main_activity">Start page</string>
     <string name="selectText">Long Tap to select text</string>
     <string name="long_press_select_paragraph">Select paragraph on long press</string>
+    <string name="cross_page_text_selection">Select text across pages</string>
+    <string name="cross_page_text_selection_summary">Hold the selection handle at the top or bottom for 0.8 seconds to turn pages within this chapter; repeats every second</string>
+    <string name="cross_page_selection_count">%1$s · %2$d characters</string>
+    <string name="cross_page_selection_boundary">Reached the chapter boundary</string>
+    <string name="cross_page_selection_loading">Waiting for chapter layout</string>
     <string name="long_press_select_paragraph_summary">Select the visible part of the paragraph on the current page</string>
     <string name="two_finger_replace_preview">Preview replacements with two-finger hold</string>
     <string name="two_finger_replace_preview_summary">Temporarily switch replacement effects for the current chapter while holding two fingers</string>
