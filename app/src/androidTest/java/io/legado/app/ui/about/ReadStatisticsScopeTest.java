@@ -61,8 +61,20 @@ public class ReadStatisticsScopeTest {
         scenario.onActivity(activity -> {
             activity.findViewById(id("tab_month")).performClick();
             activity.findViewById(id("graph_trend")).performClick();
+            selectToday(activity);
         });
         return scenario;
+    }
+    private void selectToday(Activity activity) {
+        android.view.ViewGroup grid = activity.findViewById(id("calendar_grid"));
+        for (int i = 0; i < grid.getChildCount(); i++) {
+            View cell = grid.getChildAt(i);
+            if (cell.getContentDescription() != null && cell.getContentDescription().toString().startsWith(today)) {
+                if (!cell.isSelected()) cell.performClick();
+                return;
+            }
+        }
+        fail("Today's calendar cell missing");
     }
     private void await(ActivityScenario<Activity> scenario) {
         for (int i = 0; i < 100; i++) {
@@ -310,6 +322,7 @@ public class ReadStatisticsScopeTest {
                     assertEquals(allCount, text(activity, "tv_rank_scope"));
                 }
                 activity.findViewById(id("tab_month")).performClick();
+                selectToday(activity);
                 assertTrue(text(activity, "tv_day_rank_scope").startsWith("全部 · "));
                 activity.findViewById(id("scope_qualified")).performClick();
                 assertEquals("达标 · 1本", text(activity, "tv_day_rank_scope"));

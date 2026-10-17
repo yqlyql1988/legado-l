@@ -53,13 +53,17 @@ public class OptimizedReadStatisticsTest {
     private Intent intent(String activity) {
         return new Intent().setClassName(context.getPackageName(), "io.legado.app.ui.about." + activity);
     }
-    /** Existing calendar regressions explicitly choose the monthly calendar. */
+    /** Existing daily-ranking regressions explicitly choose today's date. */
     private ActivityScenario<Activity> launchCalendar() {
+        return launchCalendar(true);
+    }
+    private ActivityScenario<Activity> launchCalendar(boolean selectToday) {
         ActivityScenario<Activity> scenario = ActivityScenario.launch(intent("ReadStatisticsActivity"));
         await(scenario, "tv_duration");
         scenario.onActivity(activity -> {
             activity.findViewById(id("tab_month")).performClick();
             activity.findViewById(id("graph_trend")).performClick();
+            if (selectToday) dayCell(activity, LocalDate.now()).performClick();
         });
         return scenario;
     }
@@ -223,6 +227,8 @@ public class OptimizedReadStatisticsTest {
                     scenario.onActivity(activity -> {
                         activity.findViewById(id("tab_month")).performClick();
                         assertEquals(View.GONE, activity.findViewById(id("chart")).getVisibility());
+                        assertFalse(dayCell(activity, today).isSelected());
+                        dayCell(activity, today).performClick();
                         GridLayout grid = activity.findViewById(id("calendar_grid"));
                         assertTrue(grid.getChildCount() >= 7 + today.lengthOfMonth());
                         for (int i = 0; i < grid.getChildCount(); i++) {
@@ -376,7 +382,8 @@ public class OptimizedReadStatisticsTest {
                 onView(withId(android.R.id.button3)).inRoot(isDialog()).perform(click());
                 checkPeriod(scenario, current, false);
                 scenario.onActivity(activity -> {
-                    assertTrue(dayCell(activity, today).isSelected());
+                    assertFalse(dayCell(activity, today).isSelected());
+                    assertEquals(View.GONE, activity.findViewById(id("day_books")).getVisibility());
                     assertFalse(activity.findViewById(id("next_period")).isEnabled());
                     activity.findViewById(id("tab_year")).performClick();
                 });
@@ -460,12 +467,32 @@ public class OptimizedReadStatisticsTest {
         } finally { restorePrefs(saved); applyTheme(); }
     }
 
-    @Test public void calendarDefaultsToTodayAndTogglesWithoutChangingFutureDates() throws Exception {
+    @Test public void calendarDefaultsToNoDateAndTogglesWithoutChangingFutureDates() throws Exception {
         LocalDate today = LocalDate.now();
-        try (ActivityScenario<Activity> scenario = launchCalendar()) {
+        try (ActivityScenario<Activity> scenario = launchCalendar(false)) {
             await(scenario, "tv_duration");
             scenario.onActivity(activity -> {
                 assertTrue(activity.findViewById(id("tab_month")).isSelected());
+                assertTrue(activity.findViewById(id("graph_trend")).isSelected());
+                GridLayout grid = activity.findViewById(id("calendar_grid"));
+                for (int i = 0; i < grid.getChildCount(); i++) assertFalse(grid.getChildAt(i).isSelected());
+                assertEquals(View.GONE, activity.findViewById(id("tv_selected_day")).getVisibility());
+                assertEquals(View.GONE, activity.findViewById(id("day_rank_header")).getVisibility());
+                assertEquals(View.GONE, activity.findViewById(id("day_books")).getVisibility());
+            });
+            screenshot("calendar-default-no-date");
+            scenario.recreate();
+            await(scenario, "tv_duration");
+            scenario.onActivity(activity -> {
+                assertTrue(activity.findViewById(id("graph_trend")).isSelected());
+                assertFalse(dayCell(activity, today).isSelected());
+                dayCell(activity, today).performClick();
+                assertTrue(dayCell(activity, today).isSelected());
+                assertEquals(View.VISIBLE, activity.findViewById(id("day_books")).getVisibility());
+            });
+            scenario.recreate();
+            await(scenario, "tv_selected_day");
+            scenario.onActivity(activity -> {
                 assertTrue(dayCell(activity, today).isSelected());
                 dayCell(activity, today).performClick();
                 assertFalse(dayCell(activity, today).isSelected());
@@ -498,7 +525,8 @@ public class OptimizedReadStatisticsTest {
                     GridLayout grid = activity.findViewById(id("calendar_grid"));
                     for (int i = 0; i < grid.getChildCount(); i++) assertFalse(grid.getChildAt(i).isSelected());
                     activity.findViewById(id("next_period")).performClick();
-                    assertTrue(dayCell(activity, today).isSelected());
+                    assertFalse(dayCell(activity, today).isSelected());
+                    assertEquals(View.GONE, activity.findViewById(id("day_books")).getVisibility());
                 }
             });
             screenshot("calendar-toggle");
