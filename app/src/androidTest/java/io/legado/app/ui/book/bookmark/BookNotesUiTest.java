@@ -217,6 +217,7 @@ public class BookNotesUiTest {
     }
     private void screenshot(String name) throws Exception {
         instrumentation.waitForIdleSync();
+        SystemClock.sleep(350); // Allow the first rendered frame to reach the screenshot surface.
         Bitmap bitmap = instrumentation.getUiAutomation().takeScreenshot();
         assertNotNull(bitmap);
         File folder = new File(context.getExternalFilesDir(null), "book-notes-ui");

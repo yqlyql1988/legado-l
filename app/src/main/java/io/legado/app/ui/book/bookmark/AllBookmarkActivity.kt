@@ -337,8 +337,18 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
     }
 
     private fun showFullNote(note: BookNote) {
-        AlertDialog.Builder(this).setTitle(note.chapterName)
-            .setMessage(notesMarkdown(listOf(note))).setPositiveButton(R.string.ok, null).show()
+        AlertDialog.Builder(this).setTitle(R.string.book_notes_view_full)
+            .setMessage(noteText(note)).setPositiveButton(R.string.ok, null).show()
+    }
+
+    private fun noteText(note: BookNote): String = buildString {
+        append("《${note.bookName}》")
+        if (note.author.isNotBlank()) append(" · ${note.author}")
+        append("\n${note.chapterName}\n\n${note.quote}")
+        if (note.note.isNotBlank()) append("\n\n").append(getString(
+            if (note.bookmark != null) R.string.book_notes_remark else R.string.book_notes_note, note.note))
+        if (note.tags.isNotEmpty()) append("\n\n${getString(R.string.book_notes_tags)}：")
+            .append(note.tags.joinToString("、") { it.name })
     }
 
     private fun showActions(note: BookNote, anchor: View) {
@@ -356,8 +366,8 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
                 "edit" -> if (note.bookmark != null) showDialogFragment(BookmarkDialog(note.bookmark, 0))
                     else showDialogFragment(HighlightNoteDialog(note.highlight!!))
                 "copy" -> (getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
-                    .setPrimaryClip(ClipData.newPlainText(note.chapterName, notesMarkdown(listOf(note))))
-                "share" -> share(notesMarkdown(listOf(note)))
+                    .setPrimaryClip(ClipData.newPlainText(note.chapterName, noteText(note)))
+                "share" -> share(noteText(note))
                 "tags" -> editTags(note)
                 "delete" -> confirmDelete(listOf(note))
             }
