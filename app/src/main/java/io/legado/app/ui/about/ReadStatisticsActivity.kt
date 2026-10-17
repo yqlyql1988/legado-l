@@ -3,7 +3,9 @@ package io.legado.app.ui.about
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.StateListDrawable
 import android.os.Bundle
 import android.view.Gravity
 import android.view.Menu
@@ -15,6 +17,7 @@ import android.widget.TextView
 import androidx.appcompat.widget.AppCompatButton
 import androidx.appcompat.app.AlertDialog
 import androidx.core.widget.doAfterTextChanged
+import androidx.core.view.ViewCompat
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
@@ -138,14 +141,29 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
             "readStatisticsYearMinimum", "readStatisticsAllMinimum")
         val values = listOf(AppConfig.readStatisticsDayMinimum, AppConfig.readStatisticsMonthMinimum,
             AppConfig.readStatisticsYearMinimum, AppConfig.readStatisticsAllMinimum)
-        val units = longArrayOf(1_000, 60_000, 3_600_000)
+        val units = listOf(R.string.read_statistics_hour_unit, R.string.read_statistics_minute_unit,
+            R.string.read_statistics_second_unit)
         rows.forEachIndexed { index, row ->
-            row.label.hint = getString(labels[index])
-            val unit = if (values[index] == 0L) 1 else units.indexOfLast { values[index] % it == 0L }.coerceAtLeast(0)
-            row.unit.setSelection(unit)
-            row.unit.contentDescription = getString(labels[index])
-            row.minimum.setText((values[index] / units[unit]).toString())
-            row.minimum.doAfterTextChanged { row.label.error = null }
+            row.label.setText(labels[index])
+            ViewCompat.setAccessibilityHeading(row.label, true)
+            val parts = listOf(values[index] / 3_600_000, values[index] / 60_000 % 60, values[index] / 1_000 % 60)
+            listOf(row.hours, row.minutes, row.seconds).forEachIndexed { part, field ->
+                field.setText(parts[part].toString())
+                field.contentDescription = getString(R.string.read_statistics_minimum_accessibility,
+                    getString(labels[index]), getString(units[part]))
+                field.backgroundTintList = null
+                field.background = StateListDrawable().apply {
+                    fun box(focused: Boolean) = GradientDrawable().apply {
+                        cornerRadius = 8.dpToPx().toFloat()
+                        setColor(ColorUtils.blendColors(backgroundColor, accentColor, .03f))
+                        setStroke(1.dpToPx(), if (focused) accentColor
+                            else ColorUtils.blendColors(backgroundColor, contentSecondary, .35f))
+                    }
+                    addState(intArrayOf(android.R.attr.state_focused), box(true))
+                    addState(intArrayOf(), box(false))
+                }
+                field.doAfterTextChanged { row.error.isVisible = false }
+            }
         }
         val dialog = alert(R.string.read_statistics_ranking_settings) {
             customView { settings.root }
@@ -153,15 +171,24 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
             cancelButton()
         }
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-            val durations = rows.map { row ->
-                val value = row.minimum.text.toString().toLongOrNull()
-                val multiplier = units[row.unit.selectedItemPosition]
-                if (value == null || value < 0 || value > Long.MAX_VALUE / multiplier) {
-                    row.label.error = getString(R.string.read_statistics_minimum_invalid)
-                    null
-                } else value * multiplier
+            val durations = rows.mapIndexed { index, row ->
+                readStatisticsMinimumMillis(row.hours.text.toString(), row.minutes.text.toString(),
+                    row.seconds.text.toString()).also { value ->
+                    row.error.isVisible = value == null
+                    row.error.setText(R.string.read_statistics_minimum_invalid)
+                }?.let { value ->
+                    // Preserve any subsecond remainder in an existing preference left unchanged.
+                    if (value == values[index] / 1_000 * 1_000) values[index] else value
+                }
             }
-            if (durations.any { it == null }) return@setOnClickListener
+            val invalid = durations.indexOfFirst { it == null }
+            if (invalid >= 0) {
+                rows[invalid].error.post {
+                    val error = rows[invalid].error
+                    error.requestRectangleOnScreen(Rect(0, 0, error.width, error.height))
+                }
+                return@setOnClickListener
+            }
             defaultSharedPreferences.edit().apply {
                 keys.forEachIndexed { index, key -> putLong(key, checkNotNull(durations[index])) }
             }.apply()
