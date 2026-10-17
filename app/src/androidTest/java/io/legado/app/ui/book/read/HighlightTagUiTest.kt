@@ -140,7 +140,7 @@ class HighlightTagUiTest {
             assertEquals("Use the original upstream popup background",
                 context.bottomBackground, (panel.background as GradientDrawable).color?.defaultColor)
             assertEquals("Use upstream primary text",
-                context.getCompatColor(R.color.primaryText), (view as TextView).currentTextColor)
+                view.context.getCompatColor(R.color.primaryText), (view as TextView).currentTextColor)
         }
         onView(withText("赞")).inRoot(isPlatformPopup()).check { view, _ ->
             labelY = screenY(view); labelWidth = view.width
