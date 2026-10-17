@@ -97,6 +97,7 @@ public class ReadStatisticsScopeTest {
     }
     private void screenshot(String name) throws Exception {
         InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+        SystemClock.sleep(150);
         Bitmap image = InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();
         assertNotNull(image);
         File folder = new File(context.getExternalFilesDir(null), "statistics-scope");
@@ -250,7 +251,11 @@ public class ReadStatisticsScopeTest {
                     }
                 });
                 screenshot("scope-" + theme + "-all");
-                scenario.onActivity(activity -> activity.findViewById(id("scope_qualified")).performClick());
+                scenario.onActivity(activity -> {
+                    activity.findViewById(id("scope_qualified")).performClick();
+                    assertTrue(activity.findViewById(id("scope_qualified")).isSelected());
+                    assertSummary(activity, minimum, 1, 1, minimum);
+                });
                 screenshot("scope-" + theme + "-qualified");
             }
         }

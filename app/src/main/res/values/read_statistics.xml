@@ -33,7 +33,7 @@
     <string name="read_statistics_history">历史未分期时长：%1$s</string>
     <string name="read_statistics_help">统计说明</string>
     <string name="read_statistics_ranking_settings">排行显示设置</string>
-    <string name="read_statistics_ranking_explanation">设置书籍最低显示时长，全为 0 表示不过滤。“全部”统计保留所有记录，“达标”统计只计入达到当前时段门槛的书籍；日度门槛仅用于当天排行。原始记录完整保留。</string>
+    <string name="read_statistics_ranking_explanation">最低时长为 0 时不过滤。“全部”统计所有记录，“达标”仅统计达到当前时段门槛的书籍；日度设置仅影响日榜。</string>
     <string name="read_statistics_day_minimum">日度排行</string>
     <string name="read_statistics_month_minimum">月度排行</string>
     <string name="read_statistics_year_minimum">年度排行</string>
