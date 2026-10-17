@@ -329,7 +329,9 @@ object Restore {
                     // Missing extension files identify an older backup: keep local tags intact.
                     if (highlightTags != null && highlightTagLinks != null) {
                         appDb.highlightTagDao.restore(
-                            highlightTags, highlightTagLinks, highlights.orEmpty().map { it.time },
+                            preserveLegacyTagNotes(File(path, "highlightTag.json").readText(),
+                                highlightTags, appDb.highlightTagDao.all()),
+                            highlightTagLinks, highlights.orEmpty().map { it.time },
                             highlightTagOrders
                         )
                     }

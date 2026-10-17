@@ -151,7 +151,7 @@ public class OptimizedReadStatisticsTest {
         SQLiteDatabase db = SQLiteDatabase.openDatabase(context.getDatabasePath("legado.db").getPath(),
             null, SQLiteDatabase.OPEN_READWRITE);
         try {
-            assertEquals(116, db.getVersion());
+            assertEquals(117, db.getVersion());
             // Include device start dates and existing details, just like the real coverage calculation.
             try (android.database.Cursor cursor = db.rawQuery(
                 "SELECT startedAt FROM readStatisticsState WHERE startedAt > 0", null)) {

@@ -2,6 +2,7 @@ package io.legado.app.help.storage
 
 import io.legado.app.data.entities.BookHighlight
 import io.legado.app.data.entities.HighlightRule
+import io.legado.app.data.entities.HighlightTag
 import io.legado.app.help.HighlightStyle
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonArray
@@ -13,6 +14,17 @@ import org.junit.Test
 import java.io.File
 
 class HighlightBackupCompatibilityTest {
+
+    @Test
+    fun `old tag backups preserve local notes while explicit empty notes can clear them`() {
+        val json = """[{"id":"old","name":"伏笔"},{"id":"clear","name":"金句","note":""},
+            {"id":"null","name":"人物","note":null},{"id":"new","name":"地点"}]"""
+        val restored = GSON.fromJsonArray<HighlightTag>(json).getOrThrow()
+        val current = listOf(HighlightTag(id = "old", note = "保留本机说明"),
+            HighlightTag(id = "clear", note = "可以清空"), HighlightTag(id = "null", note = "保留空值说明"))
+        val notes = preserveLegacyTagNotes(json, restored, current).associate { it.id to it.note }
+        assertEquals(mapOf("old" to "保留本机说明", "clear" to "", "null" to "保留空值说明", "new" to ""), notes)
+    }
 
     @Test
     fun `legacy colors are converted without replacing current styles`() {

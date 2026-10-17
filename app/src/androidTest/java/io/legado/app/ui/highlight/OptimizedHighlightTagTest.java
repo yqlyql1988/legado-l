@@ -21,15 +21,10 @@ import java.util.List;
 import java.util.UUID;
 import java.util.Arrays;
 
-import static androidx.test.espresso.Espresso.onData;
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.*;
 import static androidx.test.espresso.matcher.RootMatchers.isDialog;
-import static androidx.test.espresso.matcher.RootMatchers.isPlatformPopup;
 import static androidx.test.espresso.matcher.ViewMatchers.*;
-import static org.hamcrest.Matchers.allOf;
-import static org.hamcrest.Matchers.instanceOf;
-import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.*;
 
 /** Android APIs and actual UI only, so this also verifies the optimized delivery APK. */
@@ -95,28 +90,45 @@ public class OptimizedHighlightTagTest {
             scenario = ActivityScenario.launch(intent);
             onView(withId(id("tv_add"))).perform(click());
             onView(withId(id("et_name"))).inRoot(isDialog()).perform(replaceText(name), closeSoftKeyboard());
-            onView(withId(id("sp_kind"))).inRoot(isDialog()).perform(scrollTo(), click());
-            onData(allOf(is(instanceOf(String.class)), is(string("highlight_underline_wavy"))))
-                .inRoot(isPlatformPopup()).perform(click());
+            String note = "记录这个标签的含义\n多行说明随标签一起备份";
+            onView(withId(id("et_note"))).inRoot(isDialog()).perform(replaceText(note), closeSoftKeyboard());
+            onView(withId(id("btn_style"))).inRoot(isDialog()).perform(scrollTo(), click());
+            onView(withText(string("highlight_bold"))).inRoot(isDialog()).perform(click());
+            onView(withText(string("highlight_italic"))).inRoot(isDialog()).perform(click());
+            onView(withText(string("highlight_bg_color"))).inRoot(isDialog()).perform(click());
+            onView(withText(string("highlight_underline_solid"))).inRoot(isDialog()).perform(click());
+            androidx.test.espresso.Espresso.pressBack();
             scenario.recreate();
             onView(withId(id("et_name"))).inRoot(isDialog()).check((view, error) -> {
                 if (error != null) throw error;
                 assertEquals(name, ((TextView) view).getText().toString());
             });
+            onView(withId(id("et_note"))).inRoot(isDialog()).check((view, error) -> {
+                if (error != null) throw error;
+                assertEquals(note, ((TextView) view).getText().toString());
+            });
             screenshot("optimized-editor");
             onView(withId(id("btn_ok"))).inRoot(isDialog()).perform(click());
+            onView(withText(note)).check((view, error) -> {
+                if (error != null) throw error;
+                assertTrue(view.isShown());
+            });
             screenshot("optimized-manager");
             onView(withId(id("btn_save"))).perform(click());
             InstrumentationRegistry.getInstrumentation().waitForIdleSync();
-            try (Cursor cursor = db.rawQuery("SELECT style,sortOrder,bookUrl FROM highlight_tags WHERE name = ?",
+            try (Cursor cursor = db.rawQuery("SELECT style,sortOrder,bookUrl,note FROM highlight_tags WHERE name = ?",
                     new String[]{name})) {
                 assertTrue("The real editor saved the new label", cursor.moveToFirst());
                 JSONObject style = new JSONObject(cursor.getString(0));
                 JSONObject underline = style.getJSONObject("underline");
                 assertEquals("WAVY", underline.getString("kind"));
                 assertTrue(underline.getDouble("width") > 0);
+                assertTrue(style.getBoolean("bold"));
+                assertTrue(style.getBoolean("italic"));
+                assertNotEquals(0, style.getInt("fill"));
                 assertEquals(nextOrder, cursor.getInt(1));
                 assertEquals(bookUrl, cursor.getString(2));
+                assertEquals(note, cursor.getString(3));
             }
             assertEquals("Existing associations survive saving global settings",
                 links, snapshot(db, "highlight_tag_links"));

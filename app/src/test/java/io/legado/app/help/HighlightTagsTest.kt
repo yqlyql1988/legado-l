@@ -55,4 +55,30 @@ class HighlightTagsTest {
         assertEquals(4, tags.map { it.id }.distinct().size)
         assertTrue(tags.all { it.styleObj().underline != null })
     }
+
+    @Test fun tagBackupPreservesNoteScopeAndEveryStyleChannel() {
+        val style = base.copy(fillShape = HighlightStyle.FillShape.PILL, italic = true,
+            strike = HighlightStyle.Deco(71), box = HighlightStyle.Deco(72),
+            emphasis = HighlightStyle.Deco(73), shadow = HighlightStyle.Shadow(),
+            fontPath = "fixture.ttf", fontSize = 26f, letterSpacing = 0.2f,
+            horizontalPadding = 12f, pillPaddingScale = 1.25f)
+        val tag = clue.copy(note = "线索含义\n第二行说明", bookUrl = "book-a",
+            style = GSON.toJson(style))
+        val restored = GSON.fromJson(GSON.toJson(tag), HighlightTag::class.java)
+        assertEquals(tag, restored)
+        assertEquals(style, restored.styleObj())
+        assertEquals(style, HighlightTags.effectiveStyle(annotation, listOf(restored), listOf(tag.id)))
+        assertEquals("Keep note", annotation.note)
+        assertEquals(base, annotation.styleObj())
+    }
+
+    @Test fun legacyTagBackupDefaultsItsNoteToEmpty() {
+        val tag = GSON.fromJson(
+            """{"id":"old","name":"伏笔","style":"{}","sortOrder":2}""",
+            HighlightTag::class.java)
+        assertEquals("", tag.note)
+        assertEquals("", tag.bookUrl)
+        assertEquals("old", tag.id)
+        assertEquals(2, tag.sortOrder)
+    }
 }
