@@ -86,9 +86,59 @@ public class ReadStatisticsScopeTest {
     }
     private void assertSummary(Activity activity, long time, int books, int days, long average) {
         assertEquals(duration(time), text(activity, "tv_duration"));
-        assertEquals(books + "本\n读过的书", text(activity, "tv_books"));
-        assertEquals(days + "天\n已记录天数", text(activity, "tv_days"));
-        assertEquals(duration(average) + "\n明细日均", text(activity, "tv_average"));
+        assertEquals(books + "本", text(activity, "tv_books"));
+        assertEquals(days + "天", text(activity, "tv_days"));
+        assertEquals(duration(average), text(activity, "tv_average"));
+        assertEquals("读过的书", text(activity, "tv_books_label"));
+        assertEquals("已记录天数", text(activity, "tv_days_label"));
+        assertEquals("明细日均", text(activity, "tv_average_label"));
+    }
+    private float characterSize(TextView view, boolean digit) {
+        Spanned text = (Spanned)view.getText();
+        for (int i = 0; i < text.length(); i++) {
+            if (Character.isDigit(text.charAt(i)) != digit) continue;
+            float size = view.getTextSize();
+            for (RelativeSizeSpan span : text.getSpans(i, i + 1, RelativeSizeSpan.class))
+                size *= span.getSizeChange();
+            return size;
+        }
+        throw new AssertionError("Missing number or unit in " + text);
+    }
+    private void assertMetricsAligned(Activity activity) {
+        TextView first = activity.findViewById(id("tv_days"));
+        TextView firstLabel = activity.findViewById(id("tv_days_label"));
+        int[] firstPosition = new int[2], firstLabelPosition = new int[2];
+        first.getLocationOnScreen(firstPosition);
+        firstLabel.getLocationOnScreen(firstLabelPosition);
+        for (String name : new String[]{"tv_days", "tv_books", "tv_average"}) {
+            TextView value = activity.findViewById(id(name));
+            TextView label = activity.findViewById(id(name + "_label"));
+            int[] position = new int[2], labelPosition = new int[2];
+            value.getLocationOnScreen(position);
+            label.getLocationOnScreen(labelPosition);
+            assertEquals("Different number size: " + name, characterSize(first, true), characterSize(value, true), .01f);
+            assertEquals("Different unit size: " + name, characterSize(first, false), characterSize(value, false), .01f);
+            assertEquals("Different label size: " + name, firstLabel.getTextSize(), label.getTextSize(), .01f);
+            assertEquals("Different value top: " + name, firstPosition[1], position[1]);
+            assertEquals("Different value height: " + name, first.getHeight(), value.getHeight());
+            assertEquals("Different value baseline: " + name, first.getLayout().getLineBaseline(0), value.getLayout().getLineBaseline(0));
+            assertEquals("Different label top: " + name, firstLabelPosition[1], labelPosition[1]);
+            assertEquals("Different label height: " + name, firstLabel.getHeight(), label.getHeight());
+            assertEquals("Different label baseline: " + name, firstLabel.getBaseline(), label.getBaseline());
+            assertEquals("Column left edges differ: " + name, position[0], labelPosition[0]);
+            assertEquals("Column widths differ: " + name, value.getWidth(), label.getWidth());
+            assertTrue("Value overlaps label: " + name, position[1] + value.getHeight() <= labelPosition[1]);
+            for (TextView view : new TextView[]{value, label}) {
+                assertEquals("Text truncated: " + name, view.length(), view.getLayout().getLineEnd(view.getLineCount() - 1));
+                assertTrue("Text height clipped: " + name,
+                    view.getLayout().getHeight() <= view.getHeight() - view.getCompoundPaddingTop() - view.getCompoundPaddingBottom());
+                for (int line = 0; line < view.getLineCount(); line++)
+                    assertTrue("Text width clipped: " + name,
+                        view.getLayout().getLineWidth(line) <= view.getWidth() - view.getCompoundPaddingLeft() - view.getCompoundPaddingRight() + 1);
+            }
+            assertEquals("Accessibility lost label: " + name,
+                value.getText() + "\n" + label.getText(), value.getContentDescription().toString());
+        }
     }
     private void applyTheme() {
         InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
@@ -184,7 +234,7 @@ public class ReadStatisticsScopeTest {
         assertEquals(before, query("SELECT sum(readTime) FROM readRecord"));
     }
 
-    @Test public void selectionSurvivesRecreationAndReopeningAndEmptyScopeShowsZero() {
+    @Test public void selectionSurvivesRecreationAndReopeningAndEmptyScopeShowsZero() throws Exception {
         try (ActivityScenario<Activity> scenario = launch()) {
             await(scenario);
             scenario.onActivity(activity -> activity.findViewById(id("scope_qualified")).performClick());
@@ -204,6 +254,10 @@ public class ReadStatisticsScopeTest {
                 assertSummary(activity, 0, 0, 0, 0);
                 assertEquals(View.VISIBLE, activity.findViewById(id("tv_empty")).getVisibility());
                 assertEquals(today + " · " + duration(minimum), text(activity, "tv_selected_day"));
+            });
+            screenshot("metrics-zero");
+            scenario.onActivity(activity -> {
+                assertMetricsAligned(activity);
                 activity.findViewById(id("scope_all")).performClick();
                 assertFalse(text(activity, "tv_duration").equals("0秒"));
             });
@@ -278,10 +332,14 @@ public class ReadStatisticsScopeTest {
         long longTime = 1234L * 3600000 + 56 * 60000 + 7 * 1000;
         db.execSQL("UPDATE readRecord SET readTime=? WHERE deviceId=? AND author=?",
             new Object[]{longTime, device, "作者甲"});
+        db.execSQL("UPDATE readRecordDaily SET readTime=? WHERE deviceId=? AND author=?",
+            new Object[]{longTime, device, "作者甲"});
         try (ActivityScenario<Activity> scenario = launch()) {
             await(scenario);
             scenario.onActivity(activity -> {
                 activity.findViewById(id("tab_all")).performClick();
+                activity.findViewById(id("scope_qualified")).performClick();
+                assertEquals(duration(longTime), text(activity, "tv_average"));
                 TextView value = activity.findViewById(id("tv_duration"));
                 assertTrue(value.getText() instanceof Spanned);
                 assertTrue(((Spanned)value.getText()).getSpans(0, value.length(), RelativeSizeSpan.class).length > 1);
@@ -300,8 +358,10 @@ public class ReadStatisticsScopeTest {
                 TextView value = activity.findViewById(id("tv_duration"));
                 assertEquals("Duration text clipped", value.length(),
                     value.getLayout().getLineEnd(value.getLineCount() - 1));
-                assertEquals("Days label wrapped", 2, ((TextView)activity.findViewById(id("tv_days"))).getLineCount());
-                assertEquals("Books label wrapped", 2, ((TextView)activity.findViewById(id("tv_books"))).getLineCount());
+                assertMetricsAligned(activity);
+                assertEquals("Days label wrapped", 1, ((TextView)activity.findViewById(id("tv_days_label"))).getLineCount());
+                assertEquals("Books label wrapped", 1, ((TextView)activity.findViewById(id("tv_books_label"))).getLineCount());
+                assertEquals("Average label wrapped", 1, ((TextView)activity.findViewById(id("tv_average_label"))).getLineCount());
             });
         }
         prefs().edit().putBoolean("readRecordUseDays", true).putBoolean("readRecordShowSeconds", false).commit();
@@ -314,6 +374,7 @@ public class ReadStatisticsScopeTest {
                 assertFalse(value.contains("秒"));
             });
             screenshot("hierarchy-long-days");
+            scenario.onActivity(this::assertMetricsAligned);
         }
     }
 
@@ -350,6 +411,7 @@ public class ReadStatisticsScopeTest {
                     assertSummary(activity, minimum, 1, 1, minimum);
                 });
                 screenshot("scope-" + theme + "-qualified");
+                scenario.onActivity(this::assertMetricsAligned);
             }
         }
     }

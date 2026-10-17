@@ -724,7 +724,8 @@ public class OptimizedReadStatisticsTest {
                             assertEquals(View.VISIBLE, activity.findViewById(id("tv_empty")).getVisibility());
                             assertEquals(string("read_statistics_filtered_empty"),
                                 ((TextView)activity.findViewById(id("tv_empty"))).getText().toString());
-                            assertEquals("0本\n读过的书", ((TextView)activity.findViewById(id("tv_books"))).getText().toString());
+                            assertEquals("0本", ((TextView)activity.findViewById(id("tv_books"))).getText().toString());
+                            assertEquals("读过的书", ((TextView)activity.findViewById(id("tv_books_label"))).getText().toString());
                             activity.findViewById(id("scope_all")).performClick();
                             for (int i = 0; i < before.length; i++)
                                 assertEquals(before[i], ((TextView)activity.findViewById(id(new String[]{"tv_duration","tv_days","tv_books","tv_average"}[i]))).getText().toString());
