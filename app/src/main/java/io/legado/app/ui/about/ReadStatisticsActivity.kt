@@ -382,6 +382,7 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
                 ReadStatisticsPeriod.MONTH -> getString(R.string.read_statistics_month_period, year, month)
             }
             val canSelect = period != ReadStatisticsPeriod.ALL
+            tvPeriod.minHeight = if (canSelect) 48.dpToPx() else 0
             tvPeriod.minimumHeight = if (canSelect) 48.dpToPx() else 0
             tvPeriod.isClickable = canSelect
             tvPeriod.isFocusable = canSelect
