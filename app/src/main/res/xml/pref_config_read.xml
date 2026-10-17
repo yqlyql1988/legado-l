@@ -205,6 +205,14 @@
 
     <io.legado.app.lib.prefs.SwitchPreference
         android:defaultValue="false"
+        android:key="crossPageTextSelection"
+        android:summary="@string/cross_page_text_selection_summary"
+        android:title="@string/cross_page_text_selection"
+        app:iconSpaceReserved="false"
+        app:isBottomBackground="true" />
+
+    <io.legado.app.lib.prefs.SwitchPreference
+        android:defaultValue="false"
         android:key="twoFingerReplacePreview"
         android:summary="@string/two_finger_replace_preview_summary"
         android:title="@string/two_finger_replace_preview"

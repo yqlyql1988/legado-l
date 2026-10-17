@@ -288,6 +288,9 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     val longPressSelectParagraph: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.longPressSelectParagraph, false)
 
+    val crossPageTextSelection: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.crossPageTextSelection, false)
+
     val twoFingerReplacePreview: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.twoFingerReplacePreview, false)
 

@@ -1107,6 +1107,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     // 按下点到光标图标中心的偏移
     private var cursorTouchOffsetX = 0f
     private var cursorTouchOffsetY = 0f
+    private var draggedSelectionCursor: View? = null
 
     // 光标图标尺寸, 不含扩大触摸范围的内边距
     private val View.iconWidth get() = width - paddingLeft - paddingRight
@@ -1123,6 +1124,8 @@ class ReadBookActivity : BaseReadBookActivity(),
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
                 textActionMenu.dismiss()
+                draggedSelectionCursor = v
+                readView.beginSelectionDrag(v.id == R.id.cursor_left)
                 cursorTouchOffsetX =
                     SelectCursorGeometry.touchOffset(event.x, v.paddingLeft, v.iconWidth)
                 cursorTouchOffsetY =
@@ -1160,6 +1163,8 @@ class ReadBookActivity : BaseReadBookActivity(),
             }
 
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                draggedSelectionCursor = null
+                readView.endSelectionDrag()
                 readView.dismissTextMagnifier()
                 readView.curPage.resetReverseCursor()
                 showTextActionMenu()
@@ -1189,10 +1194,22 @@ class ReadBookActivity : BaseReadBookActivity(),
         cursorRight.visible(true)
     }
 
+    override fun upSelectionHandleVisibility(startVisible: Boolean, endVisible: Boolean) = binding.run {
+        cursorLeft.visible(startVisible || draggedSelectionCursor === cursorLeft)
+        cursorRight.visible(endVisible || draggedSelectionCursor === cursorRight)
+        if (!startVisible && endVisible) {
+            textMenuPosition.x = cursorRight.x
+            textMenuPosition.y = cursorRight.y - cursorRight.height
+        }
+    }
+
     /**
      * 取消文字选择
      */
     override fun onCancelSelect() = binding.run {
+        draggedSelectionCursor = null
+        readView.isTextSelected = false
+        readView.endSelectionDrag()
         cursorLeft.invisible()
         cursorRight.invisible()
         textActionMenu.dismiss()
@@ -1674,7 +1691,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     private fun restoreAloudFollowOnVisiblePage() {
-        if (!BaseReadAloudService.isRun || ReadAloud.followReadAloudPosition ||
+        if (binding.readView.isTextSelected || !BaseReadAloudService.isRun || ReadAloud.followReadAloudPosition ||
             !getPrefBoolean(PreferKey.readAloudControlsRealtime, true)
         ) return
         val chapterStart = ReadAloud.readAloudChapterStart
@@ -3040,6 +3057,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         observeEventSticky<Int>(EventBus.TTS_PROGRESS) { chapterStart ->
             lastReadAloudChapterStart = chapterStart
             lastReadAloudChapterIndex = ReadAloud.readAloudChapterIndex
+            if (readView.isTextSelected) return@observeEventSticky
             if (!ReadAloud.followReadAloudPosition) {
                 scheduleAloudFollowCheck()
                 return@observeEventSticky

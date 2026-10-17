@@ -121,6 +121,7 @@ object PreferKey {
     const val launcherIcon = "launcherIcon"
     const val textSelectAble = "selectText"
     const val longPressSelectParagraph = "longPressSelectParagraph"
+    const val crossPageTextSelection = "crossPageTextSelection"
     const val twoFingerReplacePreview = "twoFingerReplacePreview"
     const val shareLayout = "shareLayout"
     const val comicStyleSelect = "comicStyleSelect"

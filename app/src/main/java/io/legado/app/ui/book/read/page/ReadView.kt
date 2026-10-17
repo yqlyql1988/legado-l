@@ -4,8 +4,10 @@ import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Paint
 import android.graphics.RectF
 import android.os.Build
+import android.os.SystemClock
 import android.util.AttributeSet
 import android.util.Log
 import android.view.MotionEvent
@@ -42,6 +44,7 @@ import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.ui.book.read.page.provider.LayoutProgressListener
 import io.legado.app.ui.book.read.page.provider.TextPageFactory
 import io.legado.app.utils.activity
+import io.legado.app.utils.dpToPx
 import io.legado.app.utils.invisible
 import io.legado.app.utils.longToastOnUi
 import io.legado.app.utils.showDialogFragment
@@ -198,6 +201,17 @@ class ReadView(context: Context, attrs: AttributeSet) :
     private val initialTextPos = TextPos(0, 0, 0)
     private var textMagnifier: SelectionMagnifierApi28? = null
     private val locationOnScreen = IntArray(2)
+    internal var isSelectionDragging = false
+        private set
+    private val selectionEdgeWait = SelectionEdgeWait()
+    private var selectionDragX = 0f
+    private var selectionDragY = 0f
+    private var blockedSelectionDirection = 0
+    private var selectionEdgeMessage: String? = null
+    private val selectionHintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER
+    }
+    private val selectionEdgeRunnable = Runnable { continueSelectionAtEdge() }
 
     private val slopSquare by lazy { ViewConfiguration.get(context).scaledTouchSlop }
     private val pullBookmarkDistance
@@ -266,6 +280,23 @@ class ReadView(context: Context, attrs: AttributeSet) :
         super.dispatchDraw(canvas)
         pageDelegate?.onDraw(canvas)
         autoPager.onDraw(canvas)
+        if (isSelectionDragging && selectionEdgeWait.direction != 0) {
+            val direction = selectionEdgeWait.direction
+            val text = selectionEdgeMessage ?: context.getString(R.string.cross_page_selection_count,
+                if (direction < 0) "↑" else "↓", curPage.selectionCharacterCount)
+            selectionHintPaint.textSize = 12f * resources.displayMetrics.scaledDensity
+            val y = if (direction < 0) curPage.selectionTop + 18.dpToPx()
+                else curPage.selectionBottom - 8.dpToPx()
+            val halfWidth = selectionHintPaint.measureText(text) / 2 + 10.dpToPx()
+            selectionHintPaint.color = ReadBookConfig.bgMeanColor
+            selectionHintPaint.alpha = 235
+            canvas.drawRoundRect(width / 2f - halfWidth, y - selectionHintPaint.textSize - 4.dpToPx(),
+                width / 2f + halfWidth, y + 4.dpToPx().toFloat(), 8.dpToPx().toFloat(),
+                8.dpToPx().toFloat(), selectionHintPaint)
+            selectionHintPaint.color = ChapterProvider.contentPaint.color
+            selectionHintPaint.alpha = 220
+            canvas.drawText(text, width / 2f, y.toFloat(), selectionHintPaint)
+        }
     }
 
     override fun computeScroll() {
@@ -312,6 +343,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
         }
 
         if (event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
+            endSelectionDrag()
             curPage.cancelHighlightTap()
             if (startReplacePreviewGesture(event)) return true
         }
@@ -325,6 +357,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
         }
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                endSelectionDrag()
                 finishReplacePreviewGesture(ReplacePreviewGestureState.IDLE)
                 resetPullBookmarkGesture(animatePage = false)
                 dismissTextMagnifier()
@@ -396,6 +429,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
             }
 
             MotionEvent.ACTION_UP -> {
+                endSelectionDrag()
                 dismissTextMagnifier()
                 callBack.screenOffTimerStart()
                 removeCallbacks(longPressRunnable)
@@ -436,6 +470,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
             }
 
             MotionEvent.ACTION_CANCEL -> {
+                endSelectionDrag()
                 curPage.cancelHighlightTap()
                 dismissTextMagnifier()
                 removeCallbacks(longPressRunnable)
@@ -565,6 +600,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
     }
 
     internal fun cancelNonPdfGestures() {
+        endSelectionDrag()
         curPage.cancelHighlightTap()
         removeCallbacks(longPressRunnable)
         longPressed = false
@@ -599,6 +635,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
     }
 
     fun cancelSelect(clearSearchResult: Boolean = false) {
+        endSelectionDrag()
         dismissTextMagnifier()
         if (isTextSelected) {
             curPage.cancelSelect(clearSearchResult)
@@ -829,6 +866,12 @@ class ReadView(context: Context, attrs: AttributeSet) :
      * 选择文本
      */
     private fun selectText(x: Float, y: Float) {
+        if ((isSelectionDragging || beginSelectionDrag(false)) &&
+            curPage.moveCrossPageSelection(x, y)
+        ) {
+            updateSelectionEdge(x, y)
+            return
+        }
         curPage.selectText(x, y) { textPos ->
             val compare = initialTextPos.compare(textPos)
             when {
@@ -860,6 +903,13 @@ class ReadView(context: Context, attrs: AttributeSet) :
         getLocationOnScreen(locationOnScreen)
         val localX = x - locationOnScreen[0]
         val localY = y - locationOnScreen[1]
+        if ((isSelectionDragging || beginSelectionDrag(moveStart)) &&
+            curPage.moveCrossPageSelection(localX, localY)
+        ) {
+            updateSelectionEdge(localX, localY)
+            showTextMagnifier(localX, localY)
+            return
+        }
         if (moveStart) {
             curPage.selectStartMove(localX, localY)
         } else {
@@ -874,6 +924,88 @@ class ReadView(context: Context, attrs: AttributeSet) :
 
     fun selectEndMoveAtRaw(x: Float, y: Float) {
         selectMoveAtRaw(x, y, false)
+    }
+
+    fun beginSelectionDrag(moveStart: Boolean): Boolean {
+        if (!isTextSelected || !curPage.beginCrossPageSelection(moveStart)) return false
+        isSelectionDragging = true
+        autoPager.pause()
+        if (BaseReadAloudService.isRun) ReadAloud.detachReadAloudFollow()
+        return true
+    }
+
+    fun endSelectionDrag() {
+        isSelectionDragging = false
+        removeCallbacks(selectionEdgeRunnable)
+        selectionEdgeWait.reset()
+        blockedSelectionDirection = 0
+        selectionEdgeMessage = null
+        invalidate()
+    }
+
+    private fun updateSelectionEdge(x: Float, y: Float) {
+        selectionDragX = x
+        selectionDragY = y
+        val direction = if (x in 0f..width.toFloat()) SelectionEdgeWait.direction(y,
+            curPage.selectionTop.toFloat(), curPage.selectionBottom.toFloat(),
+            24.dpToPx().toFloat(), selectionEdgeWait.direction) else 0
+        if (direction != blockedSelectionDirection) {
+            blockedSelectionDirection = 0
+            selectionEdgeMessage = null
+        }
+        selectionEdgeWait.update(direction, SystemClock.uptimeMillis())
+        removeCallbacks(selectionEdgeRunnable)
+        if (direction != 0 && blockedSelectionDirection == 0) {
+            postDelayed(selectionEdgeRunnable,
+                (selectionEdgeWait.deadline - SystemClock.uptimeMillis()).coerceAtLeast(0))
+        }
+        invalidate()
+    }
+
+    private fun continueSelectionAtEdge() {
+        if (!isSelectionDragging || !isTextSelected || !AppConfig.crossPageTextSelection) {
+            endSelectionDrag()
+            return
+        }
+        val chapter = curPage.selectionChapter
+        if (chapter == null || chapter !== currentChapter || pageFactory.isRefreshingResources) {
+            endSelectionDrag()
+            return
+        }
+        val direction = selectionEdgeWait.direction
+        if (direction == 0) return
+        val moved = if (isScroll) {
+            curPage.scrollCrossPageSelection(-direction * 4.dpToPx())
+        } else {
+            val target = curPage.textPage.index + direction
+            if (target !in chapter.pages.indices) false else {
+                markReadPositionChanged()
+                fillPage(if (direction < 0) PageDirection.PREV else PageDirection.NEXT)
+            }
+        }
+        if (!moved) {
+            blockedSelectionDirection = direction
+            selectionEdgeMessage = context.getString(
+                if (direction > 0 && !chapter.isCompleted) R.string.cross_page_selection_loading
+                else R.string.cross_page_selection_boundary)
+            invalidate()
+            return
+        }
+        curPage.moveCrossPageSelection(selectionDragX, selectionDragY)
+        dismissTextMagnifier()
+        if (isScroll) {
+            selectionEdgeWait.repeat(SystemClock.uptimeMillis(), 16L)
+            postDelayed(selectionEdgeRunnable, 16L)
+        } else {
+            selectionEdgeWait.repeat(SystemClock.uptimeMillis())
+            postDelayed(selectionEdgeRunnable, SelectionEdgeWait.REPEAT_WAIT)
+        }
+        invalidate()
+    }
+
+    override fun onDetachedFromWindow() {
+        endSelectionDrag()
+        super.onDetachedFromWindow()
     }
 
     fun dismissTextMagnifier() {
@@ -1082,6 +1214,18 @@ class ReadView(context: Context, attrs: AttributeSet) :
      * 从选择位置开始朗读
      */
     suspend fun aloudStartSelect() {
+        val selectionStart = curPage.selectionStartPosition
+        val selectionChapter = curPage.selectionChapter
+        if (selectionStart != null && selectionChapter === currentChapter) {
+            val page = selectionChapter!!.getPageByReadPos(selectionStart) ?: return
+            endSelectionDrag()
+            ReadBook.setPageIndex(page.index)
+            upContent(resetPageOffset = true)
+            if (!BaseReadAloudService.isRun) ReadAloud.upReadAloudClass()
+            ReadBook.readAloud(startPos = selectionStart - page.chapterPosition,
+                rewindToSentenceStart = false)
+            return
+        }
         val selectStartPos = curPage.selectStartPos
         if (!selectStartPos.isSelected()) return
         var pagePos = selectStartPos.relativePagePos
