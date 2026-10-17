@@ -11,8 +11,10 @@ import android.util.AttributeSet
 import android.view.Menu
 import android.view.View
 import android.widget.ImageView
+import android.widget.TextView
 import androidx.annotation.ColorInt
 import androidx.annotation.StyleRes
+import androidx.appcompat.widget.ActionMenuView
 import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
 import androidx.core.graphics.alpha
@@ -21,6 +23,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.children
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.tabs.TabLayout
+import com.google.android.material.shape.MaterialShapeDrawable
 import io.legado.app.R
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.theme.backgroundColor
@@ -220,9 +223,12 @@ class TitleBar @JvmOverloads constructor(
         }
     }
 
+    // AppBarLayout can wrap a transparent color in a shape whose drawable alpha is still 255.
     val usesTransparentForeground: Boolean
         get() = automaticForeground && context.transparentNavBar &&
-            !AppConfig.isEInkMode && background?.alpha == 0
+            !AppConfig.isEInkMode && (background?.alpha == 0 ||
+                (background as? MaterialShapeDrawable)?.fillColor
+                    ?.getColorForState(drawableState, Color.TRANSPARENT)?.alpha == 0)
 
     fun applyForegroundColor() {
         if (!usesTransparentForeground) return
@@ -248,6 +254,11 @@ class TitleBar @JvmOverloads constructor(
             ?.setTabTextColors(tabUnselectedColor, color)
         toolbar.menu.forEach { item ->
             (item.actionView as? SearchView)?.applyTint(color)
+        }
+        toolbar.children.filterIsInstance<ActionMenuView>().forEach { actions ->
+            actions.children.filterIsInstance<TextView>().forEach { action ->
+                action.setTextColor(color)
+            }
         }
     }
 

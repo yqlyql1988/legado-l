@@ -152,7 +152,7 @@ abstract class HighlightTagDao {
         val preserved = if (orders == null) all().filter { it.bookUrl.isNotEmpty() && it.id !in tags.map { tag -> tag.id } }
             else emptyList()
         val preservedIds = preserved.mapTo(hashSetOf()) { it.id }
-        val restoredTags = tags + preserved
+        val restoredTags = tags.map { it.copy(note = it.note.orEmpty()) } + preserved
         val restoredLinks = links + if (preservedIds.isEmpty()) emptyList()
             else links().filter { it.tagId in preservedIds }
         replaceDefinitions(restoredTags)

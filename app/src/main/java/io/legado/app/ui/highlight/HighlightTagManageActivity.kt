@@ -59,15 +59,6 @@ class HighlightTagManageActivity : BaseActivity<ActivityHighlightTagBinding>(), 
     })
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
-        binding.titleBar.toolbar.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
-        binding.titleBar.menu.add(Menu.NONE, R.id.btn_save, Menu.NONE, R.string.action_save).apply {
-            setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_ALWAYS)
-            setOnMenuItemClickListener { save(); true }
-        }
-        binding.titleBar.menu.add(R.string.highlight_tag_preview).setOnMenuItemClickListener {
-            showPreview()
-            true
-        }
         original = savedInstanceState?.getString("original")?.let { GSON.fromJsonArray<HighlightTag>(it).getOrNull() }
             ?: appDb.highlightTagDao.all()
         tags.addAll(savedInstanceState?.getString("tags")?.let { GSON.fromJsonArray<HighlightTag>(it).getOrNull() } ?: original)
@@ -98,6 +89,23 @@ class HighlightTagManageActivity : BaseActivity<ActivityHighlightTagBinding>(), 
                 .setNeutralButton(R.string.cancel, null).show()
         }
         render()
+    }
+
+    override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {
+        // AppCompat finishes installing its home indicator after the menu callback.
+        binding.titleBar.post {
+            binding.titleBar.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
+            binding.titleBar.applyForegroundColor()
+        }
+        menu.add(Menu.NONE, R.id.btn_save, Menu.NONE, R.string.action_save).apply {
+            setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_ALWAYS)
+            setOnMenuItemClickListener { save(); true }
+        }
+        menu.add(R.string.highlight_tag_preview).setOnMenuItemClickListener {
+            showPreview()
+            true
+        }
+        return true
     }
 
     private fun render() {
@@ -220,7 +228,9 @@ class HighlightTagManageActivity : BaseActivity<ActivityHighlightTagBinding>(), 
         override fun onBindViewHolder(holder: TagHolder, position: Int) {
             val tag = visibleTags[position]
             holder.row.tvName.text = tag.name
-            holder.row.tvName.highlightStyle = tag.styleObj()
+            holder.row.tvPreview.highlightStyle = tag.styleObj()
+            holder.row.tvNote.text = tag.note
+            holder.row.tvNote.isVisible = tag.note.isNotBlank()
             holder.row.tvStyle.text = getString(if (tag.bookUrl.isEmpty()) R.string.highlight_tag_global else R.string.highlight_tag_book)
             holder.row.editLabel.setOnClickListener {
                 if (!saving) showDialogFragment(HighlightTagEditDialog.create(

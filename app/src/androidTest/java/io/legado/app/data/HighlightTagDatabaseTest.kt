@@ -148,6 +148,66 @@ class HighlightTagDatabaseTest {
         } finally { upgraded.close(); context.deleteDatabase(name) }
     }
 
+    @Test fun upgrade116AddsEmptyTagNotesAndKeepsScopesLinksOrdersAndReadingData() {
+        val name = "highlight-tag-note-migration"
+        context.deleteDatabase(name)
+        migrations.createDatabase(name, 116).apply {
+            execSQL("""INSERT INTO highlights
+                (time,bookUrl,chapterUrl,bookName,bookAuthor,chapterIndex,chapterPos,chapterPosEnd,
+                layoutTitleLength,chapterName,bookText,style,note)
+                VALUES (123,'book','chapter','Book','Author',2,5,8,0,'Chapter','abc','{"fill":19}','Old note')""")
+            execSQL("""INSERT INTO highlight_tags (id,name,style,sortOrder,bookUrl)
+                VALUES ('shared','金句','{"bold":true}',4,''),('local','伏笔','{}',1,'book')""")
+            execSQL("INSERT INTO highlight_tag_links VALUES (123,'shared'),(123,'local')")
+            execSQL("INSERT INTO highlight_tag_orders VALUES ('book','local',0),('book','shared',1)")
+            execSQL("""INSERT INTO bookmarks
+                (time,bookName,bookAuthor,chapterIndex,chapterPos,chapterName,bookText,content)
+                VALUES (1,'Book','Author',2,5,'Chapter','abc','Bookmark')""")
+            execSQL("""INSERT INTO readRecord(deviceId,bookName,author,readTime,lastRead,lastChapterIndex,lastChapterPos)
+                VALUES ('device-a','Book','Author',200,100,2,5),('device-b','Book','Author',300,200,3,9)""")
+            execSQL("""INSERT INTO readRecordDaily(deviceId,bookName,author,date,readTime)
+                VALUES ('device-a','Book','Author','2026-10-17',120)""")
+            close()
+        }
+        val upgraded = Room.databaseBuilder(context, AppDatabase::class.java, name)
+            .addMigrations(*DatabaseMigrations.migrations).build()
+        try {
+            assertTrue(upgraded.highlightTagDao.all().all { it.note.isEmpty() })
+            assertEquals(listOf("local", "shared"), upgraded.highlightTagDao.forBook("book").map { it.id })
+            assertEquals(setOf("local", "shared"), upgraded.highlightTagDao.idsForHighlight(123).toSet())
+            val local = upgraded.highlightTagDao.all().first { it.id == "local" }
+            upgraded.highlightTagDao.saveTag(local.copy(note = "升级后填写\n多行备注"))
+            assertEquals("升级后填写\n多行备注", upgraded.highlightTagDao.forBook("book").first().note)
+            assertEquals("Old note", upgraded.bookHighlightDao.all.single().note)
+            assertEquals(19, upgraded.bookHighlightDao.all.single().styleObj().fill)
+            upgraded.openHelper.readableDatabase.query("SELECT count(*) FROM bookmarks").use {
+                it.moveToFirst(); assertEquals(1, it.getInt(0))
+            }
+            upgraded.openHelper.readableDatabase.query(
+                "SELECT count(*),sum(readTime),sum(lastChapterPos) FROM readRecord").use {
+                it.moveToFirst()
+                assertEquals(2, it.getInt(0)); assertEquals(500, it.getInt(1)); assertEquals(14, it.getInt(2))
+            }
+            upgraded.openHelper.readableDatabase.query("SELECT sum(readTime) FROM readRecordDaily").use {
+                it.moveToFirst(); assertEquals(120, it.getInt(0))
+            }
+        } finally { upgraded.close(); context.deleteDatabase(name) }
+    }
+
+    @Test fun restoringLegacyTagsDefaultsMissingOrNullNotesAndKeepsStableLinks() {
+        val tags = io.legado.app.utils.GSON.fromJson(
+            """[{"id":"old","name":"伏笔","style":"{}","sortOrder":0},
+                {"id":"null","name":"金句","style":"{}","sortOrder":1,"note":null}]""",
+            Array<HighlightTag>::class.java).toList()
+        repeat(2) {
+            db.highlightTagDao.restore(tags, listOf(HighlightTagLink(first.time, "old")),
+                listOf(first.time), emptyList())
+        }
+        assertTrue(db.highlightTagDao.all().all { it.note.isEmpty() })
+        assertEquals(listOf("old"), db.highlightTagDao.idsForHighlight(first.time))
+        assertEquals(first, db.bookHighlightDao.all.first { it.time == first.time })
+    }
+
     @Test fun restoringLargeAllBookBackupsKeepsEveryAssociationAndNote() {
         val annotations = (1..1500).map { index ->
             first.copy(time = 10000L + index, bookUrl = "book-$index", note = "Note $index")

@@ -16,7 +16,7 @@ import io.legado.app.data.entities.HighlightTag
 import io.legado.app.databinding.DialogHighlightTagEditBinding
 import io.legado.app.help.HighlightStyle
 import io.legado.app.lib.theme.backgroundColor
-import io.legado.app.ui.book.read.UnderlineEditDialog
+import io.legado.app.ui.book.read.HighlightStyleDialog
 import io.legado.app.ui.highlight.edit.HighlightRuleEditDialog
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
@@ -24,7 +24,7 @@ import io.legado.app.utils.setLayout
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 
 class HighlightTagEditDialog : BaseDialogFragment(R.layout.dialog_highlight_tag_edit),
-    ColorPickerDialogListener, UnderlineEditDialog.Callback {
+    ColorPickerDialogListener, HighlightStyleDialog.StyleHost {
     interface Callback {
         fun saveTag(tag: HighlightTag): Boolean
         fun deleteTag(id: String)
@@ -33,7 +33,6 @@ class HighlightTagEditDialog : BaseDialogFragment(R.layout.dialog_highlight_tag_
     private val binding by viewBinding(DialogHighlightTagEditBinding::bind)
     private var tag = HighlightTag()
     private var style = HighlightStyle(underline = HighlightStyle.Underline())
-    private val underline get() = style.underline ?: HighlightStyle.Underline()
 
     override fun onStart() {
         super.onStart()
@@ -48,12 +47,16 @@ class HighlightTagEditDialog : BaseDialogFragment(R.layout.dialog_highlight_tag_
         binding.root.setBackgroundColor(requireContext().backgroundColor)
         binding.titleBar.title = getString(if (arguments?.getBoolean("new") == true)
             R.string.highlight_tag_add else R.string.highlight_tag_edit)
-        binding.titleBar.toolbar.setNavigationOnClickListener { dismiss() }
+        binding.titleBar.toolbar.apply {
+            setNavigationIcon(androidx.appcompat.R.drawable.abc_ic_ab_back_material)
+            setNavigationOnClickListener { dismiss() }
+        }
         binding.titleBar.menu.add(Menu.NONE, R.id.btn_ok, Menu.NONE, R.string.action_save).apply {
             setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_ALWAYS)
             setOnMenuItemClickListener {
                 val name = binding.etName.text.toString().trim()
-                val updated = tag.copy(name = name, style = GSON.toJson(style.normalized()))
+                val updated = tag.copy(name = name, note = binding.etNote.text.toString().trim(),
+                    style = GSON.toJson(style.normalized()))
                 if (name.isEmpty() || (activity as? Callback)?.saveTag(updated) != true)
                     binding.etName.error = getString(R.string.highlight_tag_duplicate)
                 else dismiss()
@@ -61,6 +64,7 @@ class HighlightTagEditDialog : BaseDialogFragment(R.layout.dialog_highlight_tag_
             }
         }
         binding.etName.setText(tag.name)
+        binding.etNote.setText(tag.note)
         val owner = arguments?.getString("bookUrl").orEmpty()
         binding.spScope.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item,
             listOf(getString(R.string.highlight_tag_global), getString(R.string.highlight_tag_book)))
@@ -74,24 +78,11 @@ class HighlightTagEditDialog : BaseDialogFragment(R.layout.dialog_highlight_tag_
                     R.string.highlight_tag_edit_global_hint else R.string.highlight_tag_edit_book_hint)
             }
         }
-        binding.spKind.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item,
-            HighlightStyle.Kind.entries.map { getString(it.labelRes()) })
-        binding.spKind.setSelection(underline.kind.ordinal)
-        binding.spKind.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
-            override fun onItemSelected(parent: AdapterView<*>?, item: View?, position: Int, id: Long) {
-                style = style.copy(underline = underline.copy(kind = HighlightStyle.Kind.entries[position]))
-                preview()
-            }
-        }
-        binding.btnColor.setOnClickListener {
-            HighlightRuleEditDialog.createColorPickerDialog(
-                COLOR_ID, underline.color, false, this
-            ).show(childFragmentManager, COLOR_TAG)
+        binding.btnStyle.setOnClickListener {
+            HighlightStyleDialog().show(childFragmentManager, STYLE_TAG)
         }
         (childFragmentManager.findFragmentByTag(COLOR_TAG) as? ColorPickerDialog)
             ?.setColorPickerDialogListener(this)
-        binding.btnWidth.setOnClickListener { UnderlineEditDialog.show(childFragmentManager, underline) }
         binding.btnDelete.isVisible = arguments?.getBoolean("new") != true
         binding.btnDelete.setOnClickListener {
             AlertDialog.Builder(requireContext())
@@ -109,31 +100,37 @@ class HighlightTagEditDialog : BaseDialogFragment(R.layout.dialog_highlight_tag_
 
     private fun preview() {
         binding.tvPreview.highlightStyle = style
-        binding.btnColor.setTextColor(underline.color.takeIf { it != 0 } ?: binding.tvPreview.currentTextColor)
-        binding.btnWidth.text = getString(R.string.highlight_tag_style_description,
-            getString(underline.kind.labelRes()), underline.width, underline.distance)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("tag", GSON.toJson(tag.copy(
-            name = binding.etName.text.toString(), style = GSON.toJson(style))))
+            name = binding.etName.text.toString(), note = binding.etNote.text.toString(),
+            style = GSON.toJson(style))))
         super.onSaveInstanceState(outState)
     }
 
     override fun onColorSelected(dialogId: Int, color: Int) {
-        style = style.copy(underline = underline.copy(color = color))
+        style = HighlightStyleDialog.applyChannelColor(style, dialogId, color)
+        (childFragmentManager.findFragmentByTag(STYLE_TAG) as? HighlightStyleDialog)?.refresh()
         preview()
     }
 
     override fun onDialogDismissed(dialogId: Int) = Unit
 
-    override fun onUnderlineChanged(underline: HighlightStyle.Underline) {
-        style = style.copy(underline = underline)
+    override fun currentHighlightStyle(): HighlightStyle = style
+
+    override fun onHighlightStyleChanged(style: HighlightStyle) {
+        this.style = style.normalized()
         preview()
     }
 
+    override fun pickHighlightColor(dialogId: Int, initial: Int, withAlpha: Boolean) {
+        HighlightRuleEditDialog.createColorPickerDialog(dialogId, initial, withAlpha, this)
+            .show(childFragmentManager, COLOR_TAG)
+    }
+
     companion object {
-        private const val COLOR_ID = 8401
+        private const val STYLE_TAG = "highlight-tag-style"
         private const val COLOR_TAG = "highlight-tag-color"
         fun create(tag: HighlightTag, isNew: Boolean, bookUrl: String = "") = HighlightTagEditDialog().apply {
             arguments = Bundle().apply {

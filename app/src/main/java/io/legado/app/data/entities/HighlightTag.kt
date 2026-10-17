@@ -16,7 +16,8 @@ data class HighlightTag(
     val name: String = "",
     val style: String = "",
     val sortOrder: Int = 0,
-    @ColumnInfo(defaultValue = "''") val bookUrl: String = ""
+    @ColumnInfo(defaultValue = "''") val bookUrl: String = "",
+    @ColumnInfo(defaultValue = "''") val note: String = ""
 ) {
     fun styleObj(): HighlightStyle =
         (GSON.fromJsonObject<HighlightStyle>(style).getOrNull() ?: HighlightStyle(
