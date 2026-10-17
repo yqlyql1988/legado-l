@@ -11,7 +11,6 @@ import android.view.View;
 import android.widget.GridLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-import androidx.recyclerview.widget.RecyclerView;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
@@ -388,7 +387,7 @@ public class OptimizedReadStatisticsTest {
                         String[] before = new String[4];
                         scenario.onActivity(activity -> {
                             activity.findViewById(id(tab)).performClick();
-                            assertTrue(((RecyclerView)activity.findViewById(id("recycler_view"))).getAdapter().getItemCount() >= 2);
+                            assertEquals(View.GONE, activity.findViewById(id("tv_empty")).getVisibility());
                             for (int i = 0; i < before.length; i++)
                                 before[i] = ((TextView)activity.findViewById(id(new String[]{"tv_duration","tv_days","tv_books","tv_average"}[i]))).getText().toString();
                         });
@@ -397,7 +396,7 @@ public class OptimizedReadStatisticsTest {
                         await(scenario, "tv_duration");
                         scenario.onActivity(activity -> {
                             assertTrue(activity.findViewById(id(tab)).isSelected());
-                            assertEquals(1, ((RecyclerView)activity.findViewById(id("recycler_view"))).getAdapter().getItemCount());
+                            assertEquals(View.VISIBLE, activity.findViewById(id("tv_empty")).getVisibility());
                             assertEquals(string("read_statistics_filtered_empty"),
                                 ((TextView)activity.findViewById(id("tv_empty"))).getText().toString());
                             for (int i = 0; i < before.length; i++)
@@ -406,7 +405,7 @@ public class OptimizedReadStatisticsTest {
                                 assertEquals(View.VISIBLE, activity.findViewById(id("day_books")).getVisibility());
                                 activity.findViewById(id("tab_year")).performClick();
                             } else activity.findViewById(id("tab_month")).performClick();
-                            assertTrue(((RecyclerView)activity.findViewById(id("recycler_view"))).getAdapter().getItemCount() >= 2);
+                            assertEquals(View.GONE, activity.findViewById(id("tv_empty")).getVisibility());
                         });
                     }
                 } finally {
