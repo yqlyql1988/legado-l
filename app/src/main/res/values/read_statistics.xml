@@ -17,6 +17,12 @@
     <string name="read_statistics_current_month">回到本月</string>
     <string name="read_statistics_this_year">今年已记录 %1$s</string>
     <string name="read_statistics_total_duration">累计阅读时长</string>
+    <string name="read_statistics_duration">阅读时长</string>
+    <string name="read_statistics_scope_all">全部</string>
+    <string name="read_statistics_scope_qualified">达标</string>
+    <string name="read_statistics_scope_all_description">统计范围：全部阅读记录</string>
+    <string name="read_statistics_scope_qualified_description">统计范围：达到当前时段最低时长的书籍</string>
+    <string name="read_statistics_scope_explanation">全部：统计当前时段的所有阅读记录。\n达标：按当前月、年或累计最低时长筛选书籍，再统计这些书在该时段的完整时长、书籍数、阅读天数及图表。明细日均为所选书籍的按日明细时长除以这些书有阅读的天数；历史未分期时长不计入日均。\n排行始终按各自最低时长显示；日度门槛只影响当天排行。门槛为 0 时不过滤，切换不会删除任何记录。</string>
     <string name="read_statistics_year_duration">这一年，留给阅读的时间</string>
     <string name="read_statistics_month_duration">这个月，留给阅读的时间</string>
     <string name="read_statistics_days">已记录天数</string>
@@ -27,7 +33,7 @@
     <string name="read_statistics_history">历史未分期时长：%1$s</string>
     <string name="read_statistics_help">统计说明</string>
     <string name="read_statistics_ranking_settings">排行显示设置</string>
-    <string name="read_statistics_ranking_explanation">设置书籍最低显示时长。全为 0 表示不过滤；仅隐藏排行书籍，所有阅读统计照常保留。</string>
+    <string name="read_statistics_ranking_explanation">最低时长为 0 时不过滤。“全部”统计所有记录，“达标”仅统计达到当前时段门槛的书籍；日度设置仅影响日榜。</string>
     <string name="read_statistics_day_minimum">日度排行</string>
     <string name="read_statistics_month_minimum">月度排行</string>
     <string name="read_statistics_year_minimum">年度排行</string>

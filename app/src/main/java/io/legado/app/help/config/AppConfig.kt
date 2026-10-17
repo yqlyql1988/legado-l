@@ -604,6 +604,10 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     val readStatisticsAllMinimum: Long
         get() = appCtx.getPrefLong("readStatisticsAllMinimum", 0).coerceAtLeast(0)
 
+    var readStatisticsQualifiedOnly: Boolean
+        get() = appCtx.getPrefBoolean("readStatisticsQualifiedOnly", false)
+        set(value) { appCtx.putPrefBoolean("readStatisticsQualifiedOnly", value) }
+
     var enableReadRecord: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.enableReadRecord, true)
         set(value) {

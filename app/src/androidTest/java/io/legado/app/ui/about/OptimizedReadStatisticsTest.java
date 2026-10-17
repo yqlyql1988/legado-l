@@ -15,6 +15,8 @@ import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 import org.junit.Test;
+import org.junit.Before;
+import org.junit.After;
 import org.junit.runner.RunWith;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -37,6 +39,12 @@ import static org.hamcrest.Matchers.allOf;
 @RunWith(AndroidJUnit4.class)
 public class OptimizedReadStatisticsTest {
     private final Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+    private Map<String, Object> originalScope;
+    @Before public void resetScope() {
+        originalScope = savePrefs("readStatisticsQualifiedOnly");
+        assertTrue(prefs().edit().putBoolean("readStatisticsQualifiedOnly", false).commit());
+    }
+    @After public void restoreScope() { restorePrefs(originalScope); }
     private int id(String name) {
         int value = context.getResources().getIdentifier(name, "id", context.getPackageName());
         assertTrue("Missing view: " + name, value != 0);
@@ -51,7 +59,8 @@ public class OptimizedReadStatisticsTest {
         return context.getString(value, args);
     }
     private void checkStatisticsHelp(String expectedDate, String screenshotName) throws Exception {
-        String explanation = string("read_statistics_coverage", expectedDate);
+        String explanation = string("read_statistics_coverage", expectedDate) + "\n\n" +
+            string("read_statistics_scope_explanation");
         onView(withText(explanation)).check(doesNotExist());
         openActionBarOverflowOrOptionsMenu(context);
         onView(withText(string("read_statistics_help"))).inRoot(isPlatformPopup()).perform(click());

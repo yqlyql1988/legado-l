@@ -5,6 +5,7 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.InsetDrawable
 import android.graphics.drawable.StateListDrawable
 import android.os.Bundle
 import android.view.Gravity
@@ -89,6 +90,8 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         header.previousPeriod.setOnClickListener { movePeriod(-1) }
         header.nextPeriod.setOnClickListener { movePeriod(1) }
         header.tvPeriod.setOnClickListener { showPeriodPicker() }
+        header.scopeAll.setOnClickListener { selectScope(false) }
+        header.scopeQualified.setOnClickListener { selectScope(true) }
         val surface = ColorUtils.blendColors(backgroundColor, accentColor, .06f)
         header.summary.background = rounded(surface)
         header.trendPanel.background = rounded(surface)
@@ -127,7 +130,8 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         }
         if (item.itemId == R.id.menu_statistics_help) {
             alert(R.string.read_statistics_help) {
-                setMessage(getString(R.string.read_statistics_coverage, earliestDate().toString()))
+                setMessage(getString(R.string.read_statistics_coverage, earliestDate().toString()) +
+                    "\n\n" + getString(R.string.read_statistics_scope_explanation))
                 okButton()
             }
             return true
@@ -155,7 +159,7 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
                 field.contentDescription = getString(R.string.read_statistics_minimum_accessibility,
                     getString(labels[index]), getString(units[part]))
                 field.backgroundTintList = null
-                field.background = StateListDrawable().apply {
+                field.background = InsetDrawable(StateListDrawable().apply {
                     fun box(focused: Boolean) = GradientDrawable().apply {
                         cornerRadius = 8.dpToPx().toFloat()
                         setColor(ColorUtils.blendColors(backgroundColor, accentColor, .03f))
@@ -164,7 +168,7 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
                     }
                     addState(intArrayOf(android.R.attr.state_focused), box(true))
                     addState(intArrayOf(), box(false))
-                }
+                }, 0, 4.dpToPx(), 0, 4.dpToPx())
                 field.doAfterTextChanged { row.error.isVisible = false }
             }
         }
@@ -356,14 +360,35 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         value, AppConfig.readRecordUseDays, AppConfig.readRecordShowSeconds,
     )
 
+    private fun selectScope(qualifiedOnly: Boolean) {
+        if (AppConfig.readStatisticsQualifiedOnly == qualifiedOnly) return
+        AppConfig.readStatisticsQualifiedOnly = qualifiedOnly
+        render()
+    }
+
     private fun render() {
-        val summary = snapshot.summary(period, year, month)
         val minimum = when (period) {
             ReadStatisticsPeriod.ALL -> AppConfig.readStatisticsAllMinimum
             ReadStatisticsPeriod.YEAR -> AppConfig.readStatisticsYearMinimum
             ReadStatisticsPeriod.MONTH -> AppConfig.readStatisticsMonthMinimum
         }
-        val visibleBooks = summary.books.visibleReadStatisticsBooks(minimum)
+        val all = snapshot.summary(period, year, month)
+        val qualifiedOnly = AppConfig.readStatisticsQualifiedOnly
+        val summary = if (qualifiedOnly) snapshot.summary(period, year, month, minimum) else all
+        val visibleBooks = all.books.visibleReadStatisticsBooks(minimum)
+        header.statisticsScope.background = rounded(
+            ColorUtils.blendColors(backgroundColor, accentColor, .04f),
+        ).apply { cornerRadius = 10.dpToPx().toFloat() }
+        listOf(header.scopeAll, header.scopeQualified).forEachIndexed { index, button ->
+            val selected = (index == 1) == qualifiedOnly
+            button.isSelected = selected
+            button.backgroundTintList = null
+            button.background = rounded(
+                if (selected) ColorUtils.blendColors(backgroundColor, accentColor, .20f)
+                else Color.TRANSPARENT,
+            ).apply { cornerRadius = 8.dpToPx().toFloat() }
+            button.setTextColor(if (selected) accentColor else contentSecondary)
+        }
         val buttons = listOf(header.tabAll, header.tabYear, header.tabMonth)
         buttons.forEachIndexed { index, button ->
             val selected = index == period.ordinal
@@ -399,11 +424,6 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
                 R.string.read_statistics_previous_month else R.string.read_statistics_previous_year)
             nextPeriod.contentDescription = getString(if (period == ReadStatisticsPeriod.MONTH)
                 R.string.read_statistics_next_month else R.string.read_statistics_next_year)
-            tvDurationLabel.setText(when (period) {
-                ReadStatisticsPeriod.ALL -> R.string.read_statistics_total_duration
-                ReadStatisticsPeriod.YEAR -> R.string.read_statistics_year_duration
-                ReadStatisticsPeriod.MONTH -> R.string.read_statistics_month_duration
-            })
             tvDuration.text = duration(summary.duration)
             tvDays.text = "${getString(R.string.read_statistics_day_count, summary.days.size)}\n${getString(R.string.read_statistics_days)}"
             tvBooks.text = "${getString(R.string.read_statistics_book_count, summary.books.size)}\n${getString(R.string.read_statistics_books)}"
@@ -416,7 +436,7 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
                 ReadStatisticsPeriod.MONTH -> R.string.read_statistics_month_books
             })
             tvEmpty.isVisible = visibleBooks.isEmpty()
-            tvEmpty.setText(if (summary.books.isEmpty()) R.string.read_statistics_empty else R.string.read_statistics_filtered_empty)
+            tvEmpty.setText(if (all.books.isEmpty()) R.string.read_statistics_empty else R.string.read_statistics_filtered_empty)
             calendarPanel.isVisible = period == ReadStatisticsPeriod.MONTH
             chart.isVisible = period != ReadStatisticsPeriod.MONTH
             tvPeak.isVisible = period != ReadStatisticsPeriod.MONTH
@@ -508,7 +528,8 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         header.tvSelectedDay.text = getString(
             R.string.read_statistics_selected_day, day, duration(summary.days[day] ?: 0),
         )
-        val times = snapshot.daily.filter { it.date == day }
+        val identities = summary.books.mapTo(hashSetOf()) { it.bookName to it.author }
+        val times = snapshot.daily.filter { it.date == day && (it.bookName to it.author) in identities }
             .associate { (it.bookName to it.author) to it.readTime }
         val dayBooks = snapshot.records.mapNotNull { record ->
             times[record.bookName to record.author]?.takeIf { it > 0 }?.let { record.copy(readTime = it) }
