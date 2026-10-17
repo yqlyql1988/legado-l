@@ -11,7 +11,6 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import io.legado.app.R
 import io.legado.app.data.entities.HighlightTag
-import io.legado.app.help.HighlightStyle
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getCompatColor
@@ -40,11 +39,3 @@ internal fun Context.highlightTagChip(tag: HighlightTag, selected: Boolean, comp
         })
         setOnClickListener { click() }
     }
-
-internal fun HighlightStyle.Kind.labelRes(): Int = when (this) {
-    HighlightStyle.Kind.SOLID -> R.string.highlight_underline_solid
-    HighlightStyle.Kind.WAVY -> R.string.highlight_underline_wavy
-    HighlightStyle.Kind.DASHED -> R.string.highlight_underline_dashed
-    HighlightStyle.Kind.DOTTED -> R.string.highlight_underline_dotted
-    HighlightStyle.Kind.DOUBLE -> R.string.highlight_underline_double
-}

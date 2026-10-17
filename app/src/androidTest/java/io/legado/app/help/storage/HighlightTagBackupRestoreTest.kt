@@ -40,8 +40,14 @@ class HighlightTagBackupRestoreTest {
         val second = first.copy(time = first.time + 1, bookUrl = "fixture-tag-book-b",
             bookName = "Tag fixture B", note = "第二本书")
         val tags = HighlightTags.defaults().reversed().mapIndexed { index, tag ->
-            tag.copy(name = "${tag.name}测试", sortOrder = index)
-        } + HighlightTag(id = "local-backup", name = "本书线索", sortOrder = 4, bookUrl = first.bookUrl)
+            tag.copy(name = "${tag.name}测试", sortOrder = index, note = "通用标签含义 $index\n跨书共用")
+        } + HighlightTag(id = "local-backup", name = "本书线索", sortOrder = 4,
+            bookUrl = first.bookUrl, note = "仅本书的线索说明",
+            style = GSON.toJson(HighlightStyle(fill = 0x80FFE082.toInt(),
+                fillShape = HighlightStyle.FillShape.PILL, bold = true, italic = true,
+                underline = HighlightStyle.Underline(HighlightStyle.Kind.DOUBLE, 0xFF43864C.toInt()),
+                emphasis = HighlightStyle.Deco(0xFF43864C.toInt()), shadow = HighlightStyle.Shadow(),
+                fontSize = 22f, letterSpacing = 0.1f, horizontalPadding = 8f)))
         val links = listOf(HighlightTagLink(first.time, tags.first().id),
             HighlightTagLink(first.time, tags.last().id), HighlightTagLink(second.time, tags.first().id))
         val orders = tags.reversed().mapIndexed { index, tag ->
@@ -88,6 +94,16 @@ class HighlightTagBackupRestoreTest {
             assertFalse(appDb.highlightTagDao.forBook(second.bookUrl).any { it.bookUrl.isNotEmpty() })
             assertEquals(tags.first().styleObj(),
                 HighlightTags.effectiveStyle(first, tags, appDb.highlightTagDao.idsForHighlight(first.time)))
+
+            // A backup written before label notes existed must not erase notes added locally.
+            val tagFile = File(unpacked, "highlightTag.json")
+            val fullTagJson = tagFile.readText()
+            val legacyTags = org.json.JSONArray(fullTagJson)
+            for (index in 0 until legacyTags.length()) legacyTags.getJSONObject(index).remove("note")
+            tagFile.writeText(legacyTags.toString())
+            repeat(2) { restore() }
+            assertEquals(tags, appDb.highlightTagDao.all())
+            tagFile.writeText(fullTagJson)
 
             // A pre-label backup has only highlight.json. Upsert must preserve existing label links.
             File(unpacked, "highlightTag.json").delete()

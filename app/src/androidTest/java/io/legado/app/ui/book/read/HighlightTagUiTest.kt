@@ -61,7 +61,8 @@ class HighlightTagUiTest {
     private val savedPrefs = listOf(PreferKey.textSelectAble, PreferKey.longPressSelectParagraph,
         PreferKey.highlightLastStyle, PreferKey.preDownloadNum,
         PreferKey.textSelectMenuConfig, PreferKey.highlightMenuConfig).associateWith { prefs.all[it] }
-    private val savedHelp = listOf("readHelpVersion", "readMenuHelpVersion").associateWith { LocalConfig.all[it] }
+    private val savedHelp = listOf("readHelpVersion", "readMenuHelpVersion",
+        "highlightTagNoteHelpShown").associateWith { LocalConfig.all[it] }
     private val savedTags = appDb.highlightTagDao.all()
     private val savedLinks = appDb.highlightTagDao.links()
     private val savedOrders = appDb.highlightTagDao.orders()
@@ -75,7 +76,10 @@ class HighlightTagUiTest {
     private val chapter = BookChapter(bookUrl = book.bookUrl, url = "${book.bookUrl}/0", title = "第一章")
     private var scenario: ActivityScenario<ReadBookActivity>? = null
     private lateinit var highlight: BookHighlight
-    private val tags = HighlightTags.defaults() + (1..9).map {
+    private val tagNote = "值得摘录、反复阅读的表达。\n用于记录能引起共鸣或值得借鉴的句子。"
+    private val tags = HighlightTags.defaults().mapIndexed { index, tag ->
+        if (index == 0) tag.copy(note = tagNote) else tag
+    } + (1..9).map {
         HighlightTag(id = "fixture-extra-$it", name = "附加标签$it", sortOrder = 3 + it,
             style = HighlightTags.defaults().first().style)
     }
@@ -115,8 +119,49 @@ class HighlightTagUiTest {
             } }
         }.commit()
         LocalConfig.edit().apply {
-            savedHelp.forEach { (key, value) -> if (value == null) remove(key) else putInt(key, value as Int) }
+            savedHelp.forEach { (key, value) -> when (value) {
+                null -> remove(key)
+                is Int -> putInt(key, value)
+                is Boolean -> putBoolean(key, value)
+            } }
         }.commit()
+    }
+
+    @Test fun longPressShowsNoteWithoutTogglingOrLosingTheScrolledLabelRow() {
+        selectAndHighlight()
+        popupLabel("赞").perform(click())
+        val ids = appDb.highlightTagDao.idsForHighlight(highlight.time)
+        popupLabel("赞").perform(longClick())
+        onView(withText(tagNote)).inRoot(isDialog()).check(matches(isDisplayed()))
+        assertEquals(ids, appDb.highlightTagDao.idsForHighlight(highlight.time))
+        screenshot("tag-note")
+        onView(withText(R.string.close)).inRoot(isDialog()).perform(click())
+        popupLabel("赞").check(matches(isSelected()))
+        popupLabel("赞").perform(object : ViewAction {
+            override fun getConstraints(): Matcher<View> = isDisplayed()
+            override fun getDescription() = "Scroll the label row before viewing another note"
+            override fun perform(ui: UiController, view: View) {
+                (view.parent.parent as HorizontalScrollView).scrollTo((view.parent as LinearLayout).width, 0)
+                ui.loopMainThreadForAtLeast(300)
+            }
+        })
+        var previousScroll = 0
+        popupLabel("附加标签9").check { view, _ ->
+            previousScroll = (view.parent.parent as HorizontalScrollView).scrollX
+            assertTrue(previousScroll > 0)
+            assertTrue(view.createAccessibilityNodeInfo().actionList.any {
+                it.label?.toString() == context.getString(R.string.highlight_tag_view_note)
+            })
+        }.perform(longClick())
+        onView(withText(R.string.highlight_tag_note_empty)).inRoot(isDialog()).check(matches(isDisplayed()))
+        onView(withText(R.string.close)).inRoot(isDialog()).perform(click())
+        popupLabel("附加标签9").check { view, _ ->
+            assertEquals(previousScroll, (view.parent.parent as HorizontalScrollView).scrollX)
+        }
+        assertEquals(ids, appDb.highlightTagDao.idsForHighlight(highlight.time))
+        popupLabel("附加标签9").perform(click())
+        assertTrue("A single tap still selects the label",
+            tags.last().id in appDb.highlightTagDao.idsForHighlight(highlight.time))
     }
 
     @Test fun selectTextOpensTwoRowsAndTagsToggleWithoutChangingNotesOrBaseStyle() {

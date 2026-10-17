@@ -5,8 +5,8 @@
     <string name="highlight_tag_scope">适用范围</string>
     <string name="highlight_tag_book_hint">包含本书与通用标签。拖动仅调整本书顺序，已选标签中靠前的决定样式。</string>
     <string name="highlight_tag_global_hint">所有书籍可用。拖动调整默认顺序，已自定义顺序的书籍不受影响。</string>
-    <string name="highlight_tag_edit_global_hint">修改名称和样式后，所有使用此标签的书籍都会更新。</string>
-    <string name="highlight_tag_edit_book_hint">仅在本书中使用，名称和样式独立设置。</string>
+    <string name="highlight_tag_edit_global_hint">修改名称、备注和样式后，所有使用此标签的书籍都会更新。</string>
+    <string name="highlight_tag_edit_book_hint">仅在本书中使用，名称、备注和样式独立设置。</string>
     <string name="highlight_tag_delete_book_hint">从本书中解除“%1$s”标签？标注、基础样式和备注仍然保留。</string>
     <string name="highlight_filter_all">全部</string>
     <string name="highlight_filter_untagged">无标签</string>
@@ -21,7 +21,14 @@
     <string name="highlight_tag_duplicate">请填写名称，且不能与已有标签重名。</string>
     <string name="highlight_tag_empty">暂无标签，点击新增标签开始设置。</string>
     <string name="highlight_tag_preview">多标签预览</string>
-    <string name="highlight_tag_preview_text">她袖口缝着一小片蓝色丝线。</string>
+    <string name="highlight_tag_preview_text">开源阅读</string>
+    <string name="highlight_tag_note">标签备注</string>
+    <string name="highlight_tag_note_hint">选填，说明这个标签的含义或使用场景</string>
+    <string name="highlight_tag_note_empty">暂无备注</string>
+    <string name="highlight_tag_view_note">查看标签备注</string>
+    <string name="highlight_tag_note_help">点击选择标签，长按查看备注</string>
+    <string name="highlight_tag_style">显示样式</string>
+    <string name="highlight_tag_set_style">设置样式</string>
     <string name="highlight_tag_primary">主标签：%1$s</string>
     <string name="highlight_tag_preview_empty">选择标签，预览正文样式。</string>
     <string name="highlight_tag_save">保存并应用到全部书籍</string>

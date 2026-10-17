@@ -13,17 +13,22 @@ import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
 import androidx.appcompat.widget.AppCompatImageButton
+import androidx.appcompat.app.AlertDialog
 import androidx.core.graphics.ColorUtils
+import androidx.core.view.ViewCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import io.legado.app.R
 import io.legado.app.data.entities.HighlightTag
 import io.legado.app.help.HighlightMenuConfig
 import io.legado.app.help.HighlightPopupPosition
+import io.legado.app.help.config.LocalConfig
 import io.legado.app.ui.highlight.highlightTagChip
 import io.legado.app.ui.widget.PopupAction
 import io.legado.app.ui.widget.popupActionMenu
 import io.legado.app.utils.applyMd3PopupStyle
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getCompatColor
+import io.legado.app.utils.toastOnUi
 
 /** Comfortable actions and an independently scrolling label row, anchored to the visible annotation. */
 class HighlightActionPopup(
@@ -46,6 +51,8 @@ class HighlightActionPopup(
         addView(tagRail)
     }
     private var morePopup: PopupAction? = null
+    private var noteDialog: AlertDialog? = null
+    private var hasTags = false
 
     init {
         contentView = root
@@ -54,7 +61,12 @@ class HighlightActionPopup(
         isFocusable = true
         isTouchable = true
         isOutsideTouchable = true
-        setOnDismissListener { morePopup?.dismiss(); morePopup = null }
+        setOnDismissListener {
+            morePopup?.dismiss()
+            morePopup = null
+            noteDialog?.dismiss()
+            noteDialog = null
+        }
         val config = HighlightMenuConfig.load(context)
         val actions = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
         val firstRow = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
@@ -119,6 +131,7 @@ class HighlightActionPopup(
     }
 
     fun refreshTags(tags: List<HighlightTag>, selectedIds: Collection<String>) {
+        hasTags = tags.isNotEmpty()
         val scroll = tagScroll.scrollX
         tagRail.removeAllViews()
         if (tags.isEmpty()) tagRail.addView(actionView(context.getString(R.string.highlight_tag_add)) {
@@ -128,6 +141,15 @@ class HighlightActionPopup(
             val selected = tag.id in selectedIds
             tagRail.addView(
                 context.highlightTagChip(tag, selected, compact = true) { onTag(tag.id) }.apply {
+                    setOnLongClickListener {
+                        showTagNote(tag)
+                        true
+                    }
+                    ViewCompat.replaceAccessibilityAction(this,
+                        AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_LONG_CLICK,
+                        context.getString(R.string.highlight_tag_view_note)) { view, _ ->
+                        view.performLongClick()
+                    }
                     minHeight = 44.dpToPx()
                     val chipBackground = (background as GradientDrawable).apply {
                         cornerRadius = 6f.dpToPx()
@@ -140,6 +162,20 @@ class HighlightActionPopup(
             )
         }
         tagScroll.post { tagScroll.scrollTo(scroll, 0) }
+    }
+
+    private fun showTagNote(tag: HighlightTag) {
+        noteDialog?.dismiss()
+        val scope = context.getString(if (tag.bookUrl.isEmpty())
+            R.string.highlight_tag_global else R.string.highlight_tag_book)
+        noteDialog = AlertDialog.Builder(context)
+            .setTitle("${tag.name} · $scope")
+            .setMessage(tag.note.ifBlank { context.getString(R.string.highlight_tag_note_empty) })
+            .setPositiveButton(R.string.close, null)
+            .create().apply {
+                setOnDismissListener { noteDialog = null }
+                show()
+            }
     }
 
     fun show(anchor: View, selection: Rect? = null) {
@@ -161,5 +197,9 @@ class HighlightActionPopup(
             width, height, 8.dpToPx()
         )
         showAtLocation(anchor.rootView, Gravity.TOP or Gravity.START, position.x, position.y)
+        if (hasTags && !LocalConfig.getBoolean("highlightTagNoteHelpShown", false)) {
+            context.toastOnUi(R.string.highlight_tag_note_help)
+            LocalConfig.edit().putBoolean("highlightTagNoteHelpShown", true).apply()
+        }
     }
 }

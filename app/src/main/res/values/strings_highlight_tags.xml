@@ -5,8 +5,8 @@
     <string name="highlight_tag_scope">Available in</string>
     <string name="highlight_tag_book_hint">Includes shared and book labels. Drag to set this book’s priority; the first selected label determines the style.</string>
     <string name="highlight_tag_global_hint">Shared by all books. Drag to set the default priority for books without their own order.</string>
-    <string name="highlight_tag_edit_global_hint">Name and style changes apply to all books.</string>
-    <string name="highlight_tag_edit_book_hint">Only available in this book. Its name and style are independent.</string>
+    <string name="highlight_tag_edit_global_hint">Name, note and style changes apply to all books.</string>
+    <string name="highlight_tag_edit_book_hint">Only available in this book. Its name, note and style are independent.</string>
     <string name="highlight_tag_delete_book_hint">Remove “%1$s” from this book? Annotations, base styles and notes will be kept.</string>
     <string name="highlight_filter_all">All</string>
     <string name="highlight_filter_untagged">Unlabeled</string>
@@ -21,7 +21,14 @@
     <string name="highlight_tag_duplicate">Enter a unique label name.</string>
     <string name="highlight_tag_empty">No labels. Add one to get started.</string>
     <string name="highlight_tag_preview">Preview with multiple labels</string>
-    <string name="highlight_tag_preview_text">A small piece of blue thread was sewn into her cuff.</string>
+    <string name="highlight_tag_preview_text">开源阅读</string>
+    <string name="highlight_tag_note">Label note</string>
+    <string name="highlight_tag_note_hint">Optional description of this label’s meaning or use</string>
+    <string name="highlight_tag_note_empty">No note</string>
+    <string name="highlight_tag_view_note">View label note</string>
+    <string name="highlight_tag_note_help">Tap to select a label; touch and hold to view its note</string>
+    <string name="highlight_tag_style">Appearance</string>
+    <string name="highlight_tag_set_style">Set style</string>
     <string name="highlight_tag_primary">Primary label: %1$s</string>
     <string name="highlight_tag_preview_empty">Choose labels to preview their style.</string>
     <string name="highlight_tag_save">Save and apply to all books</string>
