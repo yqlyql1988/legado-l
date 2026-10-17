@@ -87,7 +87,7 @@ class ReadRecordAuthorIdentityTest {
                 .build()
             try {
                 val dao = database.readRecordDao
-                assertEquals(117, database.openHelper.writableDatabase.version)
+                assertEquals(118, database.openHelper.writableDatabase.version)
                 assertEquals(legacy.toSet(), dao.all.toSet())
                 assertEquals(1350L, dao.allTime)
                 assertNull(dao.getRecord("phone", "Same", "Author A"))
@@ -165,7 +165,7 @@ class ReadRecordAuthorIdentityTest {
                 }, Executor { it.run() }).build()
             try {
                 val sqlite = database.openHelper.writableDatabase
-                assertEquals(117, sqlite.version)
+                assertEquals(118, sqlite.version)
                 assertEquals(records.toSet(), database.readRecordDao.all.toSet())
                 for (search in listOf(false, true)) {
                     val start = android.os.SystemClock.elapsedRealtime()

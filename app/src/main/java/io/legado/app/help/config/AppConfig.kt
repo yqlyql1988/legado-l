@@ -611,6 +611,10 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         get() = appCtx.getPrefBoolean("readStatisticsQualifiedOnly", false)
         set(value) { appCtx.putPrefBoolean("readStatisticsQualifiedOnly", value) }
 
+    var readStatisticsIntervalHours: Int
+        get() = appCtx.getPrefInt("readStatisticsIntervalHours", 1).coerceIn(1, 24)
+        set(value) { appCtx.putPrefInt("readStatisticsIntervalHours", value.coerceIn(1, 24)) }
+
     var enableReadRecord: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.enableReadRecord, true)
         set(value) {

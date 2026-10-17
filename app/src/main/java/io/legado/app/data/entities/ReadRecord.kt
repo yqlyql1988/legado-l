@@ -9,8 +9,11 @@ import io.legado.app.help.book.ReadRecordCoverCache
 import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.ReadDayDuration
 import io.legado.app.help.book.splitReadInterval
+import io.legado.app.help.book.ReadHourDuration
+import io.legado.app.help.book.splitReadHourlyInterval
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonArray
+import java.util.TimeZone
 
 @Entity(
     tableName = "readRecord",
@@ -57,14 +60,18 @@ fun ReadRecord.updateSnapshot(
 }
 
 fun ReadRecord.saveWithCover(book: Book?, elapsed: Long? = null) {
-    saveWithCover(book, elapsed, null, elapsed?.let { splitReadInterval(lastRead, it) }.orEmpty())
+    val zone = TimeZone.getDefault()
+    saveWithCover(book, elapsed, null, elapsed?.let { splitReadInterval(lastRead, it, zone) }.orEmpty(),
+        elapsed?.let { splitReadHourlyInterval(lastRead, it, zone) }.orEmpty())
 }
 
 /** Capture routing while the reader still holds its record lock, before submitting the write. */
 fun ReadRecord.prepareSaveWithCover(book: Book?, elapsed: Long): () -> Unit {
     val ticket = book?.let { readRecordMetadataRoutes.capture(it.bookUrl, bookName, author) }
-    val intervals = splitReadInterval(lastRead, elapsed)
-    return { saveWithCover(book, elapsed, ticket, intervals) }
+    val zone = TimeZone.getDefault()
+    val intervals = splitReadInterval(lastRead, elapsed, zone)
+    val hours = splitReadHourlyInterval(lastRead, elapsed, zone)
+    return { saveWithCover(book, elapsed, ticket, intervals, hours) }
 }
 
 private fun ReadRecord.saveWithCover(
@@ -72,6 +79,7 @@ private fun ReadRecord.saveWithCover(
     elapsed: Long?,
     ticket: ReadRecordMetadataRoutes.Ticket?,
     intervals: List<ReadDayDuration>,
+    hours: List<ReadHourDuration>,
 ) {
     ticket?.let {
         val identity = readRecordMetadataRoutes.resolve(it)
@@ -102,6 +110,7 @@ private fun ReadRecord.saveWithCover(
         saved = saved.copy(resolvedAuthor = current?.resolvedAuthor ?: saved.resolvedAuthor)
         appDb.readRecordDao.insert(saved)
         appDb.readRecordDao.addDaily(saved, intervals, lastRead)
+        appDb.readRecordDao.addHourly(saved, hours)
     }
     ReadRecordCoverCache.request(saved.copy(), snapshotBook?.getCoverSourceOrigin())
 }

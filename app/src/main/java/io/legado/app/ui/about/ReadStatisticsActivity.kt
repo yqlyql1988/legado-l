@@ -1,6 +1,7 @@
 package io.legado.app.ui.about
 
 import android.content.Context
+import android.app.DatePickerDialog
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Rect
@@ -20,6 +21,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.GridLayout
 import android.widget.TextView
+import android.widget.EditText
+import android.text.InputType
 import androidx.appcompat.widget.AppCompatButton
 import androidx.appcompat.app.AlertDialog
 import androidx.core.widget.doAfterTextChanged
@@ -41,6 +44,7 @@ import io.legado.app.databinding.ViewReadStatisticsHeaderBinding
 import io.legado.app.help.book.ReadStatisticsPeriod
 import io.legado.app.help.book.ReadStatisticsSnapshot
 import io.legado.app.help.book.ReadStatisticsSummary
+import io.legado.app.help.book.ReadHourlySummary
 import io.legado.app.help.book.visibleReadStatisticsBooks
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
@@ -74,16 +78,23 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
     private var dataJob: Job? = null
     private var snapshot = ReadStatisticsSnapshot(emptyList(), emptyList(), 0)
     private var bookshelf: Map<Pair<String, String>, Book> = emptyMap()
-    private var period = ReadStatisticsPeriod.MONTH
+    private var period = ReadStatisticsPeriod.DAY
     private var year = LocalDate.now().year
     private var month = LocalDate.now().monthValue
+    private var day = LocalDate.now().dayOfMonth
+    private var showHours = true
+    private var selectedHour = -1
+    private var hourly = ReadHourlySummary(emptyList(), 0, 0)
     private var selectedDay: String? = LocalDate.now().toString()
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         savedInstanceState?.let {
-            period = ReadStatisticsPeriod.entries.getOrElse(it.getInt("period")) { ReadStatisticsPeriod.MONTH }
+            period = ReadStatisticsPeriod.entries.getOrElse(it.getInt("period")) { ReadStatisticsPeriod.DAY }
             year = it.getInt("year", year)
             month = it.getInt("month", month).coerceIn(1, 12)
+            day = it.getInt("dateDay", day)
+            showHours = it.getBoolean("showHours", true)
+            selectedHour = it.getInt("selectedHour", -1)
             if (it.containsKey("day")) selectedDay = it.getString("day")
         }
         adapter.addHeaderView { header }
@@ -92,6 +103,12 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         header.tabAll.setOnClickListener { selectPeriod(ReadStatisticsPeriod.ALL) }
         header.tabYear.setOnClickListener { selectPeriod(ReadStatisticsPeriod.YEAR) }
         header.tabMonth.setOnClickListener { selectPeriod(ReadStatisticsPeriod.MONTH) }
+        header.tabDay.setOnClickListener { selectPeriod(ReadStatisticsPeriod.DAY) }
+        header.graphTrend.setOnClickListener { showHours = false; render() }
+        header.graphHours.setOnClickListener { showHours = true; render() }
+        header.hourInterval.setOnClickListener { showIntervalPicker() }
+        header.previousHour.setOnClickListener { selectHour(-1) }
+        header.nextHour.setOnClickListener { selectHour(1) }
         header.previousPeriod.setOnClickListener { movePeriod(-1) }
         header.nextPeriod.setOnClickListener { movePeriod(1) }
         header.tvPeriod.setOnClickListener { showPeriodPicker() }
@@ -113,6 +130,7 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
                     ReadStatisticsSnapshot(
                         dao.allShow, dao.dailyShow(),
                         dao.statisticsStates().map { it.startedAt }.filter { it > 0 }.minOrNull() ?: 0,
+                        dao.hourlyShow(),
                     )
                 })
                 stats to appDb.bookDao.all.sortedBy { it.durChapterTime }.associateBy { it.name to it.author }
@@ -137,7 +155,8 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         if (item.itemId == R.id.menu_statistics_help) {
             alert(R.string.read_statistics_help) {
                 setMessage(getString(R.string.read_statistics_coverage, earliestDate().toString()) +
-                    "\n\n" + getString(R.string.read_statistics_scope_explanation))
+                    "\n\n" + getString(R.string.read_statistics_scope_explanation) +
+                    "\n\n" + getString(R.string.read_statistics_hour_help))
                 okButton()
             }
             return true
@@ -214,6 +233,9 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         outState.putInt("period", period.ordinal)
         outState.putInt("year", year)
         outState.putInt("month", month)
+        outState.putInt("dateDay", day)
+        outState.putBoolean("showHours", showHours)
+        outState.putInt("selectedHour", selectedHour)
         outState.putString("day", selectedDay)
         super.onSaveInstanceState(outState)
     }
@@ -235,11 +257,19 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
             year = selected.year
             month = selected.monthValue
         }
+        if (period == ReadStatisticsPeriod.DAY) {
+            val date = LocalDate.of(year, month, day.coerceIn(1, YearMonth.of(year, month).lengthOfMonth()))
+                .coerceIn(earliestDate(), today)
+            year = date.year
+            month = date.monthValue
+            day = date.dayOfMonth
+        }
     }
 
     private fun selectPeriod(value: ReadStatisticsPeriod) {
         val changed = period != value
         period = value
+        if (period == ReadStatisticsPeriod.DAY) showHours = true
         clampPeriod()
         if (changed) resetSelectedDay()
         render()
@@ -247,7 +277,12 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
     }
 
     private fun movePeriod(offset: Long) {
-        if (period == ReadStatisticsPeriod.MONTH) {
+        if (period == ReadStatisticsPeriod.DAY) {
+            val selected = LocalDate.of(year, month, day).plusDays(offset)
+            year = selected.year
+            month = selected.monthValue
+            day = selected.dayOfMonth
+        } else if (period == ReadStatisticsPeriod.MONTH) {
             val selected = YearMonth.of(year, month).plusMonths(offset)
             year = selected.year
             month = selected.monthValue
@@ -258,6 +293,7 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
     }
 
     private fun resetSelectedDay() {
+        selectedHour = -1
         selectedDay = LocalDate.now().takeIf { YearMonth.from(it) == YearMonth.of(year, month) }?.toString()
     }
 
@@ -290,6 +326,27 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
     private fun showPeriodPicker() {
         when (period) {
             ReadStatisticsPeriod.ALL -> return
+            ReadStatisticsPeriod.DAY -> {
+                val picker = DatePickerDialog(this, { _, y, m, d ->
+                    year = y
+                    month = m + 1
+                    day = d
+                    clampPeriod()
+                    selectedHour = -1
+                    render()
+                }, year, month - 1, day)
+                picker.datePicker.minDate = earliestDate().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                picker.datePicker.maxDate = System.currentTimeMillis()
+                picker.setButton(DatePickerDialog.BUTTON_NEUTRAL, getString(R.string.read_statistics_current_day)) { _, _ ->
+                    val today = LocalDate.now()
+                    year = today.year
+                    month = today.monthValue
+                    day = today.dayOfMonth
+                    selectedHour = -1
+                    render()
+                }
+                picker.show()
+            }
             ReadStatisticsPeriod.YEAR -> showYearPicker(year, returnToCurrent = true) {
                 jumpToPeriod(YearMonth.of(it, month))
             }
@@ -396,10 +453,11 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
             ReadStatisticsPeriod.ALL -> AppConfig.readStatisticsAllMinimum
             ReadStatisticsPeriod.YEAR -> AppConfig.readStatisticsYearMinimum
             ReadStatisticsPeriod.MONTH -> AppConfig.readStatisticsMonthMinimum
+            ReadStatisticsPeriod.DAY -> AppConfig.readStatisticsDayMinimum
         }
-        val all = snapshot.summary(period, year, month)
+        val all = snapshot.summary(period, year, month, day = day)
         val qualifiedOnly = AppConfig.readStatisticsQualifiedOnly
-        val summary = if (qualifiedOnly) snapshot.summary(period, year, month, minimum) else all
+        val summary = if (qualifiedOnly) snapshot.summary(period, year, month, minimum, day) else all
         val visibleBooks = summary.books
         header.statisticsScope.background = rounded(
             ColorUtils.blendColors(backgroundColor, accentColor, .04f),
@@ -414,7 +472,7 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
             ).apply { cornerRadius = 8.dpToPx().toFloat() }
             button.setTextColor(if (selected) accentColor else contentSecondary)
         }
-        val buttons = listOf(header.tabAll, header.tabYear, header.tabMonth)
+        val buttons = listOf(header.tabAll, header.tabYear, header.tabMonth, header.tabDay)
         buttons.forEachIndexed { index, button ->
             val selected = index == period.ordinal
             button.isSelected = selected
@@ -430,6 +488,7 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
                 ReadStatisticsPeriod.ALL -> getString(R.string.read_statistics_all_period)
                 ReadStatisticsPeriod.YEAR -> getString(R.string.read_statistics_year_period, year)
                 ReadStatisticsPeriod.MONTH -> getString(R.string.read_statistics_month_period, year, month)
+                ReadStatisticsPeriod.DAY -> getString(R.string.read_statistics_day_period, year, month, day)
             }
             val canSelect = period != ReadStatisticsPeriod.ALL
             tvPeriod.minHeight = if (canSelect) 48.dpToPx() else 0
@@ -441,14 +500,26 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
             tvPeriod.setCompoundDrawablesRelative(null, null, if (canSelect) periodDropdown() else null, null)
             previousPeriod.isVisible = period != ReadStatisticsPeriod.ALL
             nextPeriod.isVisible = period != ReadStatisticsPeriod.ALL
-            previousPeriod.isEnabled = if (period == ReadStatisticsPeriod.MONTH)
-                YearMonth.of(year, month) > YearMonth.from(first) else year > first.year
-            nextPeriod.isEnabled = if (period == ReadStatisticsPeriod.MONTH)
-                YearMonth.of(year, month) < YearMonth.from(today) else year < today.year
-            previousPeriod.contentDescription = getString(if (period == ReadStatisticsPeriod.MONTH)
-                R.string.read_statistics_previous_month else R.string.read_statistics_previous_year)
-            nextPeriod.contentDescription = getString(if (period == ReadStatisticsPeriod.MONTH)
-                R.string.read_statistics_next_month else R.string.read_statistics_next_year)
+            previousPeriod.isEnabled = when (period) {
+                ReadStatisticsPeriod.DAY -> LocalDate.of(year, month, day) > first
+                ReadStatisticsPeriod.MONTH -> YearMonth.of(year, month) > YearMonth.from(first)
+                else -> year > first.year
+            }
+            nextPeriod.isEnabled = when (period) {
+                ReadStatisticsPeriod.DAY -> LocalDate.of(year, month, day) < today
+                ReadStatisticsPeriod.MONTH -> YearMonth.of(year, month) < YearMonth.from(today)
+                else -> year < today.year
+            }
+            previousPeriod.contentDescription = getString(when (period) {
+                ReadStatisticsPeriod.DAY -> R.string.read_statistics_previous_day
+                ReadStatisticsPeriod.MONTH -> R.string.read_statistics_previous_month
+                else -> R.string.read_statistics_previous_year
+            })
+            nextPeriod.contentDescription = getString(when (period) {
+                ReadStatisticsPeriod.DAY -> R.string.read_statistics_next_day
+                ReadStatisticsPeriod.MONTH -> R.string.read_statistics_next_month
+                else -> R.string.read_statistics_next_year
+            })
             tvDuration.text = summaryValue(duration(summary.duration), 1f, .4375f)
             listOf(
                 Triple(tvDays, tvDaysLabel, getString(R.string.read_statistics_day_count, summary.days.size)),
@@ -465,15 +536,33 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
                 ReadStatisticsPeriod.ALL -> R.string.read_statistics_all_books
                 ReadStatisticsPeriod.YEAR -> R.string.read_statistics_year_books
                 ReadStatisticsPeriod.MONTH -> R.string.read_statistics_month_books
+                ReadStatisticsPeriod.DAY -> R.string.read_statistics_day_books
             })
             tvRankScope.text = scopeCount(visibleBooks.size)
             tvEmpty.isVisible = visibleBooks.isEmpty()
             tvEmpty.setText(if (all.books.isEmpty()) R.string.read_statistics_empty else R.string.read_statistics_filtered_empty)
-            calendarPanel.isVisible = period == ReadStatisticsPeriod.MONTH
-            chart.isVisible = period != ReadStatisticsPeriod.MONTH
-            tvPeak.isVisible = period != ReadStatisticsPeriod.MONTH
+            val hours = showHours || period == ReadStatisticsPeriod.DAY
+            graphTabs.isVisible = period != ReadStatisticsPeriod.DAY
+            graphTrend.setText(if (period == ReadStatisticsPeriod.MONTH) R.string.read_statistics_calendar else R.string.read_statistics_trend)
+            listOf(graphTrend, graphHours).forEachIndexed { index, button ->
+                val selected = (index == 1) == hours
+                button.isSelected = selected
+                button.backgroundTintList = null
+                button.background = rounded(if (selected) ColorUtils.blendColors(backgroundColor, accentColor, .18f) else Color.TRANSPARENT)
+                button.setTextColor(if (selected) accentColor else contentSecondary)
+            }
+            hourInterval.isVisible = hours
+            hourDetails.isVisible = hours
+            calendarPanel.isVisible = !hours && period == ReadStatisticsPeriod.MONTH
+            chart.isVisible = hours || period != ReadStatisticsPeriod.MONTH
+            tvPeak.isVisible = chart.isVisible
         }
-        if (period == ReadStatisticsPeriod.MONTH) {
+        if (showHours || period == ReadStatisticsPeriod.DAY) {
+            hourly = snapshot.hourlySummary(period, year, month, if (qualifiedOnly) minimum else 0, day,
+                AppConfig.readStatisticsIntervalHours)
+            renderHourly()
+        } else if (period == ReadStatisticsPeriod.MONTH) {
+            header.chart.onBarSelected = null
             header.tvTrendTitle.setText(R.string.read_statistics_calendar)
             renderCalendar(summary)
         } else renderChart(summary)
@@ -481,6 +570,8 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
     }
 
     private fun renderChart(summary: ReadStatisticsSummary) {
+        header.chart.onBarSelected = null
+        header.chart.selectedIndex = -1
         val bars = if (period == ReadStatisticsPeriod.ALL) {
             header.tvTrendTitle.setText(R.string.read_statistics_years_chart)
             (earliestDate().year..LocalDate.now().year).map { value ->
@@ -500,6 +591,96 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
                 else getString(R.string.read_statistics_month_period, year, it.label.toInt())
             getString(R.string.read_statistics_peak, label, duration(it.duration))
         }.orEmpty()
+    }
+
+    private fun hourLabel(start: Int, end: Int) = getString(R.string.read_statistics_hour_range, start, end)
+
+    private fun renderHourly() {
+        val interval = AppConfig.readStatisticsIntervalHours
+        val buckets = hourly.buckets
+        if (buckets.isEmpty()) return
+        val peak = buckets.maxBy { it.duration }
+        if (selectedHour !in 0..23) selectedHour = peak.startHour
+        val index = (selectedHour / interval).coerceIn(buckets.indices)
+        val selected = buckets[index]
+        with(header) {
+            tvTrendTitle.setText(R.string.read_statistics_hourly)
+            hourInterval.text = getString(R.string.read_statistics_interval, interval)
+            chart.bars = buckets.map { ReadStatisticsBar(it.startHour.toString().padStart(2, '0'), it.duration) }
+            chart.selectedIndex = index
+            chart.onBarSelected = { value ->
+                selectedHour = buckets[value].startHour
+                renderHourly()
+            }
+            tvPeak.text = if (peak.duration > 0) getString(R.string.read_statistics_peak,
+                hourLabel(peak.startHour, peak.endHour), duration(peak.duration)) else getString(R.string.read_statistics_hour_empty)
+            tvSelectedHour.text = getString(R.string.read_statistics_hour_detail,
+                hourLabel(selected.startHour, selected.endHour), duration(selected.duration))
+            previousHour.isEnabled = index > 0
+            nextHour.isEnabled = index < buckets.lastIndex
+            tvHourCoverage.text = getString(R.string.read_statistics_hour_coverage,
+                duration(hourly.duration), duration(hourly.unassignedDuration))
+            hourBooks.removeAllViews()
+            if (selected.books.isEmpty()) {
+                hourBooks.addView(TextView(this@ReadStatisticsActivity).apply {
+                    setText(R.string.read_statistics_hour_empty)
+                    setTextColor(contentSecondary)
+                    setPadding(0, 8.dpToPx(), 0, 8.dpToPx())
+                })
+            } else selected.books.forEachIndexed { rank, record ->
+                val row = ItemReadStatisticsBinding.inflate(layoutInflater, hourBooks, false)
+                bindBook(row, record, rank, selected.books.first().readTime)
+                row.root.setOnClickListener { openRecordedBook(record) }
+                hourBooks.addView(row.root)
+            }
+        }
+    }
+
+    private fun selectHour(offset: Int) {
+        if (hourly.buckets.isEmpty()) return
+        val interval = AppConfig.readStatisticsIntervalHours
+        selectedHour = ((selectedHour / interval + offset).coerceIn(hourly.buckets.indices)) * interval
+        renderHourly()
+    }
+
+    private fun showIntervalPicker() {
+        val intervals = listOf(1, 2, 3, 4, 6, 8, 12, 24)
+        val labels = intervals.map { getString(R.string.read_statistics_interval, it) } +
+            getString(R.string.read_statistics_interval_custom)
+        alert(R.string.read_statistics_interval_title) {
+            singleChoiceItems(labels.toTypedArray(), intervals.indexOf(AppConfig.readStatisticsIntervalHours)) { dialog, index ->
+                dialog.dismiss()
+                if (index < intervals.size) {
+                    AppConfig.readStatisticsIntervalHours = intervals[index]
+                    render()
+                } else showCustomInterval()
+            }
+            cancelButton()
+        }
+    }
+
+    private fun showCustomInterval() {
+        val input = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER
+            setText(AppConfig.readStatisticsIntervalHours.toString())
+            contentDescription = getString(R.string.read_statistics_interval_invalid)
+            setPadding(20.dpToPx(), 12.dpToPx(), 20.dpToPx(), 12.dpToPx())
+        }
+        val dialog = alert(R.string.read_statistics_interval_title) {
+            customView { input }
+            okButton()
+            cancelButton()
+        }
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val value = input.text.toString().toIntOrNull()
+            if (value == null || value !in 1..24) {
+                input.error = getString(R.string.read_statistics_interval_invalid)
+            } else {
+                AppConfig.readStatisticsIntervalHours = value
+                dialog.dismiss()
+                render()
+            }
+        }
     }
 
     private fun renderCalendar(summary: ReadStatisticsSummary) {
