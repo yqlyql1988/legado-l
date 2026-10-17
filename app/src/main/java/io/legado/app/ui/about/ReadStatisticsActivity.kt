@@ -29,6 +29,7 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.ReadRecordShow
 import io.legado.app.databinding.ActivityReadStatisticsBinding
 import io.legado.app.databinding.DialogReadStatisticsRankingBinding
+import io.legado.app.databinding.DialogReadStatisticsPeriodBinding
 import io.legado.app.databinding.ItemReadStatisticsBinding
 import io.legado.app.databinding.ViewReadStatisticsHeaderBinding
 import io.legado.app.help.book.ReadStatisticsPeriod
@@ -44,6 +45,7 @@ import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.defaultSharedPreferences
 import io.legado.app.utils.getCompatColor
+import io.legado.app.utils.getCompatDrawable
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Job
@@ -86,6 +88,7 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         header.tabMonth.setOnClickListener { selectPeriod(ReadStatisticsPeriod.MONTH) }
         header.previousPeriod.setOnClickListener { movePeriod(-1) }
         header.nextPeriod.setOnClickListener { movePeriod(1) }
+        header.tvPeriod.setOnClickListener { showPeriodPicker() }
         val surface = ColorUtils.blendColors(backgroundColor, accentColor, .06f)
         header.summary.background = rounded(surface)
         header.trendPanel.background = rounded(surface)
@@ -248,6 +251,107 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         selectedDay = LocalDate.now().takeIf { YearMonth.from(it) == YearMonth.of(year, month) }?.toString()
     }
 
+    private fun jumpToPeriod(value: YearMonth, selectToday: Boolean = false) {
+        val changed = year != value.year || month != value.monthValue
+        year = value.year
+        month = value.monthValue
+        clampPeriod()
+        if (changed || selectToday) resetSelectedDay()
+        render()
+        binding.recyclerView.scrollToPosition(0)
+    }
+
+    private fun showYearPicker(selected: Int, returnToCurrent: Boolean = false, onSelect: (Int) -> Unit) {
+        val years = (LocalDate.now().year downTo earliestDate().year).toList()
+        val checked = years.indexOf(selected).coerceAtLeast(0)
+        val dialog = alert(R.string.read_statistics_choose_year) {
+            singleChoiceItems(years.map { getString(R.string.read_statistics_year_period, it) }.toTypedArray(), checked) { dialog, index ->
+                onSelect(years[index])
+                dialog.dismiss()
+            }
+            cancelButton()
+            if (returnToCurrent) neutralButton(R.string.read_statistics_current_year) {
+                onSelect(LocalDate.now().year)
+            }
+        }
+        dialog.listView.setSelection(checked)
+    }
+
+    private fun showPeriodPicker() {
+        when (period) {
+            ReadStatisticsPeriod.ALL -> return
+            ReadStatisticsPeriod.YEAR -> showYearPicker(year, returnToCurrent = true) {
+                jumpToPeriod(YearMonth.of(it, month))
+            }
+            ReadStatisticsPeriod.MONTH -> {
+                val picker = DialogReadStatisticsPeriodBinding.inflate(layoutInflater)
+                val first = YearMonth.from(earliestDate())
+                val current = YearMonth.now()
+                var candidate = YearMonth.of(year, month).coerceIn(first, current)
+                val months = (1..12).map { value ->
+                    AppCompatButton(this).apply {
+                        text = getString(R.string.read_statistics_month_number, value)
+                        textSize = 15f
+                        minWidth = 0
+                        minimumWidth = 0
+                        minHeight = 48.dpToPx()
+                        minimumHeight = 48.dpToPx()
+                        setPadding(4.dpToPx(), 8.dpToPx(), 4.dpToPx(), 8.dpToPx())
+                        backgroundTintList = null
+                        picker.periodMonths.addView(this, GridLayout.LayoutParams().apply {
+                            width = 0
+                            height = ViewGroup.LayoutParams.WRAP_CONTENT
+                            columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
+                            setMargins(4.dpToPx(), 4.dpToPx(), 4.dpToPx(), 4.dpToPx())
+                        })
+                    }
+                }
+                fun updatePicker() {
+                    picker.periodYear.text = getString(R.string.read_statistics_year_period, candidate.year)
+                    picker.periodYear.contentDescription = getString(R.string.read_statistics_select_year, candidate.year)
+                    months.forEachIndexed { index, button ->
+                        val value = YearMonth.of(candidate.year, index + 1)
+                        button.isEnabled = value in first..current
+                        button.isSelected = value == candidate
+                        button.contentDescription = getString(R.string.read_statistics_month_period, value.year, value.monthValue)
+                        button.alpha = if (button.isEnabled) 1f else .35f
+                        button.setTextColor(if (button.isSelected) accentColor else contentPrimary)
+                        button.background = rounded(
+                            ColorUtils.blendColors(backgroundColor, accentColor, if (button.isSelected) .20f else .04f),
+                            button.isSelected,
+                        )
+                        button.setOnClickListener {
+                            candidate = value
+                            updatePicker()
+                        }
+                    }
+                }
+                picker.periodYear.setTextColor(contentPrimary)
+                picker.periodYear.setCompoundDrawablesRelative(null, null, periodDropdown(), null)
+                picker.periodYear.setOnClickListener {
+                    showYearPicker(candidate.year) {
+                        candidate = YearMonth.of(it, candidate.monthValue).coerceIn(first, current)
+                        updatePicker()
+                    }
+                }
+                updatePicker()
+                alert(R.string.read_statistics_choose_month) {
+                    customView { picker.root }
+                    okButton { jumpToPeriod(candidate) }
+                    cancelButton()
+                    neutralButton(R.string.read_statistics_current_month) {
+                        jumpToPeriod(YearMonth.now(), selectToday = true)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun periodDropdown() = getCompatDrawable(R.drawable.ic_arrow_drop_down)?.mutate()?.apply {
+        setTint(contentPrimary)
+        setBounds(0, 0, 18.dpToPx(), 18.dpToPx())
+    }
+
     private fun duration(value: Long) = formatDuring(
         value, AppConfig.readRecordUseDays, AppConfig.readRecordShowSeconds,
     )
@@ -277,6 +381,13 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
                 ReadStatisticsPeriod.YEAR -> getString(R.string.read_statistics_year_period, year)
                 ReadStatisticsPeriod.MONTH -> getString(R.string.read_statistics_month_period, year, month)
             }
+            val canSelect = period != ReadStatisticsPeriod.ALL
+            tvPeriod.minimumHeight = if (canSelect) 48.dpToPx() else 0
+            tvPeriod.isClickable = canSelect
+            tvPeriod.isFocusable = canSelect
+            tvPeriod.contentDescription = if (canSelect)
+                getString(R.string.read_statistics_select_period, tvPeriod.text) else null
+            tvPeriod.setCompoundDrawablesRelative(null, null, if (canSelect) periodDropdown() else null, null)
             previousPeriod.isVisible = period != ReadStatisticsPeriod.ALL
             nextPeriod.isVisible = period != ReadStatisticsPeriod.ALL
             previousPeriod.isEnabled = if (period == ReadStatisticsPeriod.MONTH)

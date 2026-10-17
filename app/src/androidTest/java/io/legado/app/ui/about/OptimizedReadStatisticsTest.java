@@ -19,6 +19,9 @@ import org.junit.runner.RunWith;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -245,6 +248,188 @@ public class OptimizedReadStatisticsTest {
                 cell.getContentDescription().toString().startsWith(date.toString())) return cell;
         }
         throw new AssertionError("Date missing: " + date);
+    }
+
+    private void openPeriodPicker() {
+        onView(withId(id("tv_period"))).perform(click());
+    }
+
+    private void chooseYear(int year) {
+        onData(org.hamcrest.Matchers.equalTo(string("read_statistics_year_period", year)))
+            .inRoot(isDialog()).perform(click());
+    }
+
+    private void chooseMonth(int month) {
+        onView(allOf(withText(string("read_statistics_month_number", month)),
+            isDescendantOfA(withId(id("period_months")))))
+            .inRoot(isDialog()).perform(scrollTo(), click());
+    }
+
+    private void checkPeriod(ActivityScenario<Activity> scenario, YearMonth value, boolean annual) {
+        scenario.onActivity(activity -> {
+            assertEquals(annual ? string("read_statistics_year_period", value.getYear())
+                : string("read_statistics_month_period", value.getYear(), value.getMonthValue()),
+                ((TextView)activity.findViewById(id("tv_period"))).getText().toString());
+        });
+    }
+
+    @Test public void periodPickersJumpCancelRespectBoundsAndKeepCalendarSelection() throws Exception {
+        LocalDate today = LocalDate.now();
+        YearMonth current = YearMonth.from(today);
+        LocalDate seeded = today.minusYears(9).withMonth(4).withDayOfMonth(5);
+        String device = "period-picker-" + UUID.randomUUID();
+        try (ActivityScenario<Activity> initial = ActivityScenario.launch(intent("ReadStatisticsActivity"))) {
+            await(initial, "tv_duration");
+        }
+        SQLiteDatabase db = SQLiteDatabase.openDatabase(context.getDatabasePath("legado.db").getPath(),
+            null, SQLiteDatabase.OPEN_READWRITE);
+        try {
+            db.execSQL("INSERT INTO readRecord(deviceId,bookName,author,readTime,lastRead) VALUES(?,?,?,?,?)",
+                new Object[]{device, "年月选择验证", "年月作者", 600000L,
+                    seeded.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()});
+            db.execSQL("INSERT INTO readRecordDaily(deviceId,bookName,author,date,readTime) VALUES(?,?,?,?,?)",
+                new Object[]{device, "年月选择验证", "年月作者", seeded.toString(), 600000L});
+            LocalDate first = today;
+            try (android.database.Cursor dates = db.rawQuery(
+                "SELECT MIN(daily.date) FROM readRecordDaily daily JOIN readRecord history " +
+                "ON daily.deviceId=history.deviceId AND daily.bookName=history.bookName AND daily.author=history.author", null)) {
+                if (dates.moveToFirst() && !dates.isNull(0))
+                    first = LocalDate.parse(dates.getString(0));
+            }
+            try (android.database.Cursor states = db.rawQuery("SELECT MIN(startedAt) FROM readStatisticsState WHERE startedAt>0", null)) {
+                if (states.moveToFirst() && !states.isNull(0)) {
+                    LocalDate start = Instant.ofEpochMilli(states.getLong(0)).atZone(ZoneId.systemDefault()).toLocalDate();
+                    if (start.isBefore(first)) first = start;
+                }
+            }
+            final LocalDate earliest = first;
+            try (ActivityScenario<Activity> scenario = ActivityScenario.launch(intent("ReadStatisticsActivity"))) {
+                await(scenario, "tv_duration");
+                scenario.onActivity(activity -> dayCell(activity, today).performClick());
+                // Confirming the same month preserves a deliberately deselected calendar.
+                openPeriodPicker();
+                onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click());
+                scenario.onActivity(activity -> assertEquals(View.GONE,
+                    activity.findViewById(id("day_books")).getVisibility()));
+                openPeriodPicker();
+                if (today.getMonthValue() < 12) {
+                    onView(allOf(withText(string("read_statistics_month_number", today.getMonthValue() + 1)),
+                        isDescendantOfA(withId(id("period_months"))))).inRoot(isDialog())
+                        .perform(scrollTo()).check(matches(org.hamcrest.Matchers.not(isEnabled())));
+                }
+                onView(withId(id("period_year"))).inRoot(isDialog()).perform(scrollTo(), click());
+                chooseYear(seeded.getYear());
+                chooseMonth(7);
+                onView(withId(android.R.id.button2)).inRoot(isDialog()).perform(click());
+                checkPeriod(scenario, current, false);
+                scenario.onActivity(activity -> assertEquals(View.GONE,
+                    activity.findViewById(id("day_books")).getVisibility()));
+                openPeriodPicker();
+                onView(withId(id("period_year"))).inRoot(isDialog()).perform(scrollTo(), click());
+                chooseYear(seeded.getYear());
+                chooseMonth(7);
+                onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click());
+                YearMonth target = YearMonth.of(seeded.getYear(), 7);
+                checkPeriod(scenario, target, false);
+                scenario.onActivity(activity -> {
+                    assertEquals(View.GONE, activity.findViewById(id("day_books")).getVisibility());
+                    activity.findViewById(id("previous_period")).performClick();
+                });
+                checkPeriod(scenario, target.minusMonths(1), false);
+                scenario.onActivity(activity -> activity.findViewById(id("next_period")).performClick());
+                checkPeriod(scenario, target, false);
+                scenario.recreate();
+                await(scenario, "tv_duration");
+                checkPeriod(scenario, target, false);
+                openPeriodPicker();
+                onView(withId(id("period_year"))).inRoot(isDialog()).perform(scrollTo(), click());
+                chooseYear(earliest.getYear());
+                if (earliest.getMonthValue() > 1) {
+                    onView(allOf(withText(string("read_statistics_month_number", earliest.getMonthValue() - 1)),
+                        isDescendantOfA(withId(id("period_months"))))).inRoot(isDialog())
+                        .perform(scrollTo()).check(matches(org.hamcrest.Matchers.not(isEnabled())));
+                }
+                chooseMonth(earliest.getMonthValue());
+                onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click());
+                checkPeriod(scenario, YearMonth.from(earliest), false);
+                scenario.onActivity(activity -> assertFalse(activity.findViewById(id("previous_period")).isEnabled()));
+                openPeriodPicker();
+                onView(withId(android.R.id.button3)).inRoot(isDialog()).perform(click());
+                checkPeriod(scenario, current, false);
+                scenario.onActivity(activity -> {
+                    assertTrue(dayCell(activity, today).isSelected());
+                    assertFalse(activity.findViewById(id("next_period")).isEnabled());
+                    activity.findViewById(id("tab_year")).performClick();
+                });
+                openPeriodPicker();
+                chooseYear(seeded.getYear());
+                checkPeriod(scenario, target, true);
+                scenario.recreate();
+                await(scenario, "tv_duration");
+                checkPeriod(scenario, target, true);
+                openPeriodPicker();
+                onView(withId(android.R.id.button2)).inRoot(isDialog()).perform(click());
+                checkPeriod(scenario, target, true);
+                openPeriodPicker();
+                onView(withId(android.R.id.button3)).inRoot(isDialog()).perform(click());
+                checkPeriod(scenario, current, true);
+                scenario.onActivity(activity -> {
+                    activity.findViewById(id("tab_all")).performClick();
+                    TextView title = activity.findViewById(id("tv_period"));
+                    assertFalse(title.isClickable());
+                    assertFalse(title.isFocusable());
+                    assertNull(title.getCompoundDrawablesRelative()[2]);
+                });
+            }
+        } finally {
+            db.execSQL("DELETE FROM readRecordDaily WHERE deviceId=?", new Object[]{device});
+            db.execSQL("DELETE FROM readRecord WHERE deviceId=?", new Object[]{device});
+            db.close();
+        }
+    }
+
+    @Test public void periodPickersFitExistingLightDarkAndCustomThemes() throws Exception {
+        Map<String, Object> saved = savePrefs("themeMode", "colorPrimaryNight", "colorAccentNight",
+            "colorBackgroundNight", "colorBottomBackgroundNight");
+        try {
+            for (String theme : new String[]{"light", "dark", "custom"}) {
+                SharedPreferences.Editor edit = prefs().edit().putString("themeMode", theme.equals("light") ? "1" : "2");
+                if (theme.equals("custom")) {
+                    edit.putInt("colorPrimaryNight", 0xff10212f).putInt("colorAccentNight", 0xff80cbc4)
+                        .putInt("colorBackgroundNight", 0xff0b1821).putInt("colorBottomBackgroundNight", 0xff10212f);
+                }
+                assertTrue(edit.commit());
+                applyTheme();
+                try (ActivityScenario<Activity> scenario = ActivityScenario.launch(intent("ReadStatisticsActivity"))) {
+                    await(scenario, "tv_duration");
+                    openPeriodPicker();
+                    onView(withId(id("period_year"))).inRoot(isDialog()).perform(scrollTo())
+                        .check(matches(isDisplayed()));
+                    for (int month = 1; month <= 12; month++) {
+                        final int value = month;
+                        onView(allOf(withText(string("read_statistics_month_number", month)),
+                            isDescendantOfA(withId(id("period_months"))))).inRoot(isDialog())
+                            .perform(scrollTo()).check((view, error) -> {
+                                if (error != null) throw error;
+                                TextView cell = (TextView)view;
+                                assertTrue("Touch target", cell.getHeight() >= 48 * cell.getResources().getDisplayMetrics().density);
+                                assertTrue("Month label clipped", cell.getLayout().getLineCount() == 1);
+                                assertTrue(android.graphics.Color.alpha(cell.getCurrentTextColor()) > 200);
+                                assertEquals(value == LocalDate.now().getMonthValue(), cell.isSelected());
+                                if (value > LocalDate.now().getMonthValue()) assertFalse(cell.isEnabled());
+                                if (cell.isSelected()) assertTrue(cell.isEnabled());
+                            });
+                    }
+                    onView(withId(id("period_year"))).inRoot(isDialog()).perform(scrollTo());
+                    screenshot("period-month-" + theme);
+                    onView(withId(id("period_year"))).inRoot(isDialog()).perform(click());
+                    screenshot("period-year-" + theme);
+                    onView(withId(android.R.id.button2)).inRoot(isDialog()).perform(click());
+                    onView(withId(android.R.id.button2)).inRoot(isDialog()).perform(click());
+                    scenario.onActivity(activity -> assertTrue(dayCell(activity, LocalDate.now()).isSelected()));
+                }
+            }
+        } finally { restorePrefs(saved); applyTheme(); }
     }
 
     @Test public void calendarDefaultsToTodayAndTogglesWithoutChangingFutureDates() throws Exception {
