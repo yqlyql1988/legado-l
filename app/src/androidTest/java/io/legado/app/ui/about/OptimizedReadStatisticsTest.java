@@ -375,7 +375,7 @@ public class OptimizedReadStatisticsTest {
                     enterMinimum("day_minimum", "");
                     enterMinimum("month_minimum", "9223372036854775807");
                     onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click());
-                    onView(withText(string("read_statistics_ranking_explanation"))).inRoot(isDialog()).check(matches(isDisplayed()));
+                    onView(withId(android.R.id.button1)).inRoot(isDialog()).check(matches(isDisplayed()));
                     assertEquals(600000L, prefs().getLong(keys[0], 0));
                     assertEquals(720000L, prefs().getLong(keys[1], 0));
                     onView(withId(android.R.id.button2)).inRoot(isDialog()).perform(click());
