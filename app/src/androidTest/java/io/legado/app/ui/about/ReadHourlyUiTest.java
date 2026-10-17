@@ -29,6 +29,7 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Consumer;
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.Espresso.onData;
 import static androidx.test.espresso.action.ViewActions.*;
@@ -115,6 +116,23 @@ public class ReadHourlyUiTest {
             }
         }
         return null;
+    }
+    private void withRow(ActivityScenario<Activity> scenario, String title, Consumer<View> action) {
+        scenario.onActivity(activity -> activity.findViewById(id("recycler_view")).scrollBy(0, -100000));
+        for (int i = 0; i < 60; i++) {
+            boolean[] found = {false};
+            scenario.onActivity(activity -> {
+                View list = activity.findViewById(id("recycler_view"));
+                View item = row(list, title);
+                if (item != null) {
+                    found[0] = true;
+                    action.accept(item);
+                } else list.scrollBy(0, 100);
+            });
+            if (found[0]) return;
+            SystemClock.sleep(50);
+        }
+        fail("Record not reachable by scrolling: " + title);
     }
     private void selectSpinner(String name, int index) {
         onView(withId(id(name))).inRoot(isDialog()).perform(new ViewAction() {
@@ -242,16 +260,11 @@ public class ReadHourlyUiTest {
     @Test public void managementFiltersClearsHiddenSelectionsAndDeletesWholeBookHistory() throws Exception {
         try (ActivityScenario<Activity> scenario = launch("ReadRecordManageActivity")) {
             await(scenario, "count", "3本");
-            scenario.onActivity(activity -> {
-                View item = row(activity.findViewById(id("recycler_view")), first);
-                assertNotNull(item);
-                item.findViewById(id("delete")).performClick();
-            });
+            withRow(scenario, first, item -> item.findViewById(id("delete")).performClick());
             onView(withId(android.R.id.message)).inRoot(isDialog()).check(matches(withText(containsString("全部阅读记录"))));
             onView(withId(android.R.id.button2)).inRoot(isDialog()).perform(click());
             assertEquals(2L, count(first));
-            scenario.onActivity(activity -> row(activity.findViewById(id("recycler_view")), first)
-                .findViewById(id("selected")).performClick());
+            withRow(scenario, first, item -> item.findViewById(id("selected")).performClick());
             scenario.recreate();
             await(scenario, "count", "已选 1本");
             scenario.onActivity(activity -> activity.findViewById(id("select_all")).performClick());
@@ -290,8 +303,7 @@ public class ReadHourlyUiTest {
             confirm();
             await(scenario, "count", "筛选到 2本");
             screenshot("manage-list");
-            scenario.onActivity(activity -> row(activity.findViewById(id("recycler_view")), second)
-                .findViewById(id("delete")).performClick());
+            withRow(scenario, second, item -> item.findViewById(id("delete")).performClick());
             confirm();
             await(scenario, "count", "筛选到 1本");
             assertEquals(0L, count(second));

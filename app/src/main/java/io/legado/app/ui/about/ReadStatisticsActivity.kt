@@ -637,6 +637,7 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
     }
 
     private fun selectHour(offset: Int) {
+        if (hourly.buckets.isEmpty()) return
         val interval = AppConfig.readStatisticsIntervalHours
         selectedHour = ((selectedHour / interval + offset).coerceIn(hourly.buckets.indices)) * interval
         renderHourly()
