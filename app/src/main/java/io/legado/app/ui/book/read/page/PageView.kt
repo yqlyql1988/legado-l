@@ -513,6 +513,21 @@ class PageView(context: Context) : FrameLayout(context) {
         binding.contentTextView.selectStartMove(x - imgBgPaddingStart, y - headerHeight)
     }
 
+    internal fun beginCrossPageSelection(moveStart: Boolean) =
+        binding.contentTextView.beginCrossPageSelection(moveStart)
+
+    internal fun moveCrossPageSelection(x: Float, y: Float) =
+        binding.contentTextView.moveCrossPageSelection(x - imgBgPaddingStart, y - headerHeight)
+
+    internal fun scrollCrossPageSelection(offset: Int) =
+        binding.contentTextView.scrollCrossPageSelection(offset)
+
+    internal val selectionChapter get() = binding.contentTextView.selectionChapter
+    internal val selectionStartPosition get() = binding.contentTextView.selectionStartPosition
+    internal val selectionCharacterCount get() = binding.contentTextView.selectionCharacterCount
+    internal val selectionTop get() = headerHeight + ChapterProvider.visibleRect.top
+    internal val selectionBottom get() = headerHeight + ChapterProvider.visibleRect.bottom
+
     fun selectStartMoveIndex(
         relativePagePos: Int,
         lineIndex: Int,

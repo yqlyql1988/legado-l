@@ -60,6 +60,11 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
     private val visibleRect = ChapterProvider.visibleRect
     val selectStart = TextPos(0, -1, -1)
     private val selectEnd = TextPos(0, -1, -1)
+    private var chapterSelection: ChapterTextSelection? = null
+    internal val selectionChapter get() = chapterSelection?.chapter
+    internal val selectionStartPosition get() = chapterSelection?.range?.start
+    internal val selectionCharacterCount get() = chapterSelection?.range?.let { it.end - it.start } ?: 0
+    private var crossSelectionDraggingStart = false
     var textPage: TextPage = TextPage()
         private set
     var isMainView = false
@@ -118,8 +123,10 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
      */
     fun setContent(textPage: TextPage) {
         cancelHighlightTap()
+        if (chapterSelection?.let { it.chapter !== textPage.textChapter } == true) cancelSelect()
         this.textPage = textPage
         upHighlight()
+        renderChapterSelection()
         // 非滑动翻页动画需要同步重绘，不然翻页可能会出现闪烁
         if (isScroll) {
             postInvalidate()
@@ -240,7 +247,122 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         }
         val moved = if (textPage === previousPage) pageOffset - previousOffset else mOffset
         if (!longScreenshot && moved != 0) callBack.onReadScroll(moved)
+        renderChapterSelection()
         postInvalidateOnAnimation()
+    }
+
+    internal fun beginCrossPageSelection(moveStart: Boolean): Boolean {
+        if (!AppConfig.crossPageTextSelection) return false
+        if (chapterSelection == null) {
+            val startPage = relativePage(selectStart.relativePagePos)
+            val endPage = relativePage(selectEnd.relativePagePos)
+            val chapter = startPage.textChapter
+            if (startPage.isMsgPage || chapter !== endPage.textChapter ||
+                ReadBook.book?.let { chapter.isForBook(it) } != true
+            ) return false
+            val first = ChapterTextSelection.span(startPage.getLine(selectStart.lineIndex),
+                selectStart.columnIndex) ?: return false
+            val last = ChapterTextSelection.span(endPage.getLine(selectEnd.lineIndex),
+                selectEnd.columnIndex) ?: return false
+            if (first.start > last.start) return false
+            chapterSelection = ChapterTextSelection(chapter, SelectionRange(first, last))
+        }
+        crossSelectionDraggingStart = moveStart
+        chapterSelection!!.range.begin(moveStart)
+        renderChapterSelection()
+        return true
+    }
+
+    internal fun moveCrossPageSelection(x: Float, y: Float): Boolean {
+        val selection = chapterSelection ?: return false
+        var bestLine: TextLine? = null
+        var bestDistance = Float.MAX_VALUE
+        for (relativePos in 0..if (isScroll) 2 else 0) {
+            val page = relativePage(relativePos)
+            if (page.textChapter !== selection.chapter) continue
+            val offset = relativeOffset(relativePos)
+            for (line in page.lines) {
+                if (!line.isVisible(offset) || line.columns.none { it is TextBaseColumn }) continue
+                if (page.doublePage && line.isLeftLine != (x < width / 2)) continue
+                val distance = kotlin.math.abs(y - (line.lineTop + line.lineBottom) / 2 - offset)
+                if (distance < bestDistance) {
+                    bestLine = line
+                    bestDistance = distance
+                }
+            }
+        }
+        val line = bestLine ?: return true
+        val index = line.columns.indices.filter {
+            line.columns[it] is TextBaseColumn && line.columns[it].positionLength > 0
+        }.minByOrNull {
+            val column = line.columns[it]
+            when {
+                x < column.start -> column.start - x
+                x > column.end -> x - column.end
+                else -> 0f
+            }
+        } ?: return true
+        val point = ChapterTextSelection.span(line, index) ?: return true
+        selection.range.move(point)
+        reverseStartCursor = crossSelectionDraggingStart && selection.range.reversed
+        reverseEndCursor = !crossSelectionDraggingStart && selection.range.reversed
+        renderChapterSelection()
+        return true
+    }
+
+    internal fun scrollCrossPageSelection(offset: Int): Boolean {
+        val selection = chapterSelection ?: return false
+        if (textPage.textChapter !== selection.chapter) return false
+        var amount = offset
+        if (amount > 0 && textPage.index == 0) amount = min(amount, -pageOffset)
+        val last = selection.chapter.lastPage ?: return false
+        val relative = last.index - textPage.index
+        if (amount < 0 && relative in 0..2) {
+            val bottom = last.lines.lastOrNull()?.lineBottom ?: return false
+            val remaining = (ChapterProvider.visibleBottom - bottom - relativeOffset(relative)).toInt()
+            amount = max(amount, min(0, remaining))
+        }
+        if (amount == 0) return false
+        scroll(amount)
+        return true
+    }
+
+    private fun renderChapterSelection() {
+        val selection = chapterSelection ?: return
+        val visiblePages = (0..if (isScroll) 2 else 0).map { relativePage(it) }
+        selection.clearPaint(visiblePages)
+        var startVisible = false
+        var endVisible = false
+        for (relative in 0..if (isScroll) 2 else 0) {
+            val page = relativePage(relative)
+            if (page.textChapter !== selection.chapter) continue
+            selection.paintedPages.add(page)
+            val offset = relativeOffset(relative)
+            for (line in page.lines) {
+                var position = line.chapterPosition
+                for (column in line.columns) {
+                    val end = position + column.positionLength
+                    if (column is TextBaseColumn && end > position) {
+                        column.selected = selection.range.contains(SelectionSpan(position, end))
+                        if (line.isVisible(offset)) {
+                            val bottom = (line.lineBottom + offset).coerceIn(
+                                visibleRect.top.toFloat(), visibleRect.bottom.toFloat())
+                            if (position == selection.range.start) {
+                                startVisible = true
+                                upSelectedStart(column.start, bottom, line.lineTop + offset)
+                            }
+                            if (end == selection.range.end) {
+                                endVisible = true
+                                upSelectedEnd(column.end, bottom)
+                            }
+                        }
+                    }
+                    position = end
+                }
+            }
+        }
+        callBack.upSelectionHandleVisibility(startVisible, endVisible)
+        invalidate()
     }
 
     fun submitRenderTask() {
@@ -767,6 +889,10 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
     }
 
     private fun upSelectChars() {
+        if (chapterSelection != null) {
+            renderChapterSelection()
+            return
+        }
         if (!selectStart.isSelected() && !selectEnd.isSelected()) {
             return
         }
@@ -813,6 +939,8 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
     }
 
     fun cancelSelect(clearSearchResult: Boolean = false) {
+        chapterSelection?.clearPaint()
+        chapterSelection = null
         val last = if (callBack.isScroll) 2 else 0
         for (relativePos in 0..last) {
             val textPage = relativePage(relativePos)
@@ -882,6 +1010,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
     }
 
     fun getSelectedText(): String {
+        chapterSelection?.let { return it.selectedText() }
         val textPos = TextPos(0, 0, 0)
         val builder = StringBuilder()
         for (relativePos in selectStart.relativePagePos..selectEnd.relativePagePos) {
@@ -928,6 +1057,16 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
     }
 
     fun createBookmark(): Bookmark? {
+        chapterSelection?.let { selection ->
+            val book = ReadBook.book ?: return null
+            if (!selection.chapter.isForBook(book)) return null
+            return book.createBookMark().apply {
+                chapterIndex = selection.chapter.chapter.index
+                chapterPos = selection.range.start
+                chapterName = selection.chapter.title
+                bookText = selection.selectedText()
+            }
+        }
         val page = relativePage(selectStart.relativePagePos)
         page.getTextChapter().let { chapter ->
             ReadBook.book?.let { book ->
@@ -945,22 +1084,28 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
 
     fun createHighlight(style: HighlightStyle): BookHighlight? {
         val book = ReadBook.book ?: return null
-        val startPage = relativePage(selectStart.relativePagePos)
-        val endPage = relativePage(selectEnd.relativePagePos)
+        val selection = chapterSelection
+        val startEndpoint = selection?.endpoint(false)
+        val endEndpoint = selection?.endpoint(true)
+        if (selection != null && (startEndpoint == null || endEndpoint == null)) return null
+        val startPos = startEndpoint?.second ?: selectStart
+        val endPos = endEndpoint?.second ?: selectEnd
+        val startPage = startEndpoint?.first ?: relativePage(selectStart.relativePagePos)
+        val endPage = endEndpoint?.first ?: relativePage(selectEnd.relativePagePos)
         if (startPage.chapterIndex != endPage.chapterIndex) return null
-        val startLine = startPage.getLine(selectStart.lineIndex)
-        val endLine = endPage.getLine(selectEnd.lineIndex)
+        val startLine = startPage.getLine(startPos.lineIndex)
+        val endLine = endPage.getLine(endPos.lineIndex)
         if (startLine.isTitle || endLine.isTitle) return null
         val chapter = startPage.getTextChapter()
         if (!chapter.isForBook(book)) return null
         val titleLength = chapter.layoutTitleLength.takeIf { it >= 0 } ?: return null
-        val endLength = highlightSelectionEndLength(selectEnd.columnIndex) {
-            endLine.getColumn(selectEnd.columnIndex).positionLength
+        val endLength = highlightSelectionEndLength(endPos.columnIndex) {
+            endLine.getColumn(endPos.columnIndex).positionLength
         }
-        val rawStart = chapter.getReadLength(startPage.index) +
-                startPage.getPosByLineColumn(selectStart.lineIndex, selectStart.columnIndex)
-        val rawEnd = chapter.getReadLength(endPage.index) +
-                endPage.getPosByLineColumn(selectEnd.lineIndex, selectEnd.columnIndex) + endLength
+        val rawStart = selection?.range?.start ?: (chapter.getReadLength(startPage.index) +
+                startPage.getPosByLineColumn(startPos.lineIndex, startPos.columnIndex))
+        val rawEnd = selection?.range?.end ?: (chapter.getReadLength(endPage.index) +
+                endPage.getPosByLineColumn(endPos.lineIndex, endPos.columnIndex) + endLength)
         val bodyStart = (rawStart - titleLength).coerceAtLeast(0)
         val bodyEnd = (rawEnd - titleLength).coerceAtLeast(0)
         if (bodyEnd <= bodyStart) return null
@@ -1137,6 +1282,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         var isSelectingSearchResult: Boolean
         fun upSelectedStart(x: Float, y: Float, top: Float)
         fun upSelectedEnd(x: Float, y: Float)
+        fun upSelectionHandleVisibility(startVisible: Boolean, endVisible: Boolean)
         fun onImageLongPress(x: Float, y: Float, src: String)
         fun onCancelSelect()
         fun onLongScreenshotTouchEvent(event: MotionEvent): Boolean

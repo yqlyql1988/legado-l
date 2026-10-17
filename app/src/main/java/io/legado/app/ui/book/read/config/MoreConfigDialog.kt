@@ -129,6 +129,7 @@ class MoreConfigDialog : BasePrefDialogFragment() {
 
                 PreferKey.keepLight -> postEvent(key, true)
                 PreferKey.textSelectAble -> postEvent(key, getPrefBoolean(key))
+                PreferKey.crossPageTextSelection -> ReadBook.callBack?.cancelSelect()
                 PreferKey.screenOrientation -> {
                     (activity as? ReadBookActivity)?.setOrientation()
                 }
