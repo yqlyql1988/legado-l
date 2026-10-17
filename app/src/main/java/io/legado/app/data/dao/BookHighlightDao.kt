@@ -17,6 +17,9 @@ interface BookHighlightDao {
     )
     val all: List<BookHighlight>
 
+    @Query("SELECT * FROM highlights ORDER BY time DESC")
+    fun flowAll(): Flow<List<BookHighlight>>
+
     @Query(
         """select * from highlights
         where bookUrl = :bookUrl
