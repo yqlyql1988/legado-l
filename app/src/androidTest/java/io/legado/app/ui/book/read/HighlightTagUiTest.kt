@@ -148,8 +148,9 @@ class HighlightTagUiTest {
                 view.paddingLeft >= (12 * context.resources.displayMetrics.density).toInt())
         }
         assertTrue("Labels are the second row", labelY > actionY)
-        assertEquals("Both rows use comfortable 44dp targets",
-            (44 * context.resources.displayMetrics.density).toInt(), labelY - actionY)
+        assertEquals("Comfortable rows separated by a subtle 1dp divider",
+            (44 * context.resources.displayMetrics.density).toInt() +
+                (1 * context.resources.displayMetrics.density).toInt(), labelY - actionY)
         onView(withContentDescription(R.string.text_menu_zone_more)).inRoot(isPlatformPopup())
             .check(matches(withText("⋮")))
         popupLabel("伏笔").perform(click())

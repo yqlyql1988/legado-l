@@ -3,6 +3,7 @@ package io.legado.app.ui.book.read
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Rect
+import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.InsetDrawable
 import android.view.Gravity
 import android.view.View
@@ -12,6 +13,7 @@ import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
 import androidx.appcompat.widget.AppCompatImageButton
+import androidx.core.graphics.ColorUtils
 import io.legado.app.R
 import io.legado.app.data.entities.HighlightTag
 import io.legado.app.help.HighlightMenuConfig
@@ -81,6 +83,13 @@ class HighlightActionPopup(
         },
             LinearLayout.LayoutParams(44.dpToPx(), -2))
         root.addView(firstRow, LinearLayout.LayoutParams(-1, -2))
+        root.addView(View(context).apply {
+            setBackgroundColor(ColorUtils.setAlphaComponent(context.getCompatColor(R.color.primaryText), 24))
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }, LinearLayout.LayoutParams(-1, 1.dpToPx()).apply {
+            marginStart = 12.dpToPx()
+            marginEnd = 12.dpToPx()
+        })
         val secondRow = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
         secondRow.addView(tagScroll, LinearLayout.LayoutParams(0, -2, 1f))
         secondRow.addView(AppCompatImageButton(context).apply {
@@ -116,12 +125,18 @@ class HighlightActionPopup(
             dismiss(); onAction(Action.MANAGE_TAGS)
         })
         tags.forEach { tag ->
+            val selected = tag.id in selectedIds
             tagRail.addView(
-                context.highlightTagChip(tag, tag.id in selectedIds, compact = true) { onTag(tag.id) }.apply {
+                context.highlightTagChip(tag, selected, compact = true) { onTag(tag.id) }.apply {
                     minHeight = 44.dpToPx()
-                    background = InsetDrawable(background, 0, 8.dpToPx(), 0, 8.dpToPx())
+                    val chipBackground = (background as GradientDrawable).apply {
+                        cornerRadius = 6f.dpToPx()
+                        setStroke(if (selected) 0 else 1.dpToPx(),
+                            ColorUtils.setAlphaComponent(context.getCompatColor(R.color.primaryText), 36))
+                    }
+                    background = InsetDrawable(chipBackground, 0, 8.dpToPx(), 0, 8.dpToPx())
                     setPadding(12.dpToPx(), 0, 12.dpToPx(), 0)
-                }
+                }, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = 6.dpToPx() }
             )
         }
         tagScroll.post { tagScroll.scrollTo(scroll, 0) }
