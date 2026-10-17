@@ -11,7 +11,7 @@ import sys
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
-ORIGIN = "https://github.com/yqlyql1988/reading-l.git"
+ORIGIN = "https://github.com/yqlyql1988/legado-l.git"
 BRANCHES = ("main", "upstream-source")
 PRIVATE_SUFFIXES = {".apk", ".aab", ".bundle", ".jks", ".keystore", ".p12", ".pfx"}
 PRIVATE_FILES = {"local.properties", "keystore.properties", "signing.properties"}

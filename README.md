@@ -1,6 +1,6 @@
 # 阅读L
 
-[![阅读L检查](https://github.com/yqlyql1988/reading-l/actions/workflows/reading-l-check.yml/badge.svg)](https://github.com/yqlyql1988/reading-l/actions/workflows/reading-l-check.yml)
+[![阅读L检查](https://github.com/yqlyql1988/legado-l/actions/workflows/reading-l-check.yml/badge.svg)](https://github.com/yqlyql1988/legado-l/actions/workflows/reading-l-check.yml)
 
 阅读L是基于 [LegadoTeam/legado](https://github.com/LegadoTeam/legado) 的个人 Android 阅读器，源码和发布文件保存在本 GitHub 公开仓库。
 
@@ -13,12 +13,12 @@
 | 代码管理、备份与上游同步 | [CODE_MANAGEMENT.md](CODE_MANAGEMENT.md) |
 | 功能开发、测试与 PR 流程 | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | 更新记录 | [CHANGELOG.md](CHANGELOG.md) |
-| 可安装版本与校验值 | [Releases](https://github.com/yqlyql1988/reading-l/releases) |
-| 问题与需求 | [Issues](https://github.com/yqlyql1988/reading-l/issues) |
-| 自动检查与测试报告 | [Actions](https://github.com/yqlyql1988/reading-l/actions) |
+| 可安装版本与校验值 | [Releases](https://github.com/yqlyql1988/legado-l/releases) |
+| 问题与需求 | [Issues](https://github.com/yqlyql1988/legado-l/issues) |
+| 自动检查与测试报告 | [Actions](https://github.com/yqlyql1988/legado-l/actions) |
 | 上游项目介绍与鸣谢 | [原 README](docs/UPSTREAM_README.md) |
 
-源码、问题和发布页面可公开浏览，最新安装包见 [最新版本](https://github.com/yqlyql1988/reading-l/releases/latest)。
+源码、问题和发布页面可公开浏览，最新安装包见 [最新版本](https://github.com/yqlyql1988/legado-l/releases/latest)。
 
 ## 精简版本
 

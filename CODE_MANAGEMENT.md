@@ -1,6 +1,6 @@
 # 阅读L 代码管理
 
-本项目使用本地 Git 和 GitHub 公开仓库共同管理源码、功能分支、PR、问题、测试与版本发布。Git 仓库位于项目的 `.git` 目录，个人仓库为 `yqlyql1988/reading-l`。
+本项目使用本地 Git 和 GitHub 公开仓库共同管理源码、功能分支、PR、问题、测试与版本发布。Git 仓库位于项目的 `.git` 目录，个人仓库为 `yqlyql1988/legado-l`。
 
 ## 默认工作流程：只需说明具体需求
 
@@ -44,6 +44,8 @@
 
 2026-10-17 按用户确认将既有仓库由私有改为公开，仓库地址、提交历史、分支和标签沿用。公开前检查历史文件、常见密钥与令牌格式、发布元数据及可下载的 Actions 日志和测试附件；公开后核验匿名访问、既有 Release 附件及工作流状态。核验报告保存在本机忽略的 `build/public-visibility`。
 
+同日按用户要求将仓库从 `reading-l` 更名为 `legado-l`，新地址为 `https://github.com/yqlyql1988/legado-l`。本地 `origin`、管理工具固定地址、首页与问题模板链接同步更新；仓库身份、原分支与标签、已有 Releases、附件和 Latest 标记均完成核验。更名记录保存在本机忽略的 `build/repository-rename`。
+
 项目继续使用上述 PR 约定、本地检查及 Actions。此前私有仓库的分支保护接口因账号方案返回 HTTP 403；本次仅调整可见性，分支保护仍按实际服务器配置判断。签名密钥、访问令牌、本机配置和 Git bundle 备份另行私密保存，不进入公开源码、发布附件或 Actions 日志。
 
 开发流程见 `CONTRIBUTING.md`。个人仓库启用“阅读L检查”和上游已有的“Triage labels”分类工作流。其他官方工作流在个人仓库停用，包括官方发布、第三方分发、自动关 Issue 和需要 API 密钥的代码审查；源码文件仍保留，便于继续合并上游。
@@ -77,7 +79,7 @@ python tools/reading-l/manage.py sync
 
 Release 标题以版本标签开头，再填写应用名称和功能，例如 `v2026.1015.6 · 阅读L · 书评编辑页重设计`。功能名称写在标题和发布说明中，不再作为新安装包发布标签的前缀。最新可用安装包发布时明确设置 `make_latest=true`；历史版本整理设置为 `false`，最后核对最新发布的 Latest 标记，以及 Releases 列表从新到旧的实际顺序。
 
-下载最新版使用固定入口：[阅读L最新安装包](https://github.com/yqlyql1988/reading-l/releases/latest)。纯文档或管理调整不创建没有新安装包的 Release；发布标签也不代替 APK 内的版本号，不为整理列表而重新构建安装包。
+下载最新版使用固定入口：[阅读L最新安装包](https://github.com/yqlyql1988/legado-l/releases/latest)。纯文档或管理调整不创建没有新安装包的 Release；发布标签也不代替 APK 内的版本号，不为整理列表而重新构建安装包。
 
 已发布的标签永远固定到原源码提交。2026-10-16 整理已有 6 个 Releases 时，为原提交新增日期序号标签，并在原 Release 上更新标签和标题；原有 `reading-l-*` 标签继续保留，不删除、不移动。核对 Release ID、发布时间（`published_at`）、发布说明、附件 ID、文件名、大小和 SHA256 均与整理前一致。GitHub 更新标签时会重新计算 `created_at`，该字段与实际发布时间分别记录。整理前后的发布元数据与核验报告另存于本机忽略的 `build/release-order`，随后的源码备份包含全部新旧标签。
 
@@ -148,7 +150,7 @@ git clone "备份文件的完整路径.bundle" "新的项目目录"
 
 APK 单独保存在 `build/outputs`，不进入源码历史。签名密钥、`local.properties` 和本机配置需要另行私密备份。
 
-源码云端副本已关联到个人公开仓库 `yqlyql1988/reading-l`，远程名称为 `origin`；本机 bundle 与签名备份继续私密保存。
+源码云端副本已关联到个人公开仓库 `yqlyql1988/legado-l`，远程名称为 `origin`；本机 bundle 与签名备份继续私密保存。
 
 后续修改先保存本地提交，再同步源码与版本标签：
 

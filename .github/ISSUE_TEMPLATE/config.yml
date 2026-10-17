@@ -1,7 +1,7 @@
 blank_issues_enabled: false
 contact_links:
   - name: 阅读L代码管理
-    url: https://github.com/yqlyql1988/reading-l/blob/main/CODE_MANAGEMENT.md
+    url: https://github.com/yqlyql1988/legado-l/blob/main/CODE_MANAGEMENT.md
     about: 分支、测试、备份、发布及上游同步说明
   - name: 简繁转化
     url: https://github.com/liuyueyi/quick-chinese-transfer/issues/new
