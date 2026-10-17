@@ -10,6 +10,7 @@ import io.legado.app.constant.PreferKey
 import io.legado.app.data.entities.ReadRecord
 import io.legado.app.data.entities.ReadRecordDaily
 import io.legado.app.data.entities.ReadRecordHistory
+import io.legado.app.data.entities.ReadRecordHourly
 import io.legado.app.data.entities.ReadStatisticsState
 import io.legado.app.data.entities.prepareSaveWithCover
 import io.legado.app.data.entities.saveWithCover
@@ -150,22 +151,27 @@ class ReadStatisticsDatabaseTest {
         val directory = File(context.cacheDir, "statistics-${UUID.randomUUID()}").apply { mkdirs() }
         val record = ReadRecord(AppConst.androidId, name, "A", 1000, 100, "Saved", 7)
         val daily = ReadRecordDaily(record.deviceId, name, "A", "2026-10-17", 200)
+        val hourly = ReadRecordHourly(record.deviceId, name, "A", "2026-10-17", 9, 100)
         fun restore() = runBlocking(Dispatchers.IO) { Restore.restoreLocked(directory.absolutePath, lanTransfer = true) }
         try {
             File(directory, "readRecord.json").writeText(GSON.toJson(listOf(record)))
             restore()
             assertTrue(dao.getDaily(record.deviceId, name, "A").isEmpty())
             File(directory, "readRecordDaily.json").writeText(GSON.toJson(listOf(daily)))
+            File(directory, "readRecordHourly.json").writeText(GSON.toJson(listOf(hourly)))
             repeat(2) {
                 restore()
                 assertEquals(record, dao.getRecord(record.deviceId, name, "A"))
                 assertEquals(listOf(daily), dao.getDaily(record.deviceId, name, "A"))
+                assertEquals(listOf(hourly), dao.getHourly(record.deviceId, name, "A"))
             }
             // A backup with no detail file remains compatible and does not erase known days.
             File(directory, "readRecordDaily.json").delete()
+            File(directory, "readRecordHourly.json").delete()
             restore()
             assertEquals(1000L, dao.getRecord(record.deviceId, name, "A")!!.readTime)
             assertEquals(listOf(daily), dao.getDaily(record.deviceId, name, "A"))
+            assertEquals(listOf(hourly), dao.getHourly(record.deviceId, name, "A"))
         } finally {
             dao.deleteByBook(name, "A")
             directory.deleteRecursively()
@@ -181,10 +187,12 @@ class ReadStatisticsDatabaseTest {
         val name = "Statistics archive ${UUID.randomUUID()}"
         val record = ReadRecord(AppConst.androidId, name, "A", 1000, 100, "Chapter", 3)
         val detail = ReadRecordDaily(record.deviceId, name, "A", "2026-10-17", 200)
+        val hourly = ReadRecordHourly(record.deviceId, name, "A", "2026-10-17", 9, 200)
         val directory = File(context.cacheDir, "statistics-archive-${UUID.randomUUID()}")
         try {
             dao.insert(record)
             dao.insertDaily(detail)
+            dao.insertHourly(hourly)
             dao.insertHistory(ReadRecordHistory(record.deviceId, name, "A", 800))
             prefs.edit().putBoolean(PreferKey.onlyLatestBackup, true).commit()
             BackupConfig.contentKeys.forEach { BackupConfig.ignoreConfig[it] = true }
@@ -196,6 +204,8 @@ class ReadStatisticsDatabaseTest {
                 assertEquals(record, GSON.fromJson(json("readRecord.json"), Array<ReadRecord>::class.java)
                     .single { it.bookName == name })
                 assertEquals(detail, GSON.fromJson(json("readRecordDaily.json"), Array<ReadRecordDaily>::class.java)
+                    .single { it.bookName == name })
+                assertEquals(hourly, GSON.fromJson(json("readRecordHourly.json"), Array<ReadRecordHourly>::class.java)
                     .single { it.bookName == name })
                 assertEquals(800L, GSON.fromJson(json("readRecordHistory.json"), Array<ReadRecordHistory>::class.java)
                     .single { it.bookName == name }.readTime)

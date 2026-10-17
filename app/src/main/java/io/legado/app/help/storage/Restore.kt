@@ -413,6 +413,7 @@ object Restore {
                 fileToListT<io.legado.app.data.entities.ReadStatisticsState>(path, "readStatisticsState.json"),
                 androidId,
                 fileToListT<io.legado.app.data.entities.ReadRecordHistory>(path, "readRecordHistory.json"),
+                fileToListT<io.legado.app.data.entities.ReadRecordHourly>(path, "readRecordHourly.json"),
             )
         }
         File(path, "servers.json").takeIf {

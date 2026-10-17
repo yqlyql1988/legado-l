@@ -148,6 +148,8 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
                 recreate()
             }
 
+            R.id.menu_manage_record -> startActivity(Intent(this, ReadRecordManageActivity::class.java)
+                .putExtra("query", searchView.query.toString()))
             R.id.menu_clear_record -> clearRecords()
         }
         return super.onCompatOptionsItemSelected(item)

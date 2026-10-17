@@ -53,6 +53,16 @@ public class OptimizedReadStatisticsTest {
     private Intent intent(String activity) {
         return new Intent().setClassName(context.getPackageName(), "io.legado.app.ui.about." + activity);
     }
+    /** Existing calendar regressions explicitly choose the monthly calendar. */
+    private ActivityScenario<Activity> launchCalendar() {
+        ActivityScenario<Activity> scenario = ActivityScenario.launch(intent("ReadStatisticsActivity"));
+        await(scenario, "tv_duration");
+        scenario.onActivity(activity -> {
+            activity.findViewById(id("tab_month")).performClick();
+            activity.findViewById(id("graph_trend")).performClick();
+        });
+        return scenario;
+    }
     private String string(String name, Object... args) {
         int value = context.getResources().getIdentifier(name, "string", context.getPackageName());
         assertTrue("Missing string: " + name, value != 0);
@@ -60,7 +70,7 @@ public class OptimizedReadStatisticsTest {
     }
     private void checkStatisticsHelp(String expectedDate, String screenshotName) throws Exception {
         String explanation = string("read_statistics_coverage", expectedDate) + "\n\n" +
-            string("read_statistics_scope_explanation");
+            string("read_statistics_scope_explanation") + "\n\n" + string("read_statistics_hour_help");
         onView(withText(explanation)).check(doesNotExist());
         openActionBarOverflowOrOptionsMenu(context);
         onView(withText(string("read_statistics_help"))).inRoot(isPlatformPopup()).perform(click());
@@ -154,13 +164,13 @@ public class OptimizedReadStatisticsTest {
             "readStatisticsDayMinimum", "readStatisticsMonthMinimum",
             "readStatisticsYearMinimum", "readStatisticsAllMinimum");
         // Open the real activity once so Room creates/migrates the database first.
-        try (ActivityScenario<Activity> initial = ActivityScenario.launch(intent("ReadStatisticsActivity"))) {
+        try (ActivityScenario<Activity> initial = launchCalendar()) {
             await(initial, "tv_duration");
         }
         SQLiteDatabase db = SQLiteDatabase.openDatabase(context.getDatabasePath("legado.db").getPath(),
             null, SQLiteDatabase.OPEN_READWRITE);
         try {
-            assertEquals(117, db.getVersion());
+            assertEquals(118, db.getVersion());
             // Include device start dates and existing details, just like the real coverage calculation.
             try (android.database.Cursor cursor = db.rawQuery(
                 "SELECT startedAt FROM readStatisticsState WHERE startedAt > 0", null)) {
@@ -191,7 +201,7 @@ public class OptimizedReadStatisticsTest {
                 prefs().edit().putString("themeMode", theme).commit();
                 applyTheme();
                 String suffix = theme.equals("1") ? "light" : "dark";
-                try (ActivityScenario<Activity> scenario = ActivityScenario.launch(intent("ReadStatisticsActivity"))) {
+                try (ActivityScenario<Activity> scenario = launchCalendar()) {
                     await(scenario, "tv_duration");
                     scenario.onActivity(activity -> {
                         assertTrue(activity.findViewById(id("tab_month")).isSelected());
@@ -287,7 +297,7 @@ public class OptimizedReadStatisticsTest {
         YearMonth current = YearMonth.from(today);
         LocalDate seeded = today.minusYears(9).withMonth(4).withDayOfMonth(5);
         String device = "period-picker-" + UUID.randomUUID();
-        try (ActivityScenario<Activity> initial = ActivityScenario.launch(intent("ReadStatisticsActivity"))) {
+        try (ActivityScenario<Activity> initial = launchCalendar()) {
             await(initial, "tv_duration");
         }
         SQLiteDatabase db = SQLiteDatabase.openDatabase(context.getDatabasePath("legado.db").getPath(),
@@ -312,7 +322,7 @@ public class OptimizedReadStatisticsTest {
                 }
             }
             final LocalDate earliest = first;
-            try (ActivityScenario<Activity> scenario = ActivityScenario.launch(intent("ReadStatisticsActivity"))) {
+            try (ActivityScenario<Activity> scenario = launchCalendar()) {
                 await(scenario, "tv_duration");
                 scenario.onActivity(activity -> dayCell(activity, today).performClick());
                 // Confirming the same month preserves a deliberately deselected calendar.
@@ -418,7 +428,7 @@ public class OptimizedReadStatisticsTest {
                 }
                 assertTrue(edit.commit());
                 applyTheme();
-                try (ActivityScenario<Activity> scenario = ActivityScenario.launch(intent("ReadStatisticsActivity"))) {
+                try (ActivityScenario<Activity> scenario = launchCalendar()) {
                     await(scenario, "tv_duration");
                     openPeriodPicker();
                     onView(withId(id("period_year"))).inRoot(isDialog()).perform(scrollTo())
@@ -452,7 +462,7 @@ public class OptimizedReadStatisticsTest {
 
     @Test public void calendarDefaultsToTodayAndTogglesWithoutChangingFutureDates() throws Exception {
         LocalDate today = LocalDate.now();
-        try (ActivityScenario<Activity> scenario = ActivityScenario.launch(intent("ReadStatisticsActivity"))) {
+        try (ActivityScenario<Activity> scenario = launchCalendar()) {
             await(scenario, "tv_duration");
             scenario.onActivity(activity -> {
                 assertTrue(activity.findViewById(id("tab_month")).isSelected());
@@ -525,7 +535,7 @@ public class OptimizedReadStatisticsTest {
                 .putInt("colorBackgroundNight", 0xff0b1821).putInt("colorBottomBackgroundNight", 0xff10212f)
                 .putLong("readStatisticsDayMinimum", 360000000L).commit();
             applyTheme();
-            try (ActivityScenario<Activity> scenario = ActivityScenario.launch(intent("ReadStatisticsActivity"))) {
+            try (ActivityScenario<Activity> scenario = launchCalendar()) {
                 await(scenario, "tv_duration");
                 openRankingSettings();
                 checkComponent("day_minimum", "hours", "100");
@@ -565,7 +575,7 @@ public class OptimizedReadStatisticsTest {
             SharedPreferences.Editor editor = prefs().edit();
             for (int i = 0; i < keys.length; i++) editor.putLong(keys[i], values[i]);
             assertTrue(editor.commit());
-            try (ActivityScenario<Activity> scenario = ActivityScenario.launch(intent("ReadStatisticsActivity"))) {
+            try (ActivityScenario<Activity> scenario = launchCalendar()) {
                 await(scenario, "tv_duration");
                 openRankingSettings();
                 for (int i = 0; i < rows.length; i++) {
@@ -623,7 +633,7 @@ public class OptimizedReadStatisticsTest {
         String device = "ranking-ui-" + UUID.randomUUID();
         String title = "排行验证 " + device;
         LocalDate today = LocalDate.now();
-        try (ActivityScenario<Activity> initial = ActivityScenario.launch(intent("ReadStatisticsActivity"))) {
+        try (ActivityScenario<Activity> initial = launchCalendar()) {
             await(initial, "tv_duration");
         }
         SQLiteDatabase db = SQLiteDatabase.openDatabase(context.getDatabasePath("legado.db").getPath(),
@@ -638,7 +648,7 @@ public class OptimizedReadStatisticsTest {
                 Map<String, Object> themeBefore = savePrefs("themeMode");
                 prefs().edit().putString("themeMode", theme).commit();
                 applyTheme();
-                try (ActivityScenario<Activity> scenario = ActivityScenario.launch(intent("ReadStatisticsActivity"))) {
+                try (ActivityScenario<Activity> scenario = launchCalendar()) {
                     await(scenario, "tv_duration");
                     String[] totals = new String[4];
                     scenario.onActivity(activity -> {

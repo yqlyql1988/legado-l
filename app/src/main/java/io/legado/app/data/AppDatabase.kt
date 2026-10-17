@@ -61,6 +61,7 @@ import io.legado.app.data.entities.KeyboardAssist
 import io.legado.app.data.entities.ReadRecord
 import io.legado.app.data.entities.ReadRecordDaily
 import io.legado.app.data.entities.ReadRecordHistory
+import io.legado.app.data.entities.ReadRecordHourly
 import io.legado.app.data.entities.ReadStatisticsState
 import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.data.entities.RssArticle
@@ -88,7 +89,7 @@ val appDb by lazy {
 }
 
 @Database(
-    version = 117,
+    version = 118,
     exportSchema = true,
     entities = [Book::class, BookGroup::class, BookSource::class, BookChapter::class,
         ReplaceRule::class, SearchBook::class, SearchKeyword::class, Cookie::class,
@@ -98,7 +99,7 @@ val appDb by lazy {
         AutoTaskRule::class, BookHighlight::class, HighlightRule::class, BookSourceCheckState::class,
         BookMemo::class, BookReview::class, BookReviewDeletion::class,
         HighlightTag::class, HighlightTagLink::class, HighlightTagOrder::class,
-        ReadRecordDaily::class, ReadStatisticsState::class, ReadRecordHistory::class],
+        ReadRecordDaily::class, ReadStatisticsState::class, ReadRecordHistory::class, ReadRecordHourly::class],
     views = [BookSourcePart::class],
     autoMigrations = [
         AutoMigration(from = 43, to = 44),
@@ -166,7 +167,8 @@ val appDb by lazy {
         AutoMigration(from = 112, to = 113),
         AutoMigration(from = 113, to = 114, spec = DatabaseMigrations.Migration_113_114::class),
         AutoMigration(from = 114, to = 115),
-        AutoMigration(from = 116, to = 117)
+        AutoMigration(from = 116, to = 117),
+        AutoMigration(from = 117, to = 118)
     ]
 )
 abstract class AppDatabase : RoomDatabase() {

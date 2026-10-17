@@ -122,12 +122,14 @@ class ReadStatisticsUiTest {
         ActivityScenario.launch<ReadStatisticsActivity>(Intent(context, ReadStatisticsActivity::class.java)).use { scenario ->
             await(scenario) { it.findViewById<TextView>(R.id.tv_duration)?.text?.isNotEmpty() == true }
             scenario.onActivity { activity ->
-                assertTrue(activity.findViewById<View>(R.id.tab_month).isSelected)
+                assertTrue(activity.findViewById<View>(R.id.tab_day).isSelected)
+                assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.hour_details).visibility)
                 activity.findViewById<View>(R.id.tab_all).performClick()
                 assertTrue(activity.findViewById<TextView>(R.id.tv_history).visibility == View.VISIBLE)
                 activity.findViewById<View>(R.id.tab_year).performClick()
                 assertTrue(activity.findViewById<TextView>(R.id.tv_period).text.contains(today.year.toString()))
                 activity.findViewById<View>(R.id.tab_month).performClick()
+                activity.findViewById<View>(R.id.graph_trend).performClick()
                 val grid = activity.findViewById<GridLayout>(R.id.calendar_grid)
                 val day = (0 until grid.childCount).map { grid.getChildAt(it) }.first {
                     it.contentDescription?.startsWith(today.toString()) == true

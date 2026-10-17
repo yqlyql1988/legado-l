@@ -85,6 +85,7 @@ internal fun selectedBackupFileNames(isEnabled: (String) -> Boolean): List<Strin
             addAll(listOf("readRecord.json", "searchHistory.json"))
             addAll(listOf("readRecordDaily.json", "readStatisticsState.json"))
             add("readRecordHistory.json")
+            add("readRecordHourly.json")
         }
         if (isEnabled(BackupConfig.bookReviewContentKey)) {
             add("bookReview.json")
@@ -314,6 +315,7 @@ object Backup {
                 appDb.readRecordDao.allDaily(),
                 appDb.readRecordDao.statisticsStates(),
                 appDb.readRecordDao.allHistory(),
+                appDb.readRecordDao.allHourly(),
             )
         })
         writeListToJson(
@@ -323,6 +325,7 @@ object Backup {
         writeListToJson(history.daily, "readRecordDaily.json", backupPath, writeEmpty = true)
         writeListToJson(history.states, "readStatisticsState.json", backupPath, writeEmpty = true)
         writeListToJson(history.history, "readRecordHistory.json", backupPath, writeEmpty = true)
+        writeListToJson(history.hourly, "readRecordHourly.json", backupPath, writeEmpty = true)
         writeListToJson(appDb.searchKeywordDao.all, "searchHistory.json", backupPath)
         writeListToJson(appDb.bookReviewDao.all(), "bookReview.json", backupPath, writeEmpty = true)
         writeListToJson(appDb.bookReviewDao.deletions(), "bookReviewDeletion.json", backupPath, writeEmpty = true)

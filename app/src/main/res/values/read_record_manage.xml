@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="read_record_manage">批量管理</string>
+    <string name="read_record_manage_title">阅读记录管理</string>
+    <string name="read_record_manage_hour">小时</string>
+    <string name="read_record_manage_filter">筛选范围与阅读时长</string>
+    <string name="read_record_manage_summary">%1$s · %2$s</string>
+    <string name="read_record_manage_no_limit">时长不限</string>
+    <string name="read_record_manage_minimum">最短阅读时长（含）</string>
+    <string name="read_record_manage_maximum">最长阅读时长（含）</string>
+    <string name="read_record_manage_upper_enabled">设置最长阅读时长</string>
+    <string name="read_record_manage_bounds_error">最长时长不能小于最短时长</string>
+    <string name="read_record_manage_from">%1$s以上</string>
+    <string name="read_record_manage_between">%1$s—%2$s</string>
+    <string name="read_record_manage_count">筛选到 %1$d本 · 已选 %2$d本</string>
+    <string name="read_record_manage_all">全选筛选结果</string>
+    <string name="read_record_manage_delete">删除所选（%1$d）</string>
+    <string name="read_record_manage_empty">没有符合条件的阅读记录</string>
+    <string name="read_record_manage_explanation">按所选范围内的时长筛选书籍；删除会清理这些书的全部阅读记录。小时及日／月／年筛选仅使用已有明细。</string>
+    <string name="read_record_manage_times">当前范围：%1$s · 累计：%2$s</string>
+    <string name="read_record_manage_delete_one">删除《%1$s》的阅读记录</string>
+    <string name="read_record_manage_confirm">删除选中的 %1$d本书的阅读记录？\n\n%2$s\n\n当前筛选范围时长：%3$s\n这些书的累计时长：%4$s\n\n将删除当前应用中这些书的全部阅读记录，包括各设备的每日和小时明细，不只删除筛选时段。书架中的书籍、书签和标注保留。</string>
+    <string name="read_record_manage_more">另有 %1$d本</string>
+    <string name="read_record_manage_failed">删除未完成，请重试</string>
+    <string name="read_record_manage_presets">快捷时长</string>
+    <string-array name="read_record_manage_presets">
+        <item>自定义</item>
+        <item>时长不限</item>
+        <item>不超过10分钟</item>
+        <item>10分钟—1小时</item>
+        <item>1—5小时</item>
+        <item>5小时以上</item>
+    </string-array>
+</resources>

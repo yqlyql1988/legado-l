@@ -55,8 +55,14 @@ public class ReadStatisticsScopeTest {
         }
     }
     private ActivityScenario<Activity> launch() {
-        return ActivityScenario.launch(new Intent().setClassName(context.getPackageName(),
+        ActivityScenario<Activity> scenario = ActivityScenario.launch(new Intent().setClassName(context.getPackageName(),
             "io.legado.app.ui.about.ReadStatisticsActivity"));
+        await(scenario);
+        scenario.onActivity(activity -> {
+            activity.findViewById(id("tab_month")).performClick();
+            activity.findViewById(id("graph_trend")).performClick();
+        });
+        return scenario;
     }
     private void await(ActivityScenario<Activity> scenario) {
         for (int i = 0; i < 100; i++) {

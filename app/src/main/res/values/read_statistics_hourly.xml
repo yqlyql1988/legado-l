@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="read_statistics_day">日度</string>
+    <string name="read_statistics_day_period">%1$d年%2$d月%3$d日</string>
+    <string name="read_statistics_choose_day">选择日期</string>
+    <string name="read_statistics_current_day">回到今天</string>
+    <string name="read_statistics_previous_day">上一天</string>
+    <string name="read_statistics_next_day">下一天</string>
+    <string name="read_statistics_day_books">当日阅读书籍</string>
+    <string name="read_statistics_trend">阅读趋势</string>
+    <string name="read_statistics_hourly">时段分布</string>
+    <string name="read_statistics_one_hour">间隔 1小时</string>
+    <string name="read_statistics_interval">间隔 %1$d小时</string>
+    <string name="read_statistics_interval_title">时间间隔</string>
+    <string name="read_statistics_interval_custom">自定义…</string>
+    <string name="read_statistics_interval_invalid">请输入1—24之间的整数小时</string>
+    <string name="read_statistics_hour_range">%1$02d:00—%2$02d:00</string>
+    <string name="read_statistics_hour_detail">%1$s · %2$s</string>
+    <string name="read_statistics_previous_hour">上一个时段</string>
+    <string name="read_statistics_next_hour">下一个时段</string>
+    <string name="read_statistics_hour_empty">这个时段没有已记录的阅读时间</string>
+    <string name="read_statistics_hour_coverage">已分时：%1$s\n无时段明细：%2$s</string>
+    <string name="read_statistics_hour_help">时段分布按每天的钟点汇总，最小间隔1小时；实际时长精确累计，跨小时和午夜自动拆分。旧记录没有钟点依据的部分保留在总览中，显示为“无时段明细”，不推算到某个小时。切换间隔不增加存储记录，删除书籍阅读记录会一并清理小时明细。</string>
+    <string name="read_statistics_minutes">分钟</string>
+</resources>
