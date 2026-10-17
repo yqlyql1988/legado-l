@@ -8,6 +8,13 @@
     <string name="read_statistics_all_period">全部阅读时光</string>
     <string name="read_statistics_year_period">%1$d年</string>
     <string name="read_statistics_month_period">%1$d年%2$d月</string>
+    <string name="read_statistics_choose_year">选择年份</string>
+    <string name="read_statistics_choose_month">选择月份</string>
+    <string name="read_statistics_select_period">%1$s，点击选择年月</string>
+    <string name="read_statistics_select_year">选择年份，当前%1$d年</string>
+    <string name="read_statistics_month_number">%1$d月</string>
+    <string name="read_statistics_current_year">回到今年</string>
+    <string name="read_statistics_current_month">回到本月</string>
     <string name="read_statistics_this_year">今年已记录 %1$s</string>
     <string name="read_statistics_total_duration">累计阅读时长</string>
     <string name="read_statistics_year_duration">这一年，留给阅读的时间</string>
