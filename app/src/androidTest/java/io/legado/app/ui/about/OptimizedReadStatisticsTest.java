@@ -379,6 +379,15 @@ public class OptimizedReadStatisticsTest {
                     assertFalse(title.isClickable());
                     assertFalse(title.isFocusable());
                     assertNull(title.getCompoundDrawablesRelative()[2]);
+                    assertEquals(0, title.getMinHeight());
+                    assertEquals(0, title.getMinimumHeight());
+                });
+                onView(withId(id("tv_period"))).check((view, error) -> {
+                    if (error != null) throw error;
+                    TextView title = (TextView)view;
+                    assertEquals("Cumulative title must retain its original content height",
+                        title.getLayout().getHeight() + title.getCompoundPaddingTop() + title.getCompoundPaddingBottom(),
+                        title.getHeight());
                 });
             }
         } finally {
