@@ -42,6 +42,7 @@ class ReadStatisticsUiTest {
     private val today = LocalDate.now()
     private val originalSimple = AppConfig.readRecordSimpleLayout
     private val originalFixed = AppConfig.readRecordFixedCard
+    private val originalQualifiedOnly = AppConfig.readStatisticsQualifiedOnly
     private val minimumKeys = listOf("readStatisticsDayMinimum", "readStatisticsMonthMinimum",
         "readStatisticsYearMinimum", "readStatisticsAllMinimum")
     private val originalMinimums = minimumKeys.associateWith { context.defaultSharedPreferences.getLong(it, 0) }
@@ -52,6 +53,7 @@ class ReadStatisticsUiTest {
     private val chapter = BookChapter(bookUrl = book.bookUrl, url = "${book.bookUrl}/0", title = "继续阅读的章节")
 
     @Before fun before() {
+        AppConfig.readStatisticsQualifiedOnly = false
         context.defaultSharedPreferences.edit().apply {
             minimumKeys.forEach { putLong(it, 0) }
         }.commit()
@@ -70,6 +72,7 @@ class ReadStatisticsUiTest {
     }
 
     @After fun after() {
+        AppConfig.readStatisticsQualifiedOnly = originalQualifiedOnly
         AppConfig.readRecordSimpleLayout = originalSimple
         AppConfig.readRecordFixedCard = originalFixed
         context.defaultSharedPreferences.edit().apply {

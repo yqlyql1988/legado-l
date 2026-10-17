@@ -203,4 +203,74 @@ class ReadStatisticsTest {
         assertTrue(ranked.visibleReadStatisticsBooks(2001).isEmpty())
         assertTrue(emptyList<ReadRecordShow>().visibleReadStatisticsBooks(0).isEmpty())
     }
+
+    private val scopeSnapshot = ReadStatisticsSnapshot(
+        listOf(ReadRecordShow("Same", 1_200_000, 0, "A", lastChapterIndex = 8),
+            ReadRecordShow("Same", 480_000, 0, "B"),
+            ReadRecordShow("Historical", 3_600_000, 0, "C")),
+        listOf(
+            ReadRecordDailyShow("Same", "A", "2026-09-01", 480_000),
+            ReadRecordDailyShow("Same", "A", "2026-10-16", 360_000),
+            ReadRecordDailyShow("Same", "A", "2026-10-17", 360_000),
+            ReadRecordDailyShow("Same", "B", "2026-10-15", 480_000),
+        ), 1,
+    )
+
+    @Test fun qualifiedMonthKeepsWholeBooksAndRecomputesDaysAndAverage() {
+        val all = scopeSnapshot.summary(ReadStatisticsPeriod.MONTH, 2026, 10)
+        val qualified = scopeSnapshot.summary(ReadStatisticsPeriod.MONTH, 2026, 10, 600_000)
+        assertEquals(1_200_000L, all.duration)
+        assertEquals(3, all.days.size)
+        assertEquals(400_000L, all.average)
+        assertEquals(720_000L, qualified.duration)
+        assertEquals(720_000L, qualified.datedDuration)
+        assertEquals(0L, qualified.historyDuration)
+        assertEquals(mapOf("2026-10-16" to 360_000L, "2026-10-17" to 360_000L), qualified.days)
+        assertEquals(360_000L, qualified.average)
+        assertEquals("A", qualified.books.single().author)
+        assertEquals(8, qualified.books.single().lastChapterIndex)
+        assertEquals(all, scopeSnapshot.summary(ReadStatisticsPeriod.MONTH, 2026, 10))
+    }
+
+    @Test fun qualifyingUsesCurrentPeriodAndIncludesExactThreshold() {
+        assertTrue(scopeSnapshot.summary(ReadStatisticsPeriod.MONTH, 2026, 10, 1_200_000).books.isEmpty())
+        val year = scopeSnapshot.summary(ReadStatisticsPeriod.YEAR, 2026, 10, 1_200_000)
+        assertEquals("A", year.books.single().author)
+        assertEquals(1_200_000L, year.duration)
+        assertEquals(3, year.days.size)
+        val all = scopeSnapshot.summary(ReadStatisticsPeriod.ALL, 2026, 10, 1_200_000)
+        assertEquals(listOf("Historical", "Same"), all.books.map { it.bookName })
+        assertEquals(4_800_000L, all.duration)
+        assertEquals(3_600_000L, all.historyDuration)
+    }
+
+    @Test fun historicalOnlyQualifiedBookNeverCreatesDatesOrDailyAverage() {
+        val result = scopeSnapshot.summary(ReadStatisticsPeriod.ALL, 2026, 10, 3_600_000)
+        assertEquals("Historical", result.books.single().bookName)
+        assertEquals(3_600_000L, result.duration)
+        assertEquals(3_600_000L, result.historyDuration)
+        assertEquals(0L, result.datedDuration)
+        assertTrue(result.days.isEmpty())
+        assertEquals(0L, result.average)
+    }
+
+    @Test fun noQualifiedBooksProducesZeroStatisticsAcrossAllPeriods() {
+        ReadStatisticsPeriod.entries.forEach { period ->
+            val result = scopeSnapshot.summary(period, 2026, 10, Long.MAX_VALUE)
+            assertEquals(0L, result.duration)
+            assertEquals(0L, result.datedDuration)
+            assertEquals(0L, result.historyDuration)
+            assertEquals(0L, result.average)
+            assertTrue(result.days.isEmpty())
+            assertTrue(result.books.isEmpty())
+        }
+    }
+
+    @Test fun zeroAndNegativeThresholdsKeepAllStatisticsIdentical() {
+        ReadStatisticsPeriod.entries.forEach { period ->
+            val all = scopeSnapshot.summary(period, 2026, 10)
+            assertEquals(all, scopeSnapshot.summary(period, 2026, 10, 0))
+            assertEquals(all, scopeSnapshot.summary(period, 2026, 10, -1))
+        }
+    }
 }

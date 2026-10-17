@@ -110,7 +110,12 @@ data class ReadStatisticsSnapshot(
     val daily: List<ReadRecordDailyShow>,
     val startedAt: Long,
 ) {
-    fun summary(period: ReadStatisticsPeriod, year: Int, month: Int): ReadStatisticsSummary {
+    fun summary(
+        period: ReadStatisticsPeriod,
+        year: Int,
+        month: Int,
+        minimum: Long = 0,
+    ): ReadStatisticsSummary {
         val prefix = when (period) {
             ReadStatisticsPeriod.ALL -> ""
             ReadStatisticsPeriod.YEAR -> String.format(Locale.ROOT, "%04d-", year)
@@ -122,14 +127,20 @@ data class ReadStatisticsSnapshot(
         val ranked = if (period == ReadStatisticsPeriod.ALL) records else records.mapNotNull { record ->
             bookTimes[record.bookName to record.author]?.let { record.copy(readTime = it) }
         }
-        val dated = selected.sumOf { it.readTime }
-        val duration = if (period == ReadStatisticsPeriod.ALL) records.sumOf { it.readTime } else dated
+        // Qualify books using their aggregate for this period, then keep all of
+        // those books' daily time. A threshold never trims individual sessions.
+        val books = ranked.filter { it.readTime > 0 }.visibleReadStatisticsBooks(minimum)
+            .sortedWith(compareByDescending<ReadRecordShow> { it.readTime }
+                .thenBy { it.bookName }.thenBy { it.author })
+        val identities = books.mapTo(hashSetOf()) { it.bookName to it.author }
+        val details = if (minimum > 0) selected.filter { (it.bookName to it.author) in identities }
+            else selected
+        val dated = details.sumOf { it.readTime }
+        val duration = if (period == ReadStatisticsPeriod.ALL) books.sumOf { it.readTime } else dated
         return ReadStatisticsSummary(
             duration, dated, (duration - dated).coerceAtLeast(0),
-            selected.groupBy { it.date }.mapValues { (_, rows) -> rows.sumOf { it.readTime } },
-            ranked.filter { it.readTime > 0 }.sortedWith(
-                compareByDescending<ReadRecordShow> { it.readTime }.thenBy { it.bookName }.thenBy { it.author },
-            ),
+            details.groupBy { it.date }.mapValues { (_, rows) -> rows.sumOf { it.readTime } },
+            books,
         )
     }
 }
