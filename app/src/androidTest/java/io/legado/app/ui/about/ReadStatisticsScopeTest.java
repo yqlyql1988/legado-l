@@ -300,6 +300,8 @@ public class ReadStatisticsScopeTest {
                 TextView value = activity.findViewById(id("tv_duration"));
                 assertEquals("Duration text clipped", value.length(),
                     value.getLayout().getLineEnd(value.getLineCount() - 1));
+                assertEquals("Days label wrapped", 2, ((TextView)activity.findViewById(id("tv_days"))).getLineCount());
+                assertEquals("Books label wrapped", 2, ((TextView)activity.findViewById(id("tv_books"))).getLineCount());
             });
         }
         prefs().edit().putBoolean("readRecordUseDays", true).putBoolean("readRecordShowSeconds", false).commit();
