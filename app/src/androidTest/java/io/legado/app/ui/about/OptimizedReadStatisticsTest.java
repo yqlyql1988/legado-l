@@ -284,10 +284,15 @@ public class OptimizedReadStatisticsTest {
         SQLiteDatabase db = SQLiteDatabase.openDatabase(context.getDatabasePath("legado.db").getPath(),
             null, SQLiteDatabase.OPEN_READWRITE);
         try {
+            db.execSQL("INSERT INTO readRecord(deviceId,bookName,author,readTime,lastRead) VALUES(?,?,?,?,?)",
+                new Object[]{device, "年月选择验证", "年月作者", 600000L,
+                    seeded.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()});
             db.execSQL("INSERT INTO readRecordDaily(deviceId,bookName,author,date,readTime) VALUES(?,?,?,?,?)",
                 new Object[]{device, "年月选择验证", "年月作者", seeded.toString(), 600000L});
             LocalDate first = today;
-            try (android.database.Cursor dates = db.rawQuery("SELECT MIN(date) FROM readRecordDaily", null)) {
+            try (android.database.Cursor dates = db.rawQuery(
+                "SELECT MIN(daily.date) FROM readRecordDaily daily JOIN readRecord history " +
+                "ON daily.deviceId=history.deviceId AND daily.bookName=history.bookName AND daily.author=history.author", null)) {
                 if (dates.moveToFirst() && !dates.isNull(0))
                     first = LocalDate.parse(dates.getString(0));
             }
@@ -378,6 +383,7 @@ public class OptimizedReadStatisticsTest {
             }
         } finally {
             db.execSQL("DELETE FROM readRecordDaily WHERE deviceId=?", new Object[]{device});
+            db.execSQL("DELETE FROM readRecord WHERE deviceId=?", new Object[]{device});
             db.close();
         }
     }
