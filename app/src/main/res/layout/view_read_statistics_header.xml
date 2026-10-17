@@ -300,11 +300,20 @@
                     android:textSize="24sp"
                     android:contentDescription="@string/read_statistics_next_hour" />
             </LinearLayout>
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/toggle_hour_books"
+                style="@style/ReadStatisticsScopeButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="start|center_vertical"
+                android:minHeight="48dp"
+                android:text="@string/read_statistics_expand_hour_books" />
             <LinearLayout
                 android:id="@+id/hour_books"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical" />
+                android:orientation="vertical"
+                android:visibility="gone" />
             <TextView
                 android:id="@+id/tv_hour_coverage"
                 android:layout_width="match_parent"

@@ -82,10 +82,11 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
     private var year = LocalDate.now().year
     private var month = LocalDate.now().monthValue
     private var day = LocalDate.now().dayOfMonth
-    private var showHours = true
+    private var showHours = false
+    private var hourBooksExpanded = false
     private var selectedHour = -1
     private var hourly = ReadHourlySummary(emptyList(), 0, 0)
-    private var selectedDay: String? = LocalDate.now().toString()
+    private var selectedDay: String? = null
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         savedInstanceState?.let {
@@ -93,7 +94,8 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
             year = it.getInt("year", year)
             month = it.getInt("month", month).coerceIn(1, 12)
             day = it.getInt("dateDay", day)
-            showHours = it.getBoolean("showHours", true)
+            showHours = it.getBoolean("showHours", false)
+            hourBooksExpanded = it.getBoolean("hourBooksExpanded", false)
             selectedHour = it.getInt("selectedHour", -1)
             if (it.containsKey("day")) selectedDay = it.getString("day")
         }
@@ -109,6 +111,10 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         header.hourInterval.setOnClickListener { showIntervalPicker() }
         header.previousHour.setOnClickListener { selectHour(-1) }
         header.nextHour.setOnClickListener { selectHour(1) }
+        header.toggleHourBooks.setOnClickListener {
+            hourBooksExpanded = !hourBooksExpanded
+            renderHourly()
+        }
         header.previousPeriod.setOnClickListener { movePeriod(-1) }
         header.nextPeriod.setOnClickListener { movePeriod(1) }
         header.tvPeriod.setOnClickListener { showPeriodPicker() }
@@ -235,6 +241,7 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         outState.putInt("month", month)
         outState.putInt("dateDay", day)
         outState.putBoolean("showHours", showHours)
+        outState.putBoolean("hourBooksExpanded", hourBooksExpanded)
         outState.putInt("selectedHour", selectedHour)
         outState.putString("day", selectedDay)
         super.onSaveInstanceState(outState)
@@ -269,7 +276,6 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
     private fun selectPeriod(value: ReadStatisticsPeriod) {
         val changed = period != value
         period = value
-        if (period == ReadStatisticsPeriod.DAY) showHours = true
         clampPeriod()
         if (changed) resetSelectedDay()
         render()
@@ -294,15 +300,15 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
 
     private fun resetSelectedDay() {
         selectedHour = -1
-        selectedDay = LocalDate.now().takeIf { YearMonth.from(it) == YearMonth.of(year, month) }?.toString()
+        selectedDay = null
     }
 
-    private fun jumpToPeriod(value: YearMonth, selectToday: Boolean = false) {
+    private fun jumpToPeriod(value: YearMonth, clearSelection: Boolean = false) {
         val changed = year != value.year || month != value.monthValue
         year = value.year
         month = value.monthValue
         clampPeriod()
-        if (changed || selectToday) resetSelectedDay()
+        if (changed || clearSelection) resetSelectedDay()
         render()
         binding.recyclerView.scrollToPosition(0)
     }
@@ -407,7 +413,7 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
                     okButton { jumpToPeriod(candidate) }
                     cancelButton()
                     neutralButton(R.string.read_statistics_current_month) {
-                        jumpToPeriod(YearMonth.now(), selectToday = true)
+                        jumpToPeriod(YearMonth.now(), clearSelection = true)
                     }
                 }
             }
@@ -620,7 +626,18 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
             nextHour.isEnabled = index < buckets.lastIndex
             tvHourCoverage.text = getString(R.string.read_statistics_hour_coverage,
                 duration(hourly.duration), duration(hourly.unassignedDuration))
+            toggleHourBooks.setText(if (hourBooksExpanded) R.string.read_statistics_collapse_hour_books
+                else R.string.read_statistics_expand_hour_books)
+            toggleHourBooks.setTextColor(contentSecondary)
+            toggleHourBooks.setCompoundDrawablesRelative(null, null,
+                getCompatDrawable(if (hourBooksExpanded) R.drawable.ic_expand_less
+                    else R.drawable.ic_expand_more)?.mutate()?.apply {
+                    setTint(contentSecondary)
+                    setBounds(0, 0, 20.dpToPx(), 20.dpToPx())
+                }, null)
+            hourBooks.isVisible = hourBooksExpanded
             hourBooks.removeAllViews()
+            if (!hourBooksExpanded) return@with
             if (selected.books.isEmpty()) {
                 hourBooks.addView(TextView(this@ReadStatisticsActivity).apply {
                     setText(R.string.read_statistics_hour_empty)

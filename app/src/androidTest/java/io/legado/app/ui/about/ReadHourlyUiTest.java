@@ -212,10 +212,27 @@ public class ReadHourlyUiTest {
                     text(activity, "tv_period"));
                 assertEquals(View.VISIBLE, activity.findViewById(id("hour_details")).getVisibility());
                 assertEquals(string("read_statistics_interval", 1), text(activity, "hour_interval"));
+                assertEquals(View.GONE, activity.findViewById(id("hour_books")).getVisibility());
+                assertEquals(string("read_statistics_expand_hour_books"), text(activity, "toggle_hour_books"));
+                activity.findViewById(id("toggle_hour_books")).performClick();
+                assertEquals(View.VISIBLE, activity.findViewById(id("hour_books")).getVisibility());
+                assertTrue(((ViewGroup)activity.findViewById(id("hour_books"))).getChildCount() > 0);
+                activity.findViewById(id("toggle_hour_books")).performClick();
+                assertEquals(View.GONE, activity.findViewById(id("hour_books")).getVisibility());
                 activity.findViewById(id("tab_month")).performClick();
-                assertTrue(activity.findViewById(id("graph_hours")).isSelected());
-                activity.findViewById(id("graph_trend")).performClick();
+                assertTrue(activity.findViewById(id("graph_trend")).isSelected());
                 assertEquals(View.VISIBLE, activity.findViewById(id("calendar_panel")).getVisibility());
+                assertEquals(View.GONE, activity.findViewById(id("day_books")).getVisibility());
+                for (String period : new String[]{"tab_year", "tab_all"}) {
+                    activity.findViewById(id(period)).performClick();
+                    assertTrue(activity.findViewById(id("graph_trend")).isSelected());
+                    assertEquals(View.GONE, activity.findViewById(id("hour_details")).getVisibility());
+                    assertEquals(View.VISIBLE, activity.findViewById(id("chart")).getVisibility());
+                }
+                activity.findViewById(id("tab_day")).performClick();
+                assertEquals(View.VISIBLE, activity.findViewById(id("hour_details")).getVisibility());
+                activity.findViewById(id("tab_month")).performClick();
+                assertTrue(activity.findViewById(id("graph_trend")).isSelected());
                 activity.findViewById(id("graph_hours")).performClick();
                 activity.findViewById(id("hour_interval")).performClick();
             });
@@ -229,6 +246,10 @@ public class ReadHourlyUiTest {
             assertEquals(5, prefs().getInt("readStatisticsIntervalHours", 0));
             scenario.onActivity(activity -> {
                 assertEquals(string("read_statistics_interval", 5), text(activity, "hour_interval"));
+                assertEquals(View.GONE, activity.findViewById(id("hour_books")).getVisibility());
+                activity.findViewById(id("toggle_hour_books")).performClick();
+                assertEquals(View.VISIBLE, activity.findViewById(id("hour_books")).getVisibility());
+                assertEquals(string("read_statistics_collapse_hour_books"), text(activity, "toggle_hour_books"));
                 assertTrue(text(activity, "tv_selected_hour").contains("10:00"));
                 activity.findViewById(id("next_hour")).performClick();
                 assertTrue(text(activity, "tv_selected_hour").contains("15:00"));
@@ -241,6 +262,8 @@ public class ReadHourlyUiTest {
             scenario.onActivity(activity -> {
                 assertTrue(activity.findViewById(id("tab_month")).isSelected());
                 assertEquals(string("read_statistics_interval", 5), text(activity, "hour_interval"));
+                assertEquals(View.VISIBLE, activity.findViewById(id("hour_books")).getVisibility());
+                assertEquals(string("read_statistics_collapse_hour_books"), text(activity, "toggle_hour_books"));
                 for (String period : new String[]{"tab_year", "tab_all", "tab_day"}) {
                     activity.findViewById(id(period)).performClick();
                     assertEquals(View.VISIBLE, activity.findViewById(id("hour_details")).getVisibility());
@@ -252,7 +275,11 @@ public class ReadHourlyUiTest {
         }
         try (ActivityScenario<Activity> scenario = launch("ReadStatisticsActivity")) {
             await(scenario, "tv_duration", null);
-            scenario.onActivity(activity -> assertTrue(activity.findViewById(id("tab_day")).isSelected()));
+            scenario.onActivity(activity -> {
+                assertTrue(activity.findViewById(id("tab_day")).isSelected());
+                assertEquals(View.GONE, activity.findViewById(id("hour_books")).getVisibility());
+                assertEquals(string("read_statistics_expand_hour_books"), text(activity, "toggle_hour_books"));
+            });
             screenshot("hours-default-day");
         }
     }

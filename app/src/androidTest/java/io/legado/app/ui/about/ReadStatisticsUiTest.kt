@@ -134,7 +134,8 @@ class ReadStatisticsUiTest {
                 val day = (0 until grid.childCount).map { grid.getChildAt(it) }.first {
                     it.contentDescription?.startsWith(today.toString()) == true
                 }
-                assertTrue(day.isSelected)
+                assertFalse(day.isSelected)
+                day.performClick()
                 assertTrue(activity.findViewById<TextView>(R.id.tv_selected_day).text.startsWith(today.toString()))
                 assertTrue(activity.findViewById<LinearLayout>(R.id.day_books).childCount >= 2)
             }

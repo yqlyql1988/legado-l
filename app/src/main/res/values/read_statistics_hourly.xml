@@ -16,6 +16,8 @@
     <string name="read_statistics_interval_invalid">请输入1—24之间的整数小时</string>
     <string name="read_statistics_hour_range">%1$02d:00—%2$02d:00</string>
     <string name="read_statistics_hour_detail">%1$s · %2$s</string>
+    <string name="read_statistics_expand_hour_books">书籍时段明细 · 展开</string>
+    <string name="read_statistics_collapse_hour_books">书籍时段明细 · 收起</string>
     <string name="read_statistics_previous_hour">上一个时段</string>
     <string name="read_statistics_next_hour">下一个时段</string>
     <string name="read_statistics_hour_empty">这个时段没有已记录的阅读时间</string>
