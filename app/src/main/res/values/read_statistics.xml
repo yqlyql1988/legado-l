@@ -19,6 +19,19 @@
     <string name="read_statistics_book_count">%1$d本</string>
     <string name="read_statistics_history">历史未分期时长：%1$s</string>
     <string name="read_statistics_help">统计说明</string>
+    <string name="read_statistics_ranking_settings">排行显示设置</string>
+    <string name="read_statistics_ranking_explanation">分别设置各排行中书籍的最低阅读时长，0 表示不过滤。仅隐藏低于门槛的书籍，所有阅读时长、天数和书籍数量仍照常统计。</string>
+    <string name="read_statistics_day_minimum">日度排行</string>
+    <string name="read_statistics_month_minimum">月度排行</string>
+    <string name="read_statistics_year_minimum">年度排行</string>
+    <string name="read_statistics_all_minimum">累计排行</string>
+    <string name="read_statistics_minimum_invalid">请输入有效的非负整数，时长不能过大</string>
+    <string name="read_statistics_filtered_empty">没有达到显示时长的书籍，可在排行显示设置中调整</string>
+    <string-array name="read_statistics_duration_units">
+        <item>秒</item>
+        <item>分钟</item>
+        <item>小时</item>
+    </string-array>
     <string name="read_statistics_coverage">按日明细自 %1$s 起提供，仅统计开启阅读记录期间的时间；此前的时长保留在累计中，起始年、月的明细可能不完整。</string>
     <string name="read_statistics_years_chart">每年的阅读足迹</string>
     <string name="read_statistics_months_chart">每月阅读时长</string>

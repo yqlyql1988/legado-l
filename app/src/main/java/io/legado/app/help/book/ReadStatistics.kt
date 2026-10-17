@@ -90,6 +90,10 @@ internal fun mergeReadStatistics(
 
 enum class ReadStatisticsPeriod { ALL, YEAR, MONTH }
 
+/** Filter only an already aggregated ranking; the snapshot and summary stay intact. */
+internal fun List<ReadRecordShow>.visibleReadStatisticsBooks(minimum: Long): List<ReadRecordShow> =
+    filter { it.readTime >= minimum.coerceAtLeast(0) }
+
 data class ReadStatisticsSummary(
     val duration: Long,
     val datedDuration: Long,

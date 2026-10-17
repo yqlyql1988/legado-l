@@ -13,6 +13,8 @@ import android.view.ViewGroup
 import android.widget.GridLayout
 import android.widget.TextView
 import androidx.appcompat.widget.AppCompatButton
+import androidx.appcompat.app.AlertDialog
+import androidx.core.widget.doAfterTextChanged
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
@@ -23,11 +25,13 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.ReadRecordShow
 import io.legado.app.databinding.ActivityReadStatisticsBinding
+import io.legado.app.databinding.DialogReadStatisticsRankingBinding
 import io.legado.app.databinding.ItemReadStatisticsBinding
 import io.legado.app.databinding.ViewReadStatisticsHeaderBinding
 import io.legado.app.help.book.ReadStatisticsPeriod
 import io.legado.app.help.book.ReadStatisticsSnapshot
 import io.legado.app.help.book.ReadStatisticsSummary
+import io.legado.app.help.book.visibleReadStatisticsBooks
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.accentColor
@@ -35,6 +39,7 @@ import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.dpToPx
+import io.legado.app.utils.defaultSharedPreferences
 import io.legado.app.utils.getCompatColor
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers.IO
@@ -58,17 +63,17 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
     private var dataJob: Job? = null
     private var snapshot = ReadStatisticsSnapshot(emptyList(), emptyList(), 0)
     private var bookshelf: Map<Pair<String, String>, Book> = emptyMap()
-    private var period = ReadStatisticsPeriod.ALL
+    private var period = ReadStatisticsPeriod.MONTH
     private var year = LocalDate.now().year
     private var month = LocalDate.now().monthValue
-    private var selectedDay = LocalDate.now().toString()
+    private var selectedDay: String? = LocalDate.now().toString()
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         savedInstanceState?.let {
-            period = ReadStatisticsPeriod.entries.getOrElse(it.getInt("period")) { ReadStatisticsPeriod.ALL }
+            period = ReadStatisticsPeriod.entries.getOrElse(it.getInt("period")) { ReadStatisticsPeriod.MONTH }
             year = it.getInt("year", year)
             month = it.getInt("month", month).coerceIn(1, 12)
-            selectedDay = it.getString("day") ?: selectedDay
+            if (it.containsKey("day")) selectedDay = it.getString("day")
         }
         adapter.addHeaderView { header }
         binding.recyclerView.adapter = adapter
@@ -110,6 +115,10 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
     }
 
     override fun onCompatOptionsItemSelected(item: MenuItem): Boolean {
+        if (item.itemId == R.id.menu_statistics_ranking) {
+            showRankingSettings()
+            return true
+        }
         if (item.itemId == R.id.menu_statistics_help) {
             alert(R.string.read_statistics_help) {
                 setMessage(getString(R.string.read_statistics_coverage, earliestDate().toString()))
@@ -118,6 +127,47 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
             return true
         }
         return super.onCompatOptionsItemSelected(item)
+    }
+
+    private fun showRankingSettings() {
+        val settings = DialogReadStatisticsRankingBinding.inflate(layoutInflater)
+        val rows = listOf(settings.dayMinimum, settings.monthMinimum, settings.yearMinimum, settings.allMinimum)
+        val labels = listOf(R.string.read_statistics_day_minimum, R.string.read_statistics_month_minimum,
+            R.string.read_statistics_year_minimum, R.string.read_statistics_all_minimum)
+        val keys = listOf("readStatisticsDayMinimum", "readStatisticsMonthMinimum",
+            "readStatisticsYearMinimum", "readStatisticsAllMinimum")
+        val values = listOf(AppConfig.readStatisticsDayMinimum, AppConfig.readStatisticsMonthMinimum,
+            AppConfig.readStatisticsYearMinimum, AppConfig.readStatisticsAllMinimum)
+        val units = longArrayOf(1_000, 60_000, 3_600_000)
+        rows.forEachIndexed { index, row ->
+            row.label.hint = getString(labels[index])
+            val unit = if (values[index] == 0L) 1 else units.indexOfLast { values[index] % it == 0L }.coerceAtLeast(0)
+            row.unit.setSelection(unit)
+            row.unit.contentDescription = getString(labels[index])
+            row.minimum.setText((values[index] / units[unit]).toString())
+            row.minimum.doAfterTextChanged { row.label.error = null }
+        }
+        val dialog = alert(R.string.read_statistics_ranking_settings) {
+            customView { settings.root }
+            okButton()
+            cancelButton()
+        }
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val durations = rows.map { row ->
+                val value = row.minimum.text.toString().toLongOrNull()
+                val multiplier = units[row.unit.selectedItemPosition]
+                if (value == null || value < 0 || value > Long.MAX_VALUE / multiplier) {
+                    row.label.error = getString(R.string.read_statistics_minimum_invalid)
+                    null
+                } else value * multiplier
+            }
+            if (durations.any { it == null }) return@setOnClickListener
+            defaultSharedPreferences.edit().apply {
+                keys.forEachIndexed { index, key -> putLong(key, checkNotNull(durations[index])) }
+            }.apply()
+            dialog.dismiss()
+            render()
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -148,8 +198,10 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
     }
 
     private fun selectPeriod(value: ReadStatisticsPeriod) {
+        val changed = period != value
         period = value
         clampPeriod()
+        if (changed) resetSelectedDay()
         render()
         binding.recyclerView.scrollToPosition(0)
     }
@@ -161,7 +213,12 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
             month = selected.monthValue
         } else year += offset.toInt()
         clampPeriod()
+        resetSelectedDay()
         render()
+    }
+
+    private fun resetSelectedDay() {
+        selectedDay = LocalDate.now().takeIf { YearMonth.from(it) == YearMonth.of(year, month) }?.toString()
     }
 
     private fun duration(value: Long) = formatDuring(
@@ -170,6 +227,12 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
 
     private fun render() {
         val summary = snapshot.summary(period, year, month)
+        val minimum = when (period) {
+            ReadStatisticsPeriod.ALL -> AppConfig.readStatisticsAllMinimum
+            ReadStatisticsPeriod.YEAR -> AppConfig.readStatisticsYearMinimum
+            ReadStatisticsPeriod.MONTH -> AppConfig.readStatisticsMonthMinimum
+        }
+        val visibleBooks = summary.books.visibleReadStatisticsBooks(minimum)
         val buttons = listOf(header.tabAll, header.tabYear, header.tabMonth)
         buttons.forEachIndexed { index, button ->
             val selected = index == period.ordinal
@@ -213,7 +276,8 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
                 ReadStatisticsPeriod.YEAR -> R.string.read_statistics_year_books
                 ReadStatisticsPeriod.MONTH -> R.string.read_statistics_month_books
             })
-            tvEmpty.isVisible = summary.books.isEmpty()
+            tvEmpty.isVisible = visibleBooks.isEmpty()
+            tvEmpty.setText(if (summary.books.isEmpty()) R.string.read_statistics_empty else R.string.read_statistics_filtered_empty)
             calendarPanel.isVisible = period == ReadStatisticsPeriod.MONTH
             chart.isVisible = period != ReadStatisticsPeriod.MONTH
             tvPeak.isVisible = period != ReadStatisticsPeriod.MONTH
@@ -222,7 +286,7 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
             header.tvTrendTitle.setText(R.string.read_statistics_calendar)
             renderCalendar(summary)
         } else renderChart(summary)
-        adapter.setItems(summary.books)
+        adapter.setItems(visibleBooks)
     }
 
     private fun renderChart(summary: ReadStatisticsSummary) {
@@ -251,11 +315,7 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         val grid = header.calendarGrid
         grid.removeAllViews()
         val selectedMonth = YearMonth.of(year, month)
-        if (!selectedDay.startsWith("$selectedMonth-")) {
-            selectedDay = summary.days.keys.maxOrNull()
-                ?: if (selectedMonth == YearMonth.now()) LocalDate.now().toString()
-                else selectedMonth.atDay(1).toString()
-        }
+        if (selectedDay?.startsWith("$selectedMonth-") == false) selectedDay = null
         fun addCell(view: View, height: Int) {
             grid.addView(view, GridLayout.LayoutParams().apply {
                 width = 0
@@ -293,23 +353,31 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
                 background = rounded(ColorUtils.blendColors(backgroundColor, accentColor, strength), key == selectedDay)
                 contentDescription = getString(R.string.read_statistics_day_accessibility, key, duration(elapsed))
                 setOnClickListener {
-                    selectedDay = key
+                    selectedDay = key.takeUnless { it == selectedDay }
                     renderCalendar(summary)
                 }
             }, 44)
         }
-        header.tvSelectedDay.text = getString(
-            R.string.read_statistics_selected_day, selectedDay, duration(summary.days[selectedDay] ?: 0),
-        )
         header.dayBooks.removeAllViews()
-        val times = snapshot.daily.filter { it.date == selectedDay }
+        val day = selectedDay
+        header.tvSelectedDay.isVisible = day != null
+        header.dayBooks.isVisible = day != null
+        if (day == null) {
+            header.tvSelectedDay.text = ""
+            return
+        }
+        header.tvSelectedDay.text = getString(
+            R.string.read_statistics_selected_day, day, duration(summary.days[day] ?: 0),
+        )
+        val times = snapshot.daily.filter { it.date == day }
             .associate { (it.bookName to it.author) to it.readTime }
-        val books = snapshot.records.mapNotNull { record ->
+        val dayBooks = snapshot.records.mapNotNull { record ->
             times[record.bookName to record.author]?.takeIf { it > 0 }?.let { record.copy(readTime = it) }
         }.sortedByDescending { it.readTime }
+        val books = dayBooks.visibleReadStatisticsBooks(AppConfig.readStatisticsDayMinimum)
         if (books.isEmpty()) {
             header.dayBooks.addView(TextView(this).apply {
-                setText(R.string.read_statistics_day_empty)
+                setText(if (dayBooks.isEmpty()) R.string.read_statistics_day_empty else R.string.read_statistics_filtered_empty)
                 setTextColor(contentSecondary)
                 setPadding(0, 16.dpToPx(), 0, 8.dpToPx())
             })

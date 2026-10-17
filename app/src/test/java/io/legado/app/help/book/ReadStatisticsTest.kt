@@ -156,4 +156,51 @@ class ReadStatisticsTest {
         assertEquals(300L, summary.duration)
         assertEquals(1, summary.days.size)
     }
+
+    @Test fun thresholdsUseTheSelectedPeriodsAggregatedBookTime() {
+        val snapshot = ReadStatisticsSnapshot(
+            listOf(ReadRecordShow("Book", 20_000, 0, "A")),
+            listOf(
+                ReadRecordDailyShow("Book", "A", "2025-12-31", 1000),
+                ReadRecordDailyShow("Book", "A", "2026-09-01", 2000),
+                ReadRecordDailyShow("Book", "A", "2026-10-16", 3000),
+                ReadRecordDailyShow("Book", "A", "2026-10-17", 3000),
+            ), 1,
+        )
+        val month = snapshot.summary(ReadStatisticsPeriod.MONTH, 2026, 10)
+        assertEquals(6000L, month.books.visibleReadStatisticsBooks(6000).single().readTime)
+        assertTrue(month.books.visibleReadStatisticsBooks(6001).isEmpty())
+        val year = snapshot.summary(ReadStatisticsPeriod.YEAR, 2026, 10)
+        assertEquals(8000L, year.books.visibleReadStatisticsBooks(8000).single().readTime)
+        assertTrue(year.books.visibleReadStatisticsBooks(8001).isEmpty())
+        val all = snapshot.summary(ReadStatisticsPeriod.ALL, 2026, 10)
+        assertEquals(20_000L, all.books.visibleReadStatisticsBooks(20_000).single().readTime)
+        assertTrue(snapshot.summary(ReadStatisticsPeriod.MONTH, 2025, 12)
+            .books.visibleReadStatisticsBooks(1001).isEmpty())
+    }
+
+    @Test fun filteringKeepsTimeDaysAverageAndHistoricalBooksIntact() {
+        val snapshot = ReadStatisticsSnapshot(
+            listOf(ReadRecordShow("Book", 1000, 0, "A"), ReadRecordShow("Old", 9000, 0, "B")),
+            listOf(ReadRecordDailyShow("Book", "A", "2026-10-17", 300)), 1,
+        )
+        val all = snapshot.summary(ReadStatisticsPeriod.ALL, 2026, 10)
+        assertEquals(listOf("Old"), all.books.visibleReadStatisticsBooks(9000).map { it.bookName })
+        assertTrue(all.books.visibleReadStatisticsBooks(Long.MAX_VALUE).isEmpty())
+        assertEquals(10_000L, all.duration)
+        assertEquals(9700L, all.historyDuration)
+        assertEquals(300L, all.average)
+        assertEquals(mapOf("2026-10-17" to 300L), all.days)
+        assertEquals(2, all.books.size)
+        assertEquals(all, snapshot.summary(ReadStatisticsPeriod.ALL, 2026, 10))
+    }
+
+    @Test fun zeroThresholdKeepsRankingAndEqualityIncludesTheBook() {
+        val ranked = listOf(ReadRecordShow("Same", 2000, 0, "B"), ReadRecordShow("Same", 1000, 0, "A"))
+        assertEquals(ranked, ranked.visibleReadStatisticsBooks(0))
+        assertEquals(ranked, ranked.visibleReadStatisticsBooks(-1))
+        assertEquals(listOf("B"), ranked.visibleReadStatisticsBooks(2000).map { it.author })
+        assertTrue(ranked.visibleReadStatisticsBooks(2001).isEmpty())
+        assertTrue(emptyList<ReadRecordShow>().visibleReadStatisticsBooks(0).isEmpty())
+    }
 }

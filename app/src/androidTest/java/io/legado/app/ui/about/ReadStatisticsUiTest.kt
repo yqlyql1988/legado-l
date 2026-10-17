@@ -23,6 +23,7 @@ import io.legado.app.help.book.BookHelp
 import io.legado.app.help.config.AppConfig
 import io.legado.app.ui.book.read.ReadBookActivity
 import io.legado.app.ui.book.search.SearchActivity
+import io.legado.app.utils.defaultSharedPreferences
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -41,6 +42,9 @@ class ReadStatisticsUiTest {
     private val today = LocalDate.now()
     private val originalSimple = AppConfig.readRecordSimpleLayout
     private val originalFixed = AppConfig.readRecordFixedCard
+    private val minimumKeys = listOf("readStatisticsDayMinimum", "readStatisticsMonthMinimum",
+        "readStatisticsYearMinimum", "readStatisticsAllMinimum")
+    private val originalMinimums = minimumKeys.associateWith { context.defaultSharedPreferences.getLong(it, 0) }
     private val source = BookSource(bookSourceUrl = "https://example.invalid/statistics-source/$id")
     private val book = Book(bookUrl = "https://example.invalid/statistics-book/$id",
         tocUrl = "https://example.invalid/statistics-book/$id/toc", name = name, author = "统计作者",
@@ -48,6 +52,9 @@ class ReadStatisticsUiTest {
     private val chapter = BookChapter(bookUrl = book.bookUrl, url = "${book.bookUrl}/0", title = "继续阅读的章节")
 
     @Before fun before() {
+        context.defaultSharedPreferences.edit().apply {
+            minimumKeys.forEach { putLong(it, 0) }
+        }.commit()
         appDb.bookSourceDao.insert(source)
         appDb.bookDao.insert(book)
         appDb.bookChapterDao.insert(chapter)
@@ -65,6 +72,9 @@ class ReadStatisticsUiTest {
     @After fun after() {
         AppConfig.readRecordSimpleLayout = originalSimple
         AppConfig.readRecordFixedCard = originalFixed
+        context.defaultSharedPreferences.edit().apply {
+            originalMinimums.forEach { (key, value) -> putLong(key, value) }
+        }.commit()
         appDb.readRecordDao.deleteByBook(name, book.author)
         appDb.readRecordDao.deleteByBook(removedName, "另一作者")
         appDb.bookChapterDao.delByBook(book.bookUrl)
@@ -109,6 +119,8 @@ class ReadStatisticsUiTest {
         ActivityScenario.launch<ReadStatisticsActivity>(Intent(context, ReadStatisticsActivity::class.java)).use { scenario ->
             await(scenario) { it.findViewById<TextView>(R.id.tv_duration)?.text?.isNotEmpty() == true }
             scenario.onActivity { activity ->
+                assertTrue(activity.findViewById<View>(R.id.tab_month).isSelected)
+                activity.findViewById<View>(R.id.tab_all).performClick()
                 assertTrue(activity.findViewById<TextView>(R.id.tv_history).visibility == View.VISIBLE)
                 activity.findViewById<View>(R.id.tab_year).performClick()
                 assertTrue(activity.findViewById<TextView>(R.id.tv_period).text.contains(today.year.toString()))
@@ -117,7 +129,7 @@ class ReadStatisticsUiTest {
                 val day = (0 until grid.childCount).map { grid.getChildAt(it) }.first {
                     it.contentDescription?.startsWith(today.toString()) == true
                 }
-                day.performClick()
+                assertTrue(day.isSelected)
                 assertTrue(activity.findViewById<TextView>(R.id.tv_selected_day).text.startsWith(today.toString()))
                 assertTrue(activity.findViewById<LinearLayout>(R.id.day_books).childCount >= 2)
             }
