@@ -90,7 +90,7 @@ internal fun mergeReadStatistics(
 
 enum class ReadStatisticsPeriod { ALL, YEAR, MONTH }
 
-/** Filter only an already aggregated ranking; the snapshot and summary stay intact. */
+/** Apply a threshold after aggregating each book, without changing stored records. */
 internal fun List<ReadRecordShow>.visibleReadStatisticsBooks(minimum: Long): List<ReadRecordShow> =
     filter { it.readTime >= minimum.coerceAtLeast(0) }
 
@@ -110,6 +110,17 @@ data class ReadStatisticsSnapshot(
     val daily: List<ReadRecordDailyShow>,
     val startedAt: Long,
 ) {
+    /** Daily rankings use the day's complete records, independently of the month threshold. */
+    fun booksForDay(date: String): List<ReadRecordShow> {
+        val times = daily.filter { it.date == date }
+            .groupBy { it.bookName to it.author }
+            .mapValues { (_, rows) -> rows.sumOf { it.readTime } }
+        return records.mapNotNull { record ->
+            times[record.bookName to record.author]?.takeIf { it > 0 }?.let { record.copy(readTime = it) }
+        }.sortedWith(compareByDescending<ReadRecordShow> { it.readTime }
+            .thenBy { it.bookName }.thenBy { it.author })
+    }
+
     fun summary(
         period: ReadStatisticsPeriod,
         year: Int,

@@ -8,9 +8,12 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Bitmap;
 import android.os.SystemClock;
+import android.text.Spanned;
+import android.text.style.RelativeSizeSpan;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import androidx.recyclerview.widget.RecyclerView;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
@@ -130,7 +133,7 @@ public class ReadStatisticsScopeTest {
             new Object[]{device, title, "作者乙", today, minimum / 2});
         assertTrue(prefs().edit().putBoolean("readStatisticsQualifiedOnly", false)
             .putBoolean("readRecordUseDays", false).putBoolean("readRecordShowSeconds", true)
-            .putLong("readStatisticsDayMinimum", 0).putLong("readStatisticsMonthMinimum", minimum)
+            .putLong("readStatisticsDayMinimum", minimum).putLong("readStatisticsMonthMinimum", minimum)
             .putLong("readStatisticsYearMinimum", minimum).putLong("readStatisticsAllMinimum", minimum).commit());
     }
     @After public void after() {
@@ -200,7 +203,7 @@ public class ReadStatisticsScopeTest {
                 assertTrue(activity.findViewById(id("scope_qualified")).isSelected());
                 assertSummary(activity, 0, 0, 0, 0);
                 assertEquals(View.VISIBLE, activity.findViewById(id("tv_empty")).getVisibility());
-                assertEquals(today + " · 0秒", text(activity, "tv_selected_day"));
+                assertEquals(today + " · " + duration(minimum), text(activity, "tv_selected_day"));
                 activity.findViewById(id("scope_all")).performClick();
                 assertFalse(text(activity, "tv_duration").equals("0秒"));
             });
@@ -208,7 +211,7 @@ public class ReadStatisticsScopeTest {
     }
 
     @Test public void zeroThresholdGivesIdenticalStatisticsInBothScopes() {
-        prefs().edit().putLong("readStatisticsMonthMinimum", 0).putLong("readStatisticsYearMinimum", 0)
+        prefs().edit().putLong("readStatisticsDayMinimum", 0).putLong("readStatisticsMonthMinimum", 0).putLong("readStatisticsYearMinimum", 0)
             .putLong("readStatisticsAllMinimum", 0).commit();
         try (ActivityScenario<Activity> scenario = launch()) {
             await(scenario);
@@ -221,6 +224,96 @@ public class ReadStatisticsScopeTest {
                     assertArrayEquals(all, totals(activity));
                 }
             });
+        }
+    }
+
+    @Test public void everyRankingFollowsScopeAndDailyThresholdIsIndependent() {
+        long before = query("SELECT sum(readTime) FROM readRecord");
+        try (ActivityScenario<Activity> scenario = launch()) {
+            await(scenario);
+            scenario.onActivity(activity -> {
+                for (String tab : new String[]{"tab_month", "tab_year", "tab_all"}) {
+                    activity.findViewById(id(tab)).performClick();
+                    activity.findViewById(id("scope_all")).performClick();
+                    String allCount = text(activity, "tv_rank_scope");
+                    int allBooks = Integer.parseInt(text(activity, "tv_books").split("本")[0]);
+                    assertEquals("全部 · " + allBooks + "本", allCount);
+                    assertTrue(allBooks >= (tab.equals("tab_all") ? 3 : 2));
+                    RecyclerView ranking = activity.findViewById(id("recycler_view"));
+                    assertEquals(allBooks + 1, ranking.getAdapter().getItemCount());
+                    activity.findViewById(id("scope_qualified")).performClick();
+                    int qualifiedBooks = tab.equals("tab_all") ? 2 : 1;
+                    assertEquals("达标 · " + qualifiedBooks + "本", text(activity, "tv_rank_scope"));
+                    assertEquals(qualifiedBooks + 1, ranking.getAdapter().getItemCount());
+                    assertEquals(View.GONE, activity.findViewById(id("tv_empty")).getVisibility());
+                    activity.findViewById(id("scope_all")).performClick();
+                    assertEquals(allCount, text(activity, "tv_rank_scope"));
+                }
+                activity.findViewById(id("tab_month")).performClick();
+                assertTrue(text(activity, "tv_day_rank_scope").startsWith("全部 · "));
+                activity.findViewById(id("scope_qualified")).performClick();
+                assertEquals("达标 · 1本", text(activity, "tv_day_rank_scope"));
+                assertEquals(today + " · " + duration(minimum), text(activity, "tv_selected_day"));
+            });
+        }
+        prefs().edit().putLong("readStatisticsMonthMinimum", Long.MAX_VALUE)
+            .putLong("readStatisticsDayMinimum", minimum / 2).commit();
+        try (ActivityScenario<Activity> scenario = launch()) {
+            await(scenario);
+            scenario.onActivity(activity -> {
+                assertEquals("达标 · 0本", text(activity, "tv_rank_scope"));
+                assertEquals("达标 · 2本", text(activity, "tv_day_rank_scope"));
+                assertEquals(today + " · " + duration(minimum + minimum / 2), text(activity, "tv_selected_day"));
+                LinearLayout rows = activity.findViewById(id("day_books"));
+                assertEquals(2, rows.getChildCount());
+                assertEquals("作者乙", ((TextView)rows.getChildAt(1).findViewById(id("tv_author"))).getText().toString());
+                activity.findViewById(id("scope_all")).performClick();
+                assertEquals(View.GONE, activity.findViewById(id("tv_empty")).getVisibility());
+            });
+        }
+        assertEquals(before, query("SELECT sum(readTime) FROM readRecord"));
+    }
+
+    @Test public void hierarchyKeepsLongDurationsAndOriginalTimeDisplayOptions() throws Exception {
+        long longTime = 1234L * 3600000 + 56 * 60000 + 7 * 1000;
+        db.execSQL("UPDATE readRecord SET readTime=? WHERE deviceId=? AND author=?",
+            new Object[]{longTime, device, "作者甲"});
+        try (ActivityScenario<Activity> scenario = launch()) {
+            await(scenario);
+            scenario.onActivity(activity -> {
+                activity.findViewById(id("tab_all")).performClick();
+                TextView value = activity.findViewById(id("tv_duration"));
+                assertTrue(value.getText() instanceof Spanned);
+                assertTrue(((Spanned)value.getText()).getSpans(0, value.length(), RelativeSizeSpan.class).length > 1);
+                assertTrue(value.getText().toString().contains("秒"));
+                assertTrue(activity.findViewById(id("summary_divider")).getHeight() > 0);
+                TextView days = activity.findViewById(id("tv_days"));
+                TextView books = activity.findViewById(id("tv_books"));
+                TextView average = activity.findViewById(id("tv_average"));
+                assertEquals(days.getTop(), books.getTop());
+                assertEquals(days.getTop(), average.getTop());
+                assertTrue(days.getRight() <= books.getLeft() && books.getRight() <= average.getLeft());
+                assertTrue(value.getLineCount() <= 2);
+            });
+            screenshot("hierarchy-long-seconds");
+            scenario.onActivity(activity -> {
+                TextView value = activity.findViewById(id("tv_duration"));
+                assertEquals("Duration text clipped", value.length(),
+                    value.getLayout().getLineEnd(value.getLineCount() - 1));
+                assertEquals("Days label wrapped", 2, ((TextView)activity.findViewById(id("tv_days"))).getLineCount());
+                assertEquals("Books label wrapped", 2, ((TextView)activity.findViewById(id("tv_books"))).getLineCount());
+            });
+        }
+        prefs().edit().putBoolean("readRecordUseDays", true).putBoolean("readRecordShowSeconds", false).commit();
+        try (ActivityScenario<Activity> scenario = launch()) {
+            await(scenario);
+            scenario.onActivity(activity -> {
+                activity.findViewById(id("tab_all")).performClick();
+                String value = text(activity, "tv_duration");
+                assertTrue(value.contains("天"));
+                assertFalse(value.contains("秒"));
+            });
+            screenshot("hierarchy-long-days");
         }
     }
 

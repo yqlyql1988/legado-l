@@ -216,6 +216,36 @@ class ReadStatisticsTest {
         ), 1,
     )
 
+    @Test fun dailyRankingKeepsAuthorsAndAggregatesBeforeApplyingItsOwnThreshold() {
+        val snapshot = ReadStatisticsSnapshot(
+            listOf(ReadRecordShow("Same", 1000, 10, "A", lastChapterIndex = 8),
+                ReadRecordShow("Same", 900, 20, "B"), ReadRecordShow("Old", 5000, 30, "C")),
+            listOf(ReadRecordDailyShow("Same", "A", "2026-10-17", 200),
+                ReadRecordDailyShow("Same", "A", "2026-10-17", 100),
+                ReadRecordDailyShow("Same", "B", "2026-10-17", 200),
+                ReadRecordDailyShow("Same", "A", "2026-10-16", 700)), 1,
+        )
+        val day = snapshot.booksForDay("2026-10-17")
+        assertEquals(listOf("A", "B"), day.map { it.author })
+        assertEquals(listOf(300L, 200L), day.map { it.readTime })
+        assertEquals(8, day.first().lastChapterIndex)
+        assertEquals("A", day.visibleReadStatisticsBooks(300).single().author)
+        assertTrue(day.visibleReadStatisticsBooks(301).isEmpty())
+        assertTrue(snapshot.booksForDay("2026-10-18").isEmpty())
+        assertEquals(1000L, snapshot.records.first().readTime)
+    }
+
+    @Test fun dailyRankingIsIndependentOfMonthEligibilityAndNeverAddsHistoricalTime() {
+        assertTrue(scopeSnapshot.summary(ReadStatisticsPeriod.MONTH, 2026, 10, 900_000).books.isEmpty())
+        val day = scopeSnapshot.booksForDay("2026-10-15").visibleReadStatisticsBooks(480_000)
+        assertEquals("B", day.single().author)
+        assertEquals(480_000L, day.single().readTime)
+        assertFalse(scopeSnapshot.booksForDay("2026-10-17").any { it.bookName == "Historical" })
+        assertEquals(listOf("A"), scopeSnapshot.summary(ReadStatisticsPeriod.MONTH, 2026, 10, 600_000)
+            .books.map { it.author })
+        assertEquals("B", scopeSnapshot.booksForDay("2026-10-15").single().author)
+    }
+
     @Test fun qualifiedMonthKeepsWholeBooksAndRecomputesDaysAndAverage() {
         val all = scopeSnapshot.summary(ReadStatisticsPeriod.MONTH, 2026, 10)
         val qualified = scopeSnapshot.summary(ReadStatisticsPeriod.MONTH, 2026, 10, 600_000)

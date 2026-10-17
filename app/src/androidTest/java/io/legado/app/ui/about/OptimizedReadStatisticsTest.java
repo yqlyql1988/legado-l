@@ -616,7 +616,7 @@ public class OptimizedReadStatisticsTest {
         } finally { restorePrefs(saved); }
     }
 
-    @Test public void rankingSettingsOnlyHideBooksAndSaveAllFourThresholds() throws Exception {
+    @Test public void rankingSettingsFollowScopeAndSaveAllFourThresholds() throws Exception {
         String[] keys = {"readStatisticsDayMinimum", "readStatisticsMonthMinimum",
             "readStatisticsYearMinimum", "readStatisticsAllMinimum"};
         Map<String, Object> saved = savePrefs(keys);
@@ -662,12 +662,19 @@ public class OptimizedReadStatisticsTest {
                     for (int i = 0; i < keys.length; i++) assertEquals((11L + i) * 60000, prefs().getLong(keys[i], 0));
                     scenario.onActivity(activity -> {
                         LinearLayout rows = activity.findViewById(id("day_books"));
+                        boolean found = false;
+                        for (int i = 0; i < rows.getChildCount(); i++) {
+                            TextView name = rows.getChildAt(i).findViewById(id("tv_book_name"));
+                            if (name != null && title.equals(name.getText().toString())) found = true;
+                        }
+                        assertTrue("All scope keeps books below the threshold", found);
+                        for (int i = 0; i < totals.length; i++)
+                            assertEquals(totals[i], ((TextView)activity.findViewById(id(new String[]{"tv_duration","tv_days","tv_books","tv_average"}[i]))).getText().toString());
+                        activity.findViewById(id("scope_qualified")).performClick();
                         for (int i = 0; i < rows.getChildCount(); i++) {
                             TextView name = rows.getChildAt(i).findViewById(id("tv_book_name"));
                             assertTrue(name == null || !title.equals(name.getText().toString()));
                         }
-                        for (int i = 0; i < totals.length; i++)
-                            assertEquals(totals[i], ((TextView)activity.findViewById(id(new String[]{"tv_duration","tv_days","tv_books","tv_average"}[i]))).getText().toString());
                     });
                     // At the exact daily threshold the book remains visible.
                     openRankingSettings();
@@ -693,7 +700,8 @@ public class OptimizedReadStatisticsTest {
                     onView(withId(android.R.id.button2)).inRoot(isDialog()).perform(click());
                     for (int index : new int[]{1, 2, 3}) {
                         prefs().edit().putLong(keys[0], 0).putLong(keys[1], 0)
-                            .putLong(keys[2], 0).putLong(keys[3], 0).commit();
+                            .putLong(keys[2], 0).putLong(keys[3], 0)
+                            .putBoolean("readStatisticsQualifiedOnly", false).commit();
                         scenario.recreate();
                         await(scenario, "tv_duration");
                         String tab = new String[]{"", "tab_month", "tab_year", "tab_all"}[index];
@@ -709,9 +717,15 @@ public class OptimizedReadStatisticsTest {
                         await(scenario, "tv_duration");
                         scenario.onActivity(activity -> {
                             assertTrue(activity.findViewById(id(tab)).isSelected());
+                            assertEquals(View.GONE, activity.findViewById(id("tv_empty")).getVisibility());
+                            for (int i = 0; i < before.length; i++)
+                                assertEquals(before[i], ((TextView)activity.findViewById(id(new String[]{"tv_duration","tv_days","tv_books","tv_average"}[i]))).getText().toString());
+                            activity.findViewById(id("scope_qualified")).performClick();
                             assertEquals(View.VISIBLE, activity.findViewById(id("tv_empty")).getVisibility());
                             assertEquals(string("read_statistics_filtered_empty"),
                                 ((TextView)activity.findViewById(id("tv_empty"))).getText().toString());
+                            assertEquals("0本\n读过的书", ((TextView)activity.findViewById(id("tv_books"))).getText().toString());
+                            activity.findViewById(id("scope_all")).performClick();
                             for (int i = 0; i < before.length; i++)
                                 assertEquals(before[i], ((TextView)activity.findViewById(id(new String[]{"tv_duration","tv_days","tv_books","tv_average"}[i]))).getText().toString());
                             if (index == 1) {
