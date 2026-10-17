@@ -5,6 +5,11 @@ import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
 import androidx.test.core.app.ActivityScenario
+import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.Espresso.pressBack
+import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.matcher.RootMatchers.isDialog
+import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.R
@@ -22,6 +27,7 @@ import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.storage.BackupConfig
 import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.page.ReadView
+import io.legado.app.ui.book.read.config.MoreConfigDialog
 import io.legado.app.ui.book.read.page.entities.TextPos
 import io.legado.app.ui.book.read.page.entities.column.TextBaseColumn
 import io.legado.app.utils.defaultSharedPreferences
@@ -77,6 +83,7 @@ class CrossPageSelectionUiTest {
     @After fun cleanup() {
         scenario?.close()
         BookHelp.clearCache(book)
+        appDb.bookHighlightDao.delete(*appDb.bookHighlightDao.getByBook(book.bookUrl).toTypedArray())
         appDb.bookDao.delete(book)
         appDb.bookSourceDao.delete(source)
         prefs.edit().apply {
@@ -210,6 +217,59 @@ class CrossPageSelectionUiTest {
         SystemClock.sleep(1100)
         release()
         assertEquals(0, pageIndex())
+    }
+
+    @Test fun savedCrossPageHighlightRestoresItsTextAndRangeAfterReopeningTheBook() {
+        selectWord()
+        dragHandle(false, false)
+        await { it.curPage.textPage.index >= 2 }
+        release()
+        var saved: io.legado.app.data.entities.BookHighlight? = null
+        onReader {
+            saved = it.curPage.createHighlight(HighlightStyle(fill = android.graphics.Color.YELLOW))!!
+            saved!!.note = "跨页标注保留笔记"
+            ReadBook.addHighlight(saved!!)
+            it.cancelSelect()
+        }
+        scenario!!.close()
+        scenario = ActivityScenario.launch(Intent(context, ReadBookActivity::class.java)
+            .putExtra("bookUrl", book.bookUrl).putExtra("inBookshelf", true))
+        await { read ->
+            ReadBook.curTextChapter?.isCompleted == true && read.curPage.textPage.lines.any { line ->
+                line.columns.any { (it as? TextBaseColumn)?.highlightStyle?.fill == android.graphics.Color.YELLOW }
+            }
+        }
+        val restored = appDb.bookHighlightDao.getByBook(book.bookUrl).single()
+        assertEquals(saved!!.chapterPos, restored.chapterPos)
+        assertEquals(saved!!.chapterPosEnd, restored.chapterPosEnd)
+        assertEquals(saved!!.bookText, restored.bookText)
+        assertEquals("跨页标注保留笔记", restored.note)
+    }
+
+    @Test fun switchingOffThroughReadingSettingsClearsTheExistingCrossPageSelection() {
+        selectWord()
+        dragHandle(false, false)
+        await { it.curPage.textPage.index >= 2 }
+        release()
+        scenario!!.onActivity {
+            MoreConfigDialog().showNow(it.supportFragmentManager, "cross-page-settings")
+        }
+        instrumentation.waitForIdleSync()
+        scenario!!.onActivity {
+            val dialog = it.supportFragmentManager.findFragmentByTag("cross-page-settings") as MoreConfigDialog
+            (dialog.childFragmentManager.fragments.single() as MoreConfigDialog.ReadPreferenceFragment)
+                .scrollToPreference(PreferKey.crossPageTextSelection)
+        }
+        onView(withText(R.string.cross_page_text_selection)).inRoot(isDialog()).perform(click())
+        assertFalse(prefs.getBoolean(PreferKey.crossPageTextSelection, true))
+        onReader { assertFalse(it.isTextSelected) }
+        pressBack()
+        val before = pageIndex()
+        selectWord()
+        dragHandle(false, false)
+        SystemClock.sleep(1100)
+        release()
+        assertEquals(before, pageIndex())
     }
 
     private fun selectWord() {
