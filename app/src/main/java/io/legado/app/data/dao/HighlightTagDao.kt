@@ -22,6 +22,9 @@ abstract class HighlightTagDao {
     @Query("SELECT * FROM highlight_tag_orders ORDER BY bookUrl, sortOrder, tagId")
     abstract fun orders(): List<HighlightTagOrder>
 
+    @Query("SELECT * FROM highlight_tag_orders ORDER BY bookUrl, sortOrder, tagId")
+    abstract fun flowOrders(): Flow<List<HighlightTagOrder>>
+
     @Query("SELECT * FROM highlight_tag_orders WHERE bookUrl = :bookUrl ORDER BY sortOrder, tagId")
     abstract fun ordersForBook(bookUrl: String): List<HighlightTagOrder>
 
@@ -78,6 +81,9 @@ abstract class HighlightTagDao {
 
     @Query("SELECT * FROM highlight_tag_links ORDER BY highlightTime, tagId")
     abstract fun links(): List<HighlightTagLink>
+
+    @Query("SELECT * FROM highlight_tag_links ORDER BY highlightTime, tagId")
+    abstract fun flowLinks(): Flow<List<HighlightTagLink>>
 
     @Query("""SELECT link.* FROM highlight_tag_links link
         INNER JOIN highlights ON highlights.time = link.highlightTime WHERE highlights.bookUrl = :bookUrl""")

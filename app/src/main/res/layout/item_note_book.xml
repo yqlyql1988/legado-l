@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:orientation="horizontal" android:gravity="center_vertical"
+    android:padding="18dp" android:background="?attr/selectableItemBackground">
+    <io.legado.app.ui.widget.image.CoverImageView android:id="@+id/iv_cover"
+        android:layout_width="52dp" android:layout_height="76dp"
+        android:layout_marginEnd="14dp" android:importantForAccessibility="no" />
+    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+        android:layout_weight="1" android:orientation="vertical">
+        <TextView android:id="@+id/tv_name" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:textSize="16sp"
+            android:textColor="@color/primaryText" android:maxLines="2" android:ellipsize="end" />
+        <TextView android:id="@+id/tv_author" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_marginTop="3dp"
+            android:maxLines="1" android:ellipsize="end"
+            android:textSize="12sp" android:textColor="@color/secondaryText" />
+        <TextView android:id="@+id/tv_counts" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_marginTop="5dp"
+            android:textSize="13sp" android:textColor="@color/secondaryText" />
+        <TextView android:id="@+id/tv_date" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_marginTop="3dp"
+            android:textSize="11sp" android:textColor="@color/secondaryText" />
+    </LinearLayout>
+</LinearLayout>
