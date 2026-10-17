@@ -39,7 +39,9 @@
     </LinearLayout>
     <com.google.android.material.tabs.TabLayout android:id="@+id/note_tabs"
         android:layout_width="match_parent" android:layout_height="wrap_content"
-        app:tabMode="fixed" app:tabGravity="fill" android:visibility="gone" />
+        app:tabMode="scrollable" app:tabGravity="start" app:tabMinWidth="48dp"
+        app:tabPaddingStart="12dp" app:tabPaddingEnd="12dp" app:tabContentStart="18dp"
+        android:visibility="gone" />
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
         android:orientation="horizontal" android:gravity="center_vertical"
         android:paddingHorizontal="14dp">
