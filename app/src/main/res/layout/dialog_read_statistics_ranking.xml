@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="24dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="8dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:text="@string/read_statistics_ranking_explanation"
+            android:textColor="@color/secondaryText"
+            android:textSize="14sp" />
+
+        <include
+            android:id="@+id/day_minimum"
+            layout="@layout/view_read_statistics_minimum" />
+
+        <include
+            android:id="@+id/month_minimum"
+            layout="@layout/view_read_statistics_minimum" />
+
+        <include
+            android:id="@+id/year_minimum"
+            layout="@layout/view_read_statistics_minimum" />
+
+        <include
+            android:id="@+id/all_minimum"
+            layout="@layout/view_read_statistics_minimum" />
+    </LinearLayout>
+</ScrollView>

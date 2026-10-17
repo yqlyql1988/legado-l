@@ -592,6 +592,18 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         get() = appCtx.getPrefBoolean("readRecordFixedCard", true)
         set(value) { appCtx.putPrefBoolean("readRecordFixedCard", value) }
 
+    val readStatisticsDayMinimum: Long
+        get() = appCtx.getPrefLong("readStatisticsDayMinimum", 0).coerceAtLeast(0)
+
+    val readStatisticsMonthMinimum: Long
+        get() = appCtx.getPrefLong("readStatisticsMonthMinimum", 0).coerceAtLeast(0)
+
+    val readStatisticsYearMinimum: Long
+        get() = appCtx.getPrefLong("readStatisticsYearMinimum", 0).coerceAtLeast(0)
+
+    val readStatisticsAllMinimum: Long
+        get() = appCtx.getPrefLong("readStatisticsAllMinimum", 0).coerceAtLeast(0)
+
     var enableReadRecord: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.enableReadRecord, true)
         set(value) {
