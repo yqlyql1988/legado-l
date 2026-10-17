@@ -94,6 +94,7 @@ public class OptimizedReadStatisticsTest {
             if (entry.getValue() instanceof Boolean) editor.putBoolean(entry.getKey(), (Boolean) entry.getValue());
             else if (entry.getValue() instanceof String) editor.putString(entry.getKey(), (String) entry.getValue());
             else if (entry.getValue() instanceof Long) editor.putLong(entry.getKey(), (Long) entry.getValue());
+            else if (entry.getValue() instanceof Integer) editor.putInt(entry.getKey(), (Integer) entry.getValue());
             else editor.remove(entry.getKey());
         }
         assertTrue(editor.commit());
@@ -298,9 +299,118 @@ public class OptimizedReadStatisticsTest {
     }
 
     private void enterMinimum(String row, String value) {
-        onView(allOf(withId(id("minimum")), isDescendantOfA(withId(id(row)))))
+        enterComponent(row, "minutes", value);
+    }
+
+    private void enterComponent(String row, String component, String value) {
+        onView(allOf(withId(id(component)), isDescendantOfA(withId(id(row)))))
             .inRoot(isDialog()).perform(scrollTo(), replaceText(value),
                 androidx.test.espresso.action.ViewActions.closeSoftKeyboard());
+    }
+
+    private void checkComponent(String row, String component, String value) {
+        onView(allOf(withId(id(component)), isDescendantOfA(withId(id(row)))))
+            .inRoot(isDialog()).perform(scrollTo()).check(matches(withText(value)));
+    }
+
+    @Test public void rankingHmsFitsCustomReadingThemeAndKeepsAllUnitLabelsVisible() throws Exception {
+        Map<String, Object> saved = savePrefs("themeMode", "colorPrimaryNight", "colorAccentNight",
+            "colorBackgroundNight", "colorBottomBackgroundNight", "readStatisticsDayMinimum");
+        try {
+            prefs().edit().putString("themeMode", "2")
+                .putInt("colorPrimaryNight", 0xff10212f).putInt("colorAccentNight", 0xff80cbc4)
+                .putInt("colorBackgroundNight", 0xff0b1821).putInt("colorBottomBackgroundNight", 0xff10212f)
+                .putLong("readStatisticsDayMinimum", 360000000L).commit();
+            applyTheme();
+            try (ActivityScenario<Activity> scenario = ActivityScenario.launch(intent("ReadStatisticsActivity"))) {
+                await(scenario, "tv_duration");
+                openRankingSettings();
+                checkComponent("day_minimum", "hours", "100");
+                onView(allOf(withId(id("hours")), isDescendantOfA(withId(id("day_minimum")))))
+                    .inRoot(isDialog()).perform(click()).check((view, error) -> {
+                        if (error != null) throw error;
+                        android.widget.EditText field = (android.widget.EditText)view;
+                        assertEquals(0, field.getSelectionStart());
+                        assertEquals(3, field.getSelectionEnd());
+                        assertTrue(field.getHeight() >= 48 * view.getResources().getDisplayMetrics().density);
+                        assertTrue(android.graphics.Color.alpha(field.getCurrentTextColor()) > 200);
+                    });
+                androidx.test.espresso.Espresso.closeSoftKeyboard();
+                screenshot("ranking-settings-custom-focus");
+                for (String row : new String[]{"day_minimum", "month_minimum", "year_minimum", "all_minimum"}) {
+                    for (String unit : new String[]{"时", "分", "秒"}) {
+                        onView(allOf(withText(unit), isDescendantOfA(withId(id(row)))))
+                            .inRoot(isDialog()).perform(scrollTo()).check(matches(isDisplayed()));
+                    }
+                }
+                onView(withText(string("read_statistics_ranking_explanation")))
+                    .inRoot(isDialog()).perform(scrollTo());
+                screenshot("ranking-settings-custom");
+                onView(withId(android.R.id.button2)).inRoot(isDialog()).perform(click());
+            }
+        } finally { restorePrefs(saved); applyTheme(); }
+    }
+
+    @Test public void rankingHmsInputsKeepUnitsOldValuesAndValidateBeforeSaving() throws Exception {
+        String[] keys = {"readStatisticsDayMinimum", "readStatisticsMonthMinimum",
+            "readStatisticsYearMinimum", "readStatisticsAllMinimum"};
+        String[] rows = {"day_minimum", "month_minimum", "year_minimum", "all_minimum"};
+        Map<String, Object> saved = savePrefs(keys);
+        try {
+            // Old seconds, minutes and hours settings; also retain arbitrary imported milliseconds.
+            long[] values = {5000L, 300000L, 360000000L, Long.MAX_VALUE};
+            SharedPreferences.Editor editor = prefs().edit();
+            for (int i = 0; i < keys.length; i++) editor.putLong(keys[i], values[i]);
+            assertTrue(editor.commit());
+            try (ActivityScenario<Activity> scenario = ActivityScenario.launch(intent("ReadStatisticsActivity"))) {
+                await(scenario, "tv_duration");
+                openRankingSettings();
+                for (int i = 0; i < rows.length; i++) {
+                    checkComponent(rows[i], "hours", Long.toString(values[i] / 3600000));
+                    checkComponent(rows[i], "minutes", Long.toString(values[i] / 60000 % 60));
+                    checkComponent(rows[i], "seconds", Long.toString(values[i] / 1000 % 60));
+                    for (String unit : new String[]{"时", "分", "秒"}) {
+                        onView(allOf(withText(unit), isDescendantOfA(withId(id(rows[i])))))
+                            .inRoot(isDialog()).perform(scrollTo()).check(matches(isDisplayed()));
+                    }
+                }
+                onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click());
+                for (int i = 0; i < keys.length; i++) assertEquals(values[i], prefs().getLong(keys[i], 0));
+                openRankingSettings();
+                enterComponent(rows[0], "hours", "1");
+                enterComponent(rows[0], "minutes", "2");
+                enterComponent(rows[0], "seconds", "3");
+                enterComponent(rows[1], "minutes", "60");
+                onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click());
+                onView(allOf(withId(id("error")), isDescendantOfA(withId(id(rows[1])))))
+                    .inRoot(isDialog()).perform(scrollTo()).check(matches(isDisplayed()));
+                assertEquals(values[0], prefs().getLong(keys[0], 0));
+                enterComponent(rows[1], "minutes", "");
+                enterComponent(rows[1], "hours", "");
+                enterComponent(rows[1], "seconds", "");
+                enterComponent(rows[2], "seconds", "60");
+                onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click());
+                assertEquals(values[0], prefs().getLong(keys[0], 0));
+                enterComponent(rows[2], "seconds", "59");
+                enterComponent(rows[3], "hours", "9223372036854775807");
+                onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click());
+                onView(withId(android.R.id.button1)).inRoot(isDialog()).check(matches(isDisplayed()));
+                assertEquals(values[0], prefs().getLong(keys[0], 0));
+                enterComponent(rows[3], "hours", "100");
+                enterComponent(rows[3], "minutes", "59");
+                enterComponent(rows[3], "seconds", "59");
+                onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click());
+                assertEquals(3723000L, prefs().getLong(keys[0], 0));
+                assertEquals(0L, prefs().getLong(keys[1], -1));
+                assertEquals(360059000L, prefs().getLong(keys[2], 0));
+                assertEquals(363599000L, prefs().getLong(keys[3], 0));
+                openRankingSettings();
+                checkComponent(rows[0], "hours", "1");
+                checkComponent(rows[0], "minutes", "2");
+                checkComponent(rows[0], "seconds", "3");
+                onView(withId(android.R.id.button2)).inRoot(isDialog()).perform(click());
+            }
+        } finally { restorePrefs(saved); }
     }
 
     @Test public void rankingSettingsOnlyHideBooksAndSaveAllFourThresholds() throws Exception {
