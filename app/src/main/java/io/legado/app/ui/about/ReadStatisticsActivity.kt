@@ -8,6 +8,11 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.InsetDrawable
 import android.graphics.drawable.StateListDrawable
 import android.os.Bundle
+import android.text.Spannable
+import android.text.SpannableStringBuilder
+import android.text.style.ForegroundColorSpan
+import android.text.style.RelativeSizeSpan
+import android.text.style.TypefaceSpan
 import android.view.Gravity
 import android.view.Menu
 import android.view.MenuItem
@@ -93,7 +98,8 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         header.scopeAll.setOnClickListener { selectScope(false) }
         header.scopeQualified.setOnClickListener { selectScope(true) }
         val surface = ColorUtils.blendColors(backgroundColor, accentColor, .06f)
-        header.summary.background = rounded(surface)
+        header.summary.background = rounded(ColorUtils.blendColors(backgroundColor, contentPrimary, .025f))
+        header.summaryDivider.setBackgroundColor(ColorUtils.blendColors(backgroundColor, contentSecondary, .16f))
         header.trendPanel.background = rounded(surface)
     }
 
@@ -360,6 +366,26 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         value, AppConfig.readRecordUseDays, AppConfig.readRecordShowSeconds,
     )
 
+    private fun summaryValue(value: String, numberScale: Float, unitScale: Float = 1f, label: String? = null) =
+        SpannableStringBuilder(value).apply {
+            Regex("\\d+|\\D+").findAll(value).forEach { match ->
+                val number = match.value.first().isDigit()
+                val start = match.range.first
+                val end = match.range.last + 1
+                setSpan(RelativeSizeSpan(if (number) numberScale else unitScale),
+                    start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                setSpan(ForegroundColorSpan(if (number) contentPrimary else contentSecondary),
+                    start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                if (number) setSpan(TypefaceSpan("sans-serif-medium"),
+                    start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+            if (label != null) append("\n").append(label)
+        }
+
+    private fun scopeCount(count: Int) = getString(R.string.read_statistics_rank_scope,
+        getString(if (AppConfig.readStatisticsQualifiedOnly) R.string.read_statistics_scope_qualified
+            else R.string.read_statistics_scope_all), count)
+
     private fun selectScope(qualifiedOnly: Boolean) {
         if (AppConfig.readStatisticsQualifiedOnly == qualifiedOnly) return
         AppConfig.readStatisticsQualifiedOnly = qualifiedOnly
@@ -375,7 +401,7 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         val all = snapshot.summary(period, year, month)
         val qualifiedOnly = AppConfig.readStatisticsQualifiedOnly
         val summary = if (qualifiedOnly) snapshot.summary(period, year, month, minimum) else all
-        val visibleBooks = all.books.visibleReadStatisticsBooks(minimum)
+        val visibleBooks = summary.books
         header.statisticsScope.background = rounded(
             ColorUtils.blendColors(backgroundColor, accentColor, .04f),
         ).apply { cornerRadius = 10.dpToPx().toFloat() }
@@ -424,10 +450,13 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
                 R.string.read_statistics_previous_month else R.string.read_statistics_previous_year)
             nextPeriod.contentDescription = getString(if (period == ReadStatisticsPeriod.MONTH)
                 R.string.read_statistics_next_month else R.string.read_statistics_next_year)
-            tvDuration.text = duration(summary.duration)
-            tvDays.text = "${getString(R.string.read_statistics_day_count, summary.days.size)}\n${getString(R.string.read_statistics_days)}"
-            tvBooks.text = "${getString(R.string.read_statistics_book_count, summary.books.size)}\n${getString(R.string.read_statistics_books)}"
-            tvAverage.text = "${duration(summary.average)}\n${getString(R.string.read_statistics_average)}"
+            tvDuration.text = summaryValue(duration(summary.duration), 1f, .4375f)
+            tvDays.text = summaryValue(getString(R.string.read_statistics_day_count, summary.days.size),
+                22f / 13, label = getString(R.string.read_statistics_days))
+            tvBooks.text = summaryValue(getString(R.string.read_statistics_book_count, summary.books.size),
+                22f / 13, label = getString(R.string.read_statistics_books))
+            tvAverage.text = summaryValue(duration(summary.average), 18f / 13,
+                label = getString(R.string.read_statistics_average))
             tvHistory.isVisible = period == ReadStatisticsPeriod.ALL && summary.historyDuration > 0
             tvHistory.text = getString(R.string.read_statistics_history, duration(summary.historyDuration))
             tvRankTitle.setText(when (period) {
@@ -435,6 +464,7 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
                 ReadStatisticsPeriod.YEAR -> R.string.read_statistics_year_books
                 ReadStatisticsPeriod.MONTH -> R.string.read_statistics_month_books
             })
+            tvRankScope.text = scopeCount(visibleBooks.size)
             tvEmpty.isVisible = visibleBooks.isEmpty()
             tvEmpty.setText(if (all.books.isEmpty()) R.string.read_statistics_empty else R.string.read_statistics_filtered_empty)
             calendarPanel.isVisible = period == ReadStatisticsPeriod.MONTH
@@ -520,21 +550,19 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         header.dayBooks.removeAllViews()
         val day = selectedDay
         header.tvSelectedDay.isVisible = day != null
+        header.dayRankHeader.isVisible = day != null
         header.dayBooks.isVisible = day != null
         if (day == null) {
             header.tvSelectedDay.text = ""
             return
         }
+        val dayBooks = snapshot.booksForDay(day)
+        val books = if (AppConfig.readStatisticsQualifiedOnly)
+            dayBooks.visibleReadStatisticsBooks(AppConfig.readStatisticsDayMinimum) else dayBooks
         header.tvSelectedDay.text = getString(
-            R.string.read_statistics_selected_day, day, duration(summary.days[day] ?: 0),
+            R.string.read_statistics_selected_day, day, duration(books.sumOf { it.readTime }),
         )
-        val identities = summary.books.mapTo(hashSetOf()) { it.bookName to it.author }
-        val times = snapshot.daily.filter { it.date == day && (it.bookName to it.author) in identities }
-            .associate { (it.bookName to it.author) to it.readTime }
-        val dayBooks = snapshot.records.mapNotNull { record ->
-            times[record.bookName to record.author]?.takeIf { it > 0 }?.let { record.copy(readTime = it) }
-        }.sortedByDescending { it.readTime }
-        val books = dayBooks.visibleReadStatisticsBooks(AppConfig.readStatisticsDayMinimum)
+        header.tvDayRankScope.text = scopeCount(books.size)
         if (books.isEmpty()) {
             header.dayBooks.addView(TextView(this).apply {
                 setText(if (dayBooks.isEmpty()) R.string.read_statistics_day_empty else R.string.read_statistics_filtered_empty)
