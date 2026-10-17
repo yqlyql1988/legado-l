@@ -366,7 +366,7 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         value, AppConfig.readRecordUseDays, AppConfig.readRecordShowSeconds,
     )
 
-    private fun summaryValue(value: String, numberScale: Float, unitScale: Float = 1f, label: String? = null) =
+    private fun summaryValue(value: String, numberScale: Float, unitScale: Float = 1f) =
         SpannableStringBuilder(value).apply {
             Regex("\\d+|\\D+").findAll(value).forEach { match ->
                 val number = match.value.first().isDigit()
@@ -379,7 +379,6 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
                 if (number) setSpan(TypefaceSpan("sans-serif-medium"),
                     start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
-            if (label != null) append("\n").append(label)
         }
 
     private fun scopeCount(count: Int) = getString(R.string.read_statistics_rank_scope,
@@ -451,12 +450,15 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
             nextPeriod.contentDescription = getString(if (period == ReadStatisticsPeriod.MONTH)
                 R.string.read_statistics_next_month else R.string.read_statistics_next_year)
             tvDuration.text = summaryValue(duration(summary.duration), 1f, .4375f)
-            tvDays.text = summaryValue(getString(R.string.read_statistics_day_count, summary.days.size),
-                22f / 13, label = getString(R.string.read_statistics_days))
-            tvBooks.text = summaryValue(getString(R.string.read_statistics_book_count, summary.books.size),
-                22f / 13, label = getString(R.string.read_statistics_books))
-            tvAverage.text = summaryValue(duration(summary.average), 18f / 13,
-                label = getString(R.string.read_statistics_average))
+            listOf(
+                Triple(tvDays, tvDaysLabel, getString(R.string.read_statistics_day_count, summary.days.size)),
+                Triple(tvBooks, tvBooksLabel, getString(R.string.read_statistics_book_count, summary.books.size)),
+                Triple(tvAverage, tvAverageLabel, duration(summary.average)),
+            ).forEach { (value, label, text) ->
+                value.text = summaryValue(text, 22f / 13)
+                value.contentDescription = "$text\n${label.text}"
+                label.setTextColor(contentSecondary)
+            }
             tvHistory.isVisible = period == ReadStatisticsPeriod.ALL && summary.historyDuration > 0
             tvHistory.text = getString(R.string.read_statistics_history, duration(summary.historyDuration))
             tvRankTitle.setText(when (period) {

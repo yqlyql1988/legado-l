@@ -150,33 +150,42 @@
             android:orientation="horizontal">
             <TextView
                 android:id="@+id/tv_days"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                style="@style/ReadStatisticsMetricValue"
                 android:layout_weight="1.2"
-                android:gravity="start"
-                android:layout_marginEnd="4dp"
-                android:lineSpacingExtra="6dp"
-                android:textColor="@color/secondaryText"
-                android:textSize="13sp" />
+                android:layout_marginEnd="4dp" />
             <TextView
                 android:id="@+id/tv_books"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                style="@style/ReadStatisticsMetricValue"
                 android:layout_weight="1"
-                android:layout_marginEnd="4dp"
-                android:gravity="start"
-                android:lineSpacingExtra="6dp"
-                android:textColor="@color/secondaryText"
-                android:textSize="13sp" />
+                android:layout_marginEnd="4dp" />
             <TextView
                 android:id="@+id/tv_average"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                style="@style/ReadStatisticsMetricValue"
+                android:layout_weight="1.2" />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:baselineAligned="false"
+            android:orientation="horizontal">
+            <TextView
+                android:id="@+id/tv_days_label"
+                style="@style/ReadStatisticsMetricLabel"
                 android:layout_weight="1.2"
-                android:gravity="start"
-                android:lineSpacingExtra="6dp"
-                android:textColor="@color/secondaryText"
-                android:textSize="13sp" />
+                android:layout_marginEnd="4dp"
+                android:text="@string/read_statistics_days" />
+            <TextView
+                android:id="@+id/tv_books_label"
+                style="@style/ReadStatisticsMetricLabel"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:text="@string/read_statistics_books" />
+            <TextView
+                android:id="@+id/tv_average_label"
+                style="@style/ReadStatisticsMetricLabel"
+                android:layout_weight="1.2"
+                android:text="@string/read_statistics_average" />
         </LinearLayout>
     </LinearLayout>
     <TextView
