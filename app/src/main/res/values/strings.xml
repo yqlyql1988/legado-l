@@ -847,7 +847,7 @@
     <string name="selectText">Long Tap to select text</string>
     <string name="long_press_select_paragraph">Select paragraph on long press</string>
     <string name="cross_page_text_selection">Select text across pages</string>
-    <string name="cross_page_text_selection_summary">Hold the selection handle at the top or bottom for 0.8 seconds to turn pages within this chapter; repeats every second</string>
+    <string name="cross_page_text_selection_summary">Hold the selection handle at the top-left corner of the text to turn back or the bottom-right to turn forward; starts after 0.8 seconds, repeats every second and stops when you leave the corner, within this chapter only</string>
     <string name="cross_page_selection_count">%1$s · %2$d characters</string>
     <string name="cross_page_selection_boundary">Reached the chapter boundary</string>
     <string name="cross_page_selection_loading">Waiting for chapter layout</string>
