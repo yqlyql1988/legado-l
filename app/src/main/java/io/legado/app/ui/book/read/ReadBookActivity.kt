@@ -90,8 +90,6 @@ import io.legado.app.receiver.TimeBatteryReceiver
 import io.legado.app.service.BaseReadAloudService
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.book.bookmark.BookmarkDialog
-import io.legado.app.ui.book.readingmark.ReadingMarkDialog
-import io.legado.app.data.entities.BookReadingMark
 import io.legado.app.ui.book.changesource.ChangeBookSourceDialog
 import io.legado.app.ui.book.changesource.ChangeChapterSourceDialog
 import io.legado.app.ui.book.info.BookInfoActivity
@@ -858,18 +856,6 @@ class ReadBookActivity : BaseReadBookActivity(),
 
             R.id.menu_download -> showDownloadDialog()
             R.id.menu_add_bookmark -> addBookmark()
-            R.id.menu_reading_mark, R.id.menu_abandon_here, R.id.menu_mark_finished -> {
-                ReadBook.book?.let { book ->
-                    val status = when (item.itemId) {
-                        R.id.menu_abandon_here -> BookReadingMark.ABANDONED
-                        R.id.menu_mark_finished -> BookReadingMark.FINISHED
-                        else -> null
-                    }
-                    showDialogFragment(ReadingMarkDialog.newInstance(book.copy(
-                        durChapterIndex = ReadBook.durChapterIndex, durChapterPos = ReadBook.durChapterPos,
-                    ), status))
-                }
-            }
             R.id.menu_highlight_rule -> startActivity<HighlightRuleActivity>()
             R.id.menu_simulated_reading -> showSimulatedReading()
             R.id.menu_edit_content -> ContentEditDialog.newInstance()?.let {

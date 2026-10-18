@@ -84,7 +84,6 @@ import io.legado.app.ui.book.group.GroupSelectDialog
 import io.legado.app.ui.book.info.edit.BookInfoEditActivity
 import io.legado.app.ui.book.manga.ReadMangaActivity
 import io.legado.app.ui.book.read.ReadBookActivity
-import io.legado.app.ui.book.readingmark.ReadingMarkDialog
 import io.legado.app.ui.book.read.ReadBookActivity.Companion.RESULT_DELETED
 import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.model.SourceCallBack
@@ -140,7 +139,6 @@ class BookInfoActivity :
 
     private var reviewJob: Job? = null
     private var reviewIdentity: Pair<String, String>? = null
-    private var readingMarkJob: Job? = null
 
     private val tocActivityResult = registerForActivityResult(TocActivityResult()) {
         it?.let {
@@ -615,21 +613,11 @@ class BookInfoActivity :
 
     private fun showBook(book: Book) = binding.run {
         showCover(book)
-        readingMark.setOnClickListener { showDialogFragment(ReadingMarkDialog.newInstance(book)) }
         bookReview.setBook(book)
         val identity = book.name to book.author
         if (reviewIdentity != identity) {
             reviewIdentity = identity
             reviewJob?.cancel()
-            readingMarkJob?.cancel()
-            readingMark.submitMark(null)
-            readingMarkJob = lifecycleScope.launch {
-                repeatOnLifecycle(Lifecycle.State.STARTED) {
-                    appDb.bookReadingMarkDao.flowForBook(book.name, book.author).collect {
-                        readingMark.submitMark(it)
-                    }
-                }
-            }
             reviewJob = lifecycleScope.launch {
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
                     appDb.bookReviewDao.flowForBook(book.name, book.author).collect {

@@ -23,7 +23,6 @@ import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.model.ReadBook
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.book.toc.rule.TxtTocRuleDialog
-import io.legado.app.ui.book.readingmark.ReadingMarkDialog
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.widget.dialog.WaitDialog
 import io.legado.app.utils.applyTint
@@ -55,7 +54,6 @@ class TocActivity : VMBaseActivity<ActivityChapterListBinding, TocViewModel>(),
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
-        viewModel.onlySkipped = savedInstanceState?.getBoolean("onlySkipped") ?: viewModel.onlySkipped
         tabLayout = binding.titleBar.findViewById(R.id.tab_layout)
         tabLayout.isTabIndicatorFullWidth = false
         tabLayout.setSelectedTabIndicatorColor(accentColor)
@@ -114,7 +112,6 @@ class TocActivity : VMBaseActivity<ActivityChapterListBinding, TocViewModel>(),
     }
 
     override fun onMenuOpened(featureId: Int, menu: Menu): Boolean {
-        menu.findItem(R.id.menu_only_skipped)?.isChecked = viewModel.onlySkipped
         when (tabLayout.selectedTabPosition) {
             1 -> {
                 menu.setGroupVisible(R.id.menu_group_bookmark, true)
@@ -153,14 +150,6 @@ class TocActivity : VMBaseActivity<ActivityChapterListBinding, TocViewModel>(),
 
     override fun onCompatOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
-            R.id.menu_only_skipped -> {
-                viewModel.onlySkipped = !viewModel.onlySkipped
-                item.isChecked = viewModel.onlySkipped
-                viewModel.startChapterListSearch(viewModel.searchKey)
-            }
-            R.id.menu_reading_mark -> viewModel.bookData.value?.let {
-                showDialogFragment(ReadingMarkDialog.newInstance(it))
-            }
             R.id.menu_toc_regex -> showDialogFragment(
                 TxtTocRuleDialog(viewModel.bookData.value?.tocUrl)
             )
@@ -216,11 +205,6 @@ class TocActivity : VMBaseActivity<ActivityChapterListBinding, TocViewModel>(),
             book.tocUrl = tocRegex
             upBookAndToc(book)
         }
-    }
-
-    override fun onSaveInstanceState(outState: Bundle) {
-        outState.putBoolean("onlySkipped", viewModel.onlySkipped)
-        super.onSaveInstanceState(outState)
     }
 
     private fun upBookAndToc(book: Book) {
