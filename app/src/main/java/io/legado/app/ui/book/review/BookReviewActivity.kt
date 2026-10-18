@@ -3,7 +3,6 @@ package io.legado.app.ui.book.review
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.content.res.ColorStateList
 import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
@@ -26,10 +25,8 @@ import io.legado.app.data.entities.BookReviewSort
 import io.legado.app.data.entities.archiveBookReviews
 import io.legado.app.databinding.ActivityBookReviewBinding
 import io.legado.app.databinding.ItemBookReviewBinding
-import io.legado.app.lib.theme.accentColor
 import io.legado.app.ui.book.info.BookInfoActivity
 import io.legado.app.ui.widget.PopupAction
-import io.legado.app.ui.widget.popupActionMenu
 import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.dpToPx
@@ -44,6 +41,7 @@ class BookReviewActivity : BaseActivity<ActivityBookReviewBinding>() {
     override val binding by viewBinding(ActivityBookReviewBinding::inflate)
     private val book by lazy { intent.reviewBook() }
     private val adapter = ReviewAdapter()
+    private val entriesAdapter = BookReviewEntriesAdapter(this)
     private var reviews: List<BookReview> = emptyList()
     private var query = ""
     private var sort = BookReviewSort.RECENT
@@ -52,7 +50,7 @@ class BookReviewActivity : BaseActivity<ActivityBookReviewBinding>() {
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         sort = if (getPrefString(SORT_PREFERENCE) == "rating") BookReviewSort.RATING
             else BookReviewSort.RECENT
-        binding.recyclerView.adapter = adapter
+        binding.recyclerView.adapter = if (book == null) adapter else entriesAdapter
         if (book == null) binding.recyclerView.addItemDecoration(
             DividerItemDecoration(this, DividerItemDecoration.VERTICAL))
         binding.recyclerView.applyNavigationBarPadding()
@@ -159,6 +157,7 @@ class BookReviewActivity : BaseActivity<ActivityBookReviewBinding>() {
                 it.bookName.contains(query, true) || it.bookAuthor.contains(query, true)
             }.map { BookReviewArchive(listOf(it)) }
         }
+        entriesAdapter.reviews = if (book == null) emptyList() else adapter.rows.map { it.latest }
         binding.tvSummary.text = if (book == null) {
             getString(R.string.book_review_archive_count, archives.size, reviews.size)
         } else {
@@ -197,56 +196,25 @@ class BookReviewActivity : BaseActivity<ActivityBookReviewBinding>() {
             val archive = rows[position]
             val review = archive.latest
             holder.binding.run {
-                val isArchive = book == null
-                root.setPadding(18.dpToPx(), if (isArchive) 18.dpToPx() else 0,
-                    18.dpToPx(), if (isArchive) 18.dpToPx() else 0)
-                reviewBody.setPadding(0, 0, 0, if (isArchive) 0 else 24.dpToPx())
-                timelineIndicator.isVisible = !isArchive
-                timelineLine.isVisible = !isArchive && position < rows.lastIndex
-                timelineDot.backgroundTintList = ColorStateList.valueOf(
-                    if (position == 0) accentColor else getCompatColor(R.color.secondaryText))
-                ivCover.isVisible = isArchive
-                if (isArchive) ivCover.load(review.asBook(), false)
-                tvTitle.text = if (isArchive) {
-                    review.bookName
-                } else getString(
-                    if (review.isFollowUp) R.string.book_review_follow_up_label
-                    else R.string.book_review_initial
-                )
-                tvTitle.maxLines = if (isArchive) 2 else 1
-                tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP,
-                    if (isArchive) 16f else 13f)
-                tvAuthor.isVisible = isArchive && review.bookAuthor.isNotBlank()
+                root.setPadding(18.dpToPx(), 18.dpToPx(), 18.dpToPx(), 18.dpToPx())
+                reviewBody.setPadding(0, 0, 0, 0)
+                timelineIndicator.isVisible = false
+                ivCover.isVisible = true
+                ivCover.load(review.asBook(), false)
+                tvTitle.text = review.bookName
+                tvTitle.maxLines = 2
+                tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 16f)
+                tvAuthor.isVisible = review.bookAuthor.isNotBlank()
                 tvAuthor.text = review.bookAuthor
-                bindBookReviewRating(reviewRatingStars, tvRating, archive.rating,
-                    if (!isArchive && review.isFollowUp) R.string.book_review_no_score
-                    else R.string.book_review_unrated
-                )
-                tvContent.maxLines = if (isArchive) 2 else Int.MAX_VALUE
-                tvContent.ellipsize = if (isArchive) android.text.TextUtils.TruncateAt.END else null
+                bindBookReviewRating(reviewRatingStars, tvRating, archive.rating)
+                tvContent.maxLines = 2
+                tvContent.ellipsize = android.text.TextUtils.TruncateAt.END
                 tvContent.text = review.content
-                tvDate.text = if (isArchive) {
-                    "${review.reviewDate} · ${getString(R.string.book_review_count, archive.reviews.size)}"
-                } else review.reviewDate
-                tvDate.isVisible = isArchive
-                tvHistoryDate.isVisible = !isArchive
-                tvHistoryDate.text = review.reviewDate
-                reviewMore.isVisible = !isArchive
-                reviewMore.setOnClickListener { anchor ->
-                    popupActionMenu(this@BookReviewActivity) {
-                        item(getString(R.string.edit), "edit")
-                        item(getString(R.string.delete), "delete")
-                        danger("delete")
-                    }.show(anchor) { action ->
-                        if (action == "edit") BookReviewEditActivity.edit(
-                            this@BookReviewActivity, review.id)
-                        else confirmDeleteBookReview(review)
-                    }
-                }
-                root.setOnClickListener {
-                    if (isArchive) open(this@BookReviewActivity, review.asBook())
-                    else BookReviewEditActivity.edit(this@BookReviewActivity, review.id)
-                }
+                tvDate.text = "${review.reviewDate} · ${getString(R.string.book_review_count, archive.reviews.size)}"
+                tvDate.isVisible = true
+                tvHistoryDate.isVisible = false
+                reviewMore.isVisible = false
+                root.setOnClickListener { open(this@BookReviewActivity, review.asBook()) }
                 var openDetailsOnRelease = false
                 val openDetails = {
                     startActivity(Intent(this@BookReviewActivity, BookInfoActivity::class.java)
@@ -254,7 +222,7 @@ class BookReviewActivity : BaseActivity<ActivityBookReviewBinding>() {
                         .putExtra("author", review.bookAuthor)
                         .putExtra("bookUrl", review.bookUrl))
                 }
-                root.setOnTouchListener(if (isArchive) {
+                root.setOnTouchListener(
                     android.view.View.OnTouchListener { view, event ->
                         when (event.actionMasked) {
                             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_CANCEL ->
@@ -267,14 +235,13 @@ class BookReviewActivity : BaseActivity<ActivityBookReviewBinding>() {
                         }
                         false
                     }
-                } else null)
-                root.setOnLongClickListener(if (isArchive) {
+                )
+                root.setOnLongClickListener(
                     android.view.View.OnLongClickListener { view ->
                         if (view.isPressed) openDetailsOnRelease = true else openDetails()
                         true
                     }
-                } else null)
-                root.isLongClickable = isArchive
+                )
             }
         }
     }

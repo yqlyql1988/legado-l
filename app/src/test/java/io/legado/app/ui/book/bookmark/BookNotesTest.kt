@@ -3,6 +3,7 @@ package io.legado.app.ui.book.bookmark
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookHighlight
 import io.legado.app.data.entities.Bookmark
+import io.legado.app.data.entities.BookReview
 import io.legado.app.data.entities.HighlightTag
 import io.legado.app.data.entities.HighlightTagLink
 import io.legado.app.data.entities.HighlightTagOrder
@@ -20,8 +21,67 @@ class BookNotesTest {
     private fun archive(
         bookmarks: List<Bookmark> = listOf(bookmark()), highlights: List<BookHighlight> = listOf(highlight()),
         books: List<Book> = listOf(book), tags: List<HighlightTag> = emptyList(),
-        links: List<HighlightTagLink> = emptyList(), orders: List<HighlightTagOrder> = emptyList()
-    ) = archiveBookNotes(bookmarks, highlights, books, tags, links, orders)
+        links: List<HighlightTagLink> = emptyList(), orders: List<HighlightTagOrder> = emptyList(),
+        reviews: List<BookReview> = emptyList()
+    ) = archiveBookNotes(bookmarks, highlights, books, tags, links, orders, reviews)
+
+    private fun review(id: String = "review", date: String = "2026-10-18", score: Int? = 9) =
+        BookReview(id = id, bookName = book.name, bookAuthor = book.author, bookUrl = book.bookUrl,
+            content = "重读后更喜欢安静的段落", reviewDate = date, rating = score,
+            createdAt = 10, updatedAt = 20)
+
+    @Test fun reviewOnlyBooksAppearWithoutShelfAndKeepCoverAndHistory() {
+        val saved = review().copy(coverUrl = "saved-cover")
+        val result = archive(emptyList(), emptyList(), emptyList(), reviews = listOf(saved)).single()
+        assertNull(result.book)
+        assertEquals(saved.coverUrl, result.asBook().coverUrl)
+        assertEquals(listOf(saved), result.reviews)
+        assertEquals(0, result.notes.size)
+    }
+    @Test fun reviewOnlyBookUsesCurrentSourceAfterChangingSource() {
+        val current = book.copy(bookUrl = "new-source")
+        val result = archive(emptyList(), emptyList(), listOf(current),
+            reviews = listOf(review())).single()
+        assertEquals(current, result.book)
+        assertEquals(current.bookUrl, result.bookUrl)
+    }
+    @Test fun reviewsAttachToExistingNotesWithoutCreatingDuplicateBooks() {
+        val result = archive(reviews = listOf(review())).single()
+        assertEquals(2, result.notes.size)
+        assertEquals(1, result.reviews.size)
+        assertEquals(9, result.rating)
+    }
+    @Test fun reviewsFollowExistingWorkIdentityWithoutCombiningSourceBoundNotes() {
+        val saved = review()
+        val results = archive(highlights = listOf(highlight(2), highlight(3, "source-b")),
+            books = listOf(book, book.copy(bookUrl = "source-b")), reviews = listOf(saved))
+        assertEquals(3, results.size)
+        assertTrue(results.all { it.reviews == listOf(saved) })
+        assertEquals(1, results.flatMap { it.reviews }.distinctBy { it.id }.size)
+        assertEquals(3, results.flatMap { it.notes }.size)
+    }
+    @Test fun reviewsFromOtherAuthorsRemainSeparate() {
+        val results = archive(reviews = listOf(review().copy(bookAuthor = "另一作者")))
+        assertEquals(2, results.size)
+        assertTrue(results.single { it.author == book.author }.reviews.isEmpty())
+        assertEquals(1, results.single { it.author == "另一作者" }.reviews.size)
+    }
+    @Test fun historySortAndInheritedRatingKeepExistingReviewSemantics() {
+        val earlier = review("first", "2026-10-01", 8)
+        val later = review("follow", "2026-10-18", null).copy(isFollowUp = true)
+        val result = archive(reviews = listOf(earlier, later)).single()
+        assertEquals(listOf("follow", "first"), result.reviews.map { it.id })
+        assertEquals(8, result.rating)
+        assertTrue(result.matches(" 重读后 "))
+        assertEquals(listOf(later), result.matchingReviews("2026-10-18"))
+        assertFalse(result.matches("没有的文字"))
+    }
+    @Test fun latestActivityIncludesReviewEditsAndDeletingReviewsKeepsNotes() {
+        val withReview = archive(reviews = listOf(review().copy(updatedAt = 500))).single()
+        assertEquals(500L, withReview.latestTime)
+        assertEquals(2L, archive(reviews = emptyList()).single().latestTime)
+        assertEquals(withReview.notes, archive(reviews = emptyList()).single().notes)
+    }
 
     @Test fun combinesLegacyBookmarkWithUnambiguousSourceBoundHighlights() {
         val result = archive().single()

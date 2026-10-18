@@ -27,8 +27,8 @@ internal object BookNotesRepository {
     private val tagData = combine(appDb.highlightTagDao.flowAll(),
         appDb.highlightTagDao.flowLinks(), appDb.highlightTagDao.flowOrders(), ::TagData)
     val archives = combine(appDb.bookmarkDao.flowAll(), appDb.bookHighlightDao.flowAll(),
-        appDb.bookDao.flowAll(), tagData) { bookmarks, highlights, books, tagData ->
-        archiveBookNotes(bookmarks, highlights, books, tagData.tags, tagData.links, tagData.orders)
+        appDb.bookDao.flowAll(), tagData, appDb.bookReviewDao.flowAll()) { bookmarks, highlights, books, tagData, reviews ->
+        archiveBookNotes(bookmarks, highlights, books, tagData.tags, tagData.links, tagData.orders, reviews)
     }.flowOn(IO)
 
     suspend fun delete(notes: List<BookNote>) {

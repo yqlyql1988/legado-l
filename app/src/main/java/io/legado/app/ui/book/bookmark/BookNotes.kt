@@ -3,12 +3,15 @@ package io.legado.app.ui.book.bookmark
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookHighlight
 import io.legado.app.data.entities.Bookmark
+import io.legado.app.data.entities.BookReview
+import io.legado.app.data.entities.BookReviewArchive
+import io.legado.app.data.entities.bookReviewOrder
 import io.legado.app.data.entities.HighlightTag
 import io.legado.app.data.entities.HighlightTagLink
 import io.legado.app.data.entities.HighlightTagOrder
 import io.legado.app.help.HighlightTags
 
-internal enum class NoteType { ALL, BOOKMARK, HIGHLIGHT }
+internal enum class NoteType { ALL, BOOKMARK, HIGHLIGHT, REVIEW }
 
 internal data class BookNote(
     val bookmark: Bookmark? = null,
@@ -34,19 +37,30 @@ internal data class BookNote(
 
 internal data class NoteBook(
     val id: String, val bookUrl: String, val name: String, val author: String,
-    val book: Book?, val notes: List<BookNote>, val ambiguous: Boolean = false
+    val book: Book?, val notes: List<BookNote>, val ambiguous: Boolean = false,
+    val reviews: List<BookReview> = emptyList()
 ) {
     val bookmarkCount get() = notes.count { it.bookmark != null }
     val highlightCount get() = notes.size - bookmarkCount
-    val latestTime get() = notes.maxOfOrNull { it.time } ?: 0L
-    fun asBook() = book ?: Book(bookUrl = bookUrl, name = name, author = author)
+    val latestTime get() = maxOf(notes.maxOfOrNull { it.time } ?: 0L,
+        reviews.maxOfOrNull { it.updatedAt } ?: 0L)
+    val rating get() = reviews.takeIf { it.isNotEmpty() }?.let { BookReviewArchive(it).rating }
+    fun asBook() = book ?: Book(bookUrl = bookUrl, name = name, author = author,
+        coverUrl = reviews.firstOrNull()?.coverUrl)
+    fun matches(query: String): Boolean = query.isBlank() ||
+        name.contains(query.trim(), true) || author.contains(query.trim(), true) ||
+        notes.any { it.matches(query.trim()) } || matchingReviews(query).isNotEmpty()
+    fun matchingReviews(query: String): List<BookReview> = reviews.filter {
+        query.isBlank() || listOf(it.bookName, it.bookAuthor, it.content, it.reviewDate)
+            .any { text -> text.contains(query.trim(), true) }
+    }
 }
 
 /** Keep source-bound highlights separate; never guess between same-name books. */
 internal fun archiveBookNotes(
     bookmarks: List<Bookmark>, highlights: List<BookHighlight>, books: List<Book>,
     tags: List<HighlightTag>, links: List<HighlightTagLink>,
-    orders: List<HighlightTagOrder> = emptyList()
+    orders: List<HighlightTagOrder> = emptyList(), reviews: List<BookReview> = emptyList()
 ): List<NoteBook> {
     fun metadata(name: String, author: String) = "metadata:${name.length}:$name$author"
     val booksByUrl = books.associateBy { it.bookUrl }
@@ -66,7 +80,7 @@ internal fun archiveBookNotes(
         val attached = orderedTags[highlight.bookUrl].orEmpty().filter { it.id in ids }
         BookNote(highlight = highlight, tags = attached)
     } + bookmarks.map { BookNote(bookmark = it) }
-    return entries.groupBy { entry ->
+    val noteBooks = entries.groupBy { entry ->
         val url = entry.highlight?.bookUrl?.takeIf(String::isNotBlank)
             ?: legacyOwners(entry.bookName, entry.author).singleOrNull()
         url?.let { "url:$it" } ?: metadata(entry.bookName, entry.author)
@@ -76,7 +90,20 @@ internal fun archiveBookNotes(
         NoteBook(id, url, book?.name ?: notes.first().bookName,
             book?.author ?: notes.first().author, book, notes,
             url.isEmpty() && legacyOwners(notes.first().bookName, notes.first().author).size > 1)
-    }.sortedWith(compareByDescending<NoteBook> { it.latestTime }.thenBy { it.id })
+    }
+    // Reviews keep their existing work-wide identity across source changes. Notes keep theirs.
+    val reviewsByBook = reviews.groupBy { it.bookName to it.bookAuthor }
+        .mapValues { (_, values) -> values.sortedWith(bookReviewOrder) }
+    val existingNames = noteBooks.mapTo(hashSetOf()) { it.name to it.author }
+    val reviewOnly = reviewsByBook.filterKeys { it !in existingNames }.map { (name, values) ->
+        val shelf = booksByName[name].orEmpty()
+        val owner = shelf.firstOrNull { it.bookUrl == values.first().bookUrl } ?: shelf.singleOrNull()
+        val url = owner?.bookUrl ?: values.first().bookUrl
+        NoteBook(if (owner != null) "url:$url" else metadata(name.first, name.second),
+            url, name.first, name.second, owner, emptyList(), reviews = values)
+    }
+    return (noteBooks.map { it.copy(reviews = reviewsByBook[it.name to it.author].orEmpty()) } +
+        reviewOnly).sortedWith(compareByDescending<NoteBook> { it.latestTime }.thenBy { it.id })
 }
 
 internal fun filterBookNotes(

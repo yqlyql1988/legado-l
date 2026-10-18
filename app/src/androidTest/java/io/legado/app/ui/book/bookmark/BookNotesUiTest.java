@@ -173,6 +173,10 @@ public class BookNotesUiTest {
     }
     @After public void cleanup() {
         if (db != null) {
+            db.execSQL("DELETE FROM book_review_deletions WHERE id IN (SELECT id FROM book_reviews WHERE bookAuthor=?)",
+                new Object[]{author});
+            db.delete("book_review_deletions", "id LIKE ?", new String[]{tag + "-review%"});
+            db.delete("book_reviews", "bookAuthor = ?", new String[]{author});
             db.delete("highlight_tags", "id = ?", new String[]{tag});
             db.delete("highlights", "bookAuthor = ?", new String[]{author});
             db.delete("bookmarks", "bookAuthor = ?", new String[]{author});
@@ -230,11 +234,104 @@ public class BookNotesUiTest {
             assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream));
         } finally { bitmap.recycle(); }
     }
+    private void seedReview(String suffix, String name, String content, String date, int score) {
+        ContentValues review = new ContentValues();
+        review.put("id", tag + "-review-" + suffix);
+        review.put("bookName", name); review.put("bookAuthor", author);
+        review.put("bookUrl", bookUrl); review.put("rating", score);
+        review.put("content", content); review.put("reviewDate", date);
+        review.put("isFollowUp", suffix.equals("initial") ? 0 : 1);
+        review.put("createdAt", time + 10); review.put("updatedAt", time + 10);
+        insert("book_reviews", review);
+    }
+
+    @Test public void reviewSummaryTabSearchAndRecreationUseExistingHistory() throws Exception {
+        seedReview("initial", "长夜书店", "初读更喜欢雨夜书店的温柔。", "2026-10-01", 8);
+        seedReview("follow", "长夜书店", "重读才看懂那些安静的段落。", "2026-10-18", 9);
+        try (ActivityScenario<Activity> scenario = ActivityScenario.launch(intent(true))) {
+            awaitCount(scenario, 3);
+            onView(withText("重读才看懂那些安静的段落。")).check(matches(isDisplayed()));
+            screenshot("review-summary");
+            onView(withText(text("book_notes_tab_review", 2))).perform(click());
+            awaitSummary(scenario, text("book_review_count", 2));
+            onView(withId(id("tv_tag_filter"))).check(matches(withEffectiveVisibility(Visibility.GONE)));
+            onView(withId(id("tv_sort"))).check(matches(withEffectiveVisibility(Visibility.GONE)));
+            onView(withId(id("batch_actions"))).check(matches(withEffectiveVisibility(Visibility.GONE)));
+            screenshot("review-history");
+            scenario.onActivity(activity -> query(activity, "初读", true));
+            awaitSummary(scenario, text("book_review_count", 1));
+            closeSoftKeyboard();
+            scenario.recreate();
+            awaitSummary(scenario, text("book_review_count", 1));
+            onView(withText(text("book_notes_tab_review", 2))).check(matches(isSelected()));
+            onView(withText("初读更喜欢雨夜书店的温柔。")).check(matches(isDisplayed()));
+            toolbarBack();
+            awaitSummary(scenario, text("book_review_count", 2));
+            toolbarBack();
+            scenario.onActivity(activity -> query(activity, author, false));
+            awaitSummary(scenario, text("book_notes_summary", 2, 2, 2, 2));
+        }
+    }
+
+    @Test public void archiveIncludesReviewOnlyBookAndSearchesItsReviewBody() throws Exception {
+        seedReview("initial", "寻常的光", "关于家人的那些段落，值得反复回味。", "2026-10-18", 10);
+        try (ActivityScenario<Activity> scenario = ActivityScenario.launch(intent(false))) {
+            scenario.onActivity(activity -> query(activity, "关于家人的那些段落", false));
+            awaitSummary(scenario, text("book_notes_summary", 1, 0, 0, 1));
+            onView(withText("寻常的光")).perform(click());
+            awaitCount(scenario, 0);
+            onView(withText("关于家人的那些段落，值得反复回味。")).check(matches(isDisplayed()));
+            onView(withId(id("tv_continue"))).check(matches(withEffectiveVisibility(Visibility.GONE)));
+            onView(withText(text("book_notes_tab_review", 1))).perform(click());
+            awaitSummary(scenario, text("book_review_count", 1));
+            screenshot("review-only");
+            toolbarBack();
+            awaitSummary(scenario, text("book_notes_summary", 1, 0, 0, 1));
+        }
+    }
+
+    @Test public void newFollowUpReturnsToSameTabWithInheritedRatingAndUpdatedCount() throws Exception {
+        seedReview("initial", "长夜书店", "最初的书评", "2026-10-01", 9);
+        try (ActivityScenario<Activity> scenario = ActivityScenario.launch(intent(true))) {
+            awaitCount(scenario, 3);
+            onView(withText(text("book_notes_tab_review", 1))).perform(click());
+            awaitSummary(scenario, text("book_review_count", 1));
+            onView(withId(id("tv_write_review"))).perform(click());
+            onView(withId(id("et_content"))).perform(scrollTo(), replaceText("从阅读笔记直接写下新的追评。"));
+            closeSoftKeyboard();
+            onView(withId(id("menu_save"))).perform(click());
+            awaitSummary(scenario, text("book_review_count", 2));
+            assertEquals(2, count("book_reviews", "bookAuthor=? AND rating=9", author));
+            assertEquals(1, count("book_reviews", "bookAuthor=? AND content=?", author, "从阅读笔记直接写下新的追评。"));
+            onView(withText(text("book_notes_tab_review", 2))).check(matches(isSelected()));
+            onView(withText("从阅读笔记直接写下新的追评。")).check(matches(isDisplayed()));
+        }
+    }
+
+    @Test public void deletingReviewKeepsNotesProgressAndRefreshesAllSummary() throws Exception {
+        seedReview("initial", "长夜书店", "即将删除的书评", "2026-10-18", 9);
+        try (ActivityScenario<Activity> scenario = ActivityScenario.launch(intent(true))) {
+            awaitCount(scenario, 3);
+            onView(withText(text("book_notes_tab_review", 1))).perform(click());
+            awaitSummary(scenario, text("book_review_count", 1));
+            onView(withId(id("review_more"))).perform(click());
+            onView(withText(text("delete"))).perform(click());
+            onView(withId(android.R.id.button1)).perform(click());
+            awaitSummary(scenario, text("book_review_count", 0));
+            assertEquals(0, count("book_reviews", "bookAuthor=?", author));
+            assertEquals(2, count("highlights", "bookAuthor=?", author));
+            assertEquals(1, count("books", "bookUrl=? AND durChapterIndex=2 AND durChapterPos=678", bookUrl));
+            onView(withText(text("book_notes_tab_all", 3))).perform(click());
+            awaitCount(scenario, 3);
+            onView(withId(id("tv_add"))).check(matches(withText(text("book_review_write"))))
+                .check(matches(isDisplayed()));
+        }
+    }
     @Test public void archiveGroupsBooksAndOldExportActionsStayAvailable() throws Exception {
         try (ActivityScenario<Activity> scenario = ActivityScenario.launch(intent(false))) {
             scenario.onActivity(activity -> query(activity, author, false));
-            awaitSummary(scenario, text("book_notes_summary", 2, 2, 2));
-            onView(withText(text("book_notes_book_count", 1, 2))).check(matches(isDisplayed()));
+            awaitSummary(scenario, text("book_notes_summary", 2, 2, 2, 0));
+            onView(withText(text("book_notes_book_count", 1, 2, 0))).check(matches(isDisplayed()));
             screenshot("archive");
             openActionBarOverflowOrOptionsMenu(context);
             onView(withText(text("export"))).check(matches(isDisplayed()));
@@ -256,11 +353,11 @@ public class BookNotesUiTest {
         for (boolean toolbar : new boolean[]{true, false}) {
             try (ActivityScenario<Activity> scenario = ActivityScenario.launch(intent(false))) {
                 scenario.onActivity(activity -> query(activity, author, false));
-                awaitSummary(scenario, text("book_notes_summary", 2, 2, 2));
+                awaitSummary(scenario, text("book_notes_summary", 2, 2, 2, 0));
                 onView(withText("长夜书店")).perform(click());
                 awaitCount(scenario, 3);
                 if (toolbar) toolbarBack(); else pressBack();
-                awaitSummary(scenario, text("book_notes_summary", 2, 2, 2));
+                awaitSummary(scenario, text("book_notes_summary", 2, 2, 2, 0));
                 scenario.onActivity(activity -> {
                     assertFalse(activity.isFinishing());
                     assertEquals(View.GONE, activity.findViewById(id("book_heading")).getVisibility());
@@ -283,7 +380,7 @@ public class BookNotesUiTest {
         }
         try (ActivityScenario<Activity> scenario = ActivityScenario.launch(intent(false))) {
             scenario.onActivity(activity -> query(activity, author, true));
-            awaitSummary(scenario, text("book_notes_summary", 22, 22, 2));
+            awaitSummary(scenario, text("book_notes_summary", 22, 22, 2, 0));
             closeSoftKeyboard();
             for (int i = 0; i < 6; i++)
                 onView(withId(id("recycler_view"))).perform(swipeUp());
@@ -301,7 +398,7 @@ public class BookNotesUiTest {
             scenario.recreate();
             awaitCount(scenario, 3);
             toolbarBack();
-            awaitSummary(scenario, text("book_notes_summary", 22, 22, 2));
+            awaitSummary(scenario, text("book_notes_summary", 22, 22, 2, 0));
             instrumentation.waitForIdleSync();
             scenario.onActivity(activity -> {
                 View search = activity.findViewById(id("search_view"));
@@ -310,7 +407,7 @@ public class BookNotesUiTest {
                 assertListPosition(activity, firstName.get(), top[0]);
             });
             scenario.recreate();
-            awaitSummary(scenario, text("book_notes_summary", 22, 22, 2));
+            awaitSummary(scenario, text("book_notes_summary", 22, 22, 2, 0));
             instrumentation.waitForIdleSync();
             scenario.onActivity(activity -> assertListPosition(activity, firstName.get(), top[0]));
             screenshot("navigation-restored");
@@ -329,7 +426,7 @@ public class BookNotesUiTest {
     @Test public void toolbarBackExitsBatchAndSearchBeforeReturningToBooks() throws Exception {
         try (ActivityScenario<Activity> scenario = ActivityScenario.launch(intent(false))) {
             scenario.onActivity(activity -> query(activity, author, false));
-            awaitSummary(scenario, text("book_notes_summary", 2, 2, 2));
+            awaitSummary(scenario, text("book_notes_summary", 2, 2, 2, 0));
             onView(withText("长夜书店")).perform(click());
             awaitCount(scenario, 3);
             scenario.onActivity(activity -> activity.findViewById(id("note_body")).performLongClick());
@@ -345,7 +442,7 @@ public class BookNotesUiTest {
             onView(withId(id("search_view"))).check(matches(withEffectiveVisibility(Visibility.GONE)));
             onView(withId(id("book_heading"))).check(matches(isDisplayed()));
             toolbarBack();
-            awaitSummary(scenario, text("book_notes_summary", 2, 2, 2));
+            awaitSummary(scenario, text("book_notes_summary", 2, 2, 2, 0));
         }
     }
     @Test public void continueReadingRestoresSavedProgressWhileItemClickCarriesPosition() throws Exception {
@@ -424,7 +521,7 @@ public class BookNotesUiTest {
     @Test public void missingBookShowsReadableEditableArchiveWithoutResumeButton() throws Exception {
         try (ActivityScenario<Activity> scenario = ActivityScenario.launch(intent(false))) {
             scenario.onActivity(activity -> query(activity, author, false));
-            awaitSummary(scenario, text("book_notes_summary", 2, 2, 2));
+            awaitSummary(scenario, text("book_notes_summary", 2, 2, 2, 0));
             onView(withText("山海来信")).perform(click());
             awaitCount(scenario, 1);
             onView(withId(id("tv_continue"))).check(matches(withEffectiveVisibility(Visibility.GONE)));
@@ -505,6 +602,7 @@ public class BookNotesUiTest {
     }
 
     @Test public void nightEinkAndLandscapeKeepClassificationAndReadingActionsVisible() throws Exception {
+        seedReview("initial", "长夜书店", "夜间、墨水屏和横屏下也能查看书评摘要。", "2026-10-18", 9);
         SharedPreferences prefs = context.getSharedPreferences(context.getPackageName() + "_preferences", Context.MODE_PRIVATE);
         String original = prefs.getString("themeMode", "0");
         try {

@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="book_notes">书签与标注</string>
-    <string name="book_notes_summary">%1$d 本书 · %2$d 个书签 · %3$d 条标注</string>
-    <string name="book_notes_book_count">%1$d 个书签 · %2$d 条标注</string>
+    <string name="book_notes">阅读笔记</string>
+    <string name="book_notes_summary">%1$d 本书 · %2$d 个书签 · %3$d 条标注 · %4$d 篇书评</string>
+    <string name="book_notes_book_count">%1$d 个书签 · %2$d 条标注 · %3$d 篇书评</string>
+    <string name="book_notes_description">按书归档书签、标注与书评</string>
     <string name="book_notes_recent">最近添加</string>
     <string name="book_notes_chapter_order">章节顺序</string>
-    <string name="book_notes_search">搜索书名、作者、原文、备注、笔记或标签</string>
-    <string name="book_notes_empty">还没有书签或标注</string>
-    <string name="book_notes_search_empty">没有符合条件的书签或标注</string>
+    <string name="book_notes_search">搜索书名、作者、原文、笔记、标签或书评</string>
+    <string name="book_notes_empty">还没有书签、标注或书评</string>
+    <string name="book_notes_search_empty">没有符合条件的阅读笔记</string>
     <string name="book_notes_unavailable">原书不可用，可查看、编辑和导出摘录</string>
     <string name="book_notes_ambiguous">存在同名书籍，保留为独立书签归档</string>
     <string name="book_notes_location_unavailable">原章节已变更，暂时无法定位；摘录内容仍完整保留</string>
@@ -15,6 +16,9 @@
     <string name="book_notes_tab_all">全部 %1$d</string>
     <string name="book_notes_tab_bookmark">书签 %1$d</string>
     <string name="book_notes_tab_highlight">标注 %1$d</string>
+    <string name="book_notes_tab_review">书评 %1$d</string>
+    <string name="book_notes_rating">%1$.1f</string>
+    <string name="book_notes_review_date">%1$s · %2$s</string>
     <string name="book_notes_note">笔记：%1$s</string>
     <string name="book_notes_highlight">标注</string>
     <string name="book_notes_remark">备注：%1$s</string>
@@ -29,7 +33,7 @@
     <string name="book_notes_no_tags">暂无已使用标签</string>
     <string name="book_notes_tags">标签</string>
     <string name="book_notes_progress">已读 %1$s</string>
-    <string name="book_notes_latest">最近添加 %1$s</string>
+    <string name="book_notes_latest">最近记录 %1$s</string>
     <string name="book_notes_actions">摘录操作</string>
-    <string name="book_notes_load_failed">书签与标注加载失败，请返回后重试</string>
+    <string name="book_notes_load_failed">阅读笔记加载失败，请返回后重试</string>
 </resources>

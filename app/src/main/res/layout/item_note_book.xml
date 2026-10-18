@@ -8,16 +8,23 @@
         android:layout_marginEnd="14dp" android:importantForAccessibility="no" />
     <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
         android:layout_weight="1" android:orientation="vertical">
-        <TextView android:id="@+id/tv_name" android:layout_width="match_parent"
+        <LinearLayout android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:orientation="horizontal"
+            android:gravity="center_vertical">
+        <TextView android:id="@+id/tv_name" android:layout_width="0dp" android:layout_weight="1"
             android:layout_height="wrap_content" android:textSize="16sp"
             android:textColor="@color/primaryText" android:maxLines="2" android:ellipsize="end" />
+        <io.legado.app.ui.widget.text.AccentTextView android:id="@+id/tv_rating"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginStart="8dp" android:textSize="14sp" android:visibility="gone" />
+        </LinearLayout>
         <TextView android:id="@+id/tv_author" android:layout_width="match_parent"
             android:layout_height="wrap_content" android:layout_marginTop="3dp"
             android:maxLines="1" android:ellipsize="end"
             android:textSize="12sp" android:textColor="@color/secondaryText" />
         <TextView android:id="@+id/tv_counts" android:layout_width="match_parent"
             android:layout_height="wrap_content" android:layout_marginTop="5dp"
-            android:textSize="13sp" android:textColor="@color/secondaryText" />
+            android:textSize="12sp" android:textColor="@color/secondaryText" />
         <TextView android:id="@+id/tv_date" android:layout_width="match_parent"
             android:layout_height="wrap_content" android:layout_marginTop="3dp"
             android:textSize="11sp" android:textColor="@color/secondaryText" />
