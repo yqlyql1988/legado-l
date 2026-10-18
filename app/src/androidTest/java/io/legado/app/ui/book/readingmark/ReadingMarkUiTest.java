@@ -146,7 +146,7 @@ public class ReadingMarkUiTest {
 
     @Before public void setup() {
         launch("ui.about.ReadRecordActivity");
-        ready("tv_reading_time");
+        ready("title_bar");
         // Wait for the first Room query, not just inflation of an initially empty summary.
         await(() -> {
             boolean[] loaded = {false};
