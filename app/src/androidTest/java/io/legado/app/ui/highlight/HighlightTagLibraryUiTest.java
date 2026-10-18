@@ -264,4 +264,27 @@ public class HighlightTagLibraryUiTest {
         assertEquals(links, snapshot("highlight_tag_links"));
         assertEquals(orders, snapshot("highlight_tag_orders"));
     }
+
+    @Test public void switchingThenDeletingOldLibraryEntryKeepsTheChosenAssociation() {
+        insertTag(book, false);
+        long time = insertHighlight(book);
+        String shared = token + "-shared";
+        db.execSQL("INSERT INTO highlight_tags (id,name,style,sortOrder,bookUrl,note,common)"
+            + " VALUES (?,?,?,998,?,'常用同名标签',1)",
+            new Object[]{shared, name, "{\"italic\":true}", otherBook});
+        launch();
+        addSearch();
+        onView(allOf(withId(id("tv_status")),
+            withParent(hasDescendant(withText("★ " + name))))).inRoot(isDialog()).perform(click());
+        onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click());
+        openLibrary();
+        onView(allOf(withId(id("btn_more")),
+            withParent(hasDescendant(withText("标签说明"))))).perform(click());
+        onView(withText(text("highlight_tag_delete_library"))).perform(click());
+        onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click());
+        save();
+        await(() -> scalar("SELECT count(*) FROM highlight_tags WHERE id=?", token) == 0);
+        assertEquals(1, scalar("SELECT count(*) FROM highlight_tag_links WHERE highlightTime=? AND tagId=?", "" + time, shared));
+        assertEquals(1, scalar("SELECT count(*) FROM highlights WHERE time=? AND note='标注笔记'", "" + time));
+    }
 }

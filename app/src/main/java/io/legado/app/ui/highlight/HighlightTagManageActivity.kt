@@ -267,7 +267,6 @@ class HighlightTagManageActivity : BaseActivity<ActivityHighlightTagBinding>(),
             .setPositiveButton(R.string.delete) { _, _ ->
                 tags.removeAll { it.id == tag.id }
                 bookOrder = bookOrder.filterNot { it.tagId == tag.id }
-                replacements.entries.removeAll { it.key == tag.id || it.value == tag.id }
                 render()
             }.show()
     }
@@ -291,12 +290,14 @@ class HighlightTagManageActivity : BaseActivity<ActivityHighlightTagBinding>(),
             try {
                 withContext(IO) {
                     appDb.runInTransaction {
-                        appDb.highlightTagDao.saveDefinitions(tags.toList(), bookUrl)
-                        if (bookUrl.isNotEmpty() && bookOrder != originalOrder)
-                            appDb.highlightTagDao.saveBookLabels(bookUrl, bookOrder)
+                        // Apply confirmed switches before deleting definitions so removing
+                        // the old library entry cannot cascade away the chosen association.
                         replacements.forEach { (from, to) ->
                             appDb.highlightTagDao.useLibraryLabel(bookUrl, from, to)
                         }
+                        appDb.highlightTagDao.saveDefinitions(tags.toList(), bookUrl)
+                        if (bookUrl.isNotEmpty() && bookOrder != originalOrder)
+                            appDb.highlightTagDao.saveBookLabels(bookUrl, bookOrder)
                     }
                 }
                 ReadBook.upHighlightTags()
