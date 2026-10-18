@@ -34,6 +34,7 @@ import static androidx.test.espresso.matcher.RootMatchers.*;
 import static androidx.test.espresso.matcher.ViewMatchers.*;
 import static org.junit.Assert.*;
 import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.containsString;
 
 /** Uses Android UI and SQL so the same checks run against the optimized release APK. */
 @RunWith(AndroidJUnit4.class)
@@ -73,15 +74,21 @@ public class OptimizedReadStatisticsTest {
         return context.getString(value, args);
     }
     private void checkStatisticsHelp(String expectedDate, String screenshotName) throws Exception {
-        String explanation = string("read_statistics_coverage", expectedDate) + "\n\n" +
-            string("read_statistics_scope_explanation") + "\n\n" + string("read_statistics_hour_help");
-        onView(withText(explanation)).check(doesNotExist());
+        onView(withText(containsString("已分时："))).check(doesNotExist());
+        onView(withText(containsString("无时段明细："))).check(doesNotExist());
         openActionBarOverflowOrOptionsMenu(context);
         onView(withText(string("read_statistics_help"))).inRoot(isPlatformPopup()).perform(click());
-        onView(withText(explanation)).inRoot(isDialog()).check(matches(isDisplayed()));
+        onView(withId(android.R.id.message)).inRoot(isDialog()).check(matches(allOf(isDisplayed(),
+            withText(containsString(string("read_statistics_coverage", expectedDate))),
+            withText(containsString(string("read_statistics_scope_explanation"))),
+            withText(containsString("时段明细 · ")),
+            withText(containsString("已分时：")),
+            withText(containsString("无时段明细：")),
+            withText(containsString(string("read_statistics_hour_help"))))));
         screenshot(screenshotName);
         onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click());
-        onView(withText(explanation)).check(doesNotExist());
+        onView(withText(containsString("已分时："))).check(doesNotExist());
+        onView(withText(containsString("无时段明细："))).check(doesNotExist());
     }
     private void screenshot(String name) throws Exception {
         InstrumentationRegistry.getInstrumentation().waitForIdleSync();
