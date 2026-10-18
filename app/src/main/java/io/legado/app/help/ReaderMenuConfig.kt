@@ -36,6 +36,9 @@ data class ReaderMenuConfig(
 
         val ALL_KEYS = listOf(
             "bookmark",
+            "readingMark",
+            "abandonHere",
+            "markFinished",
             "highlightRule",
             "editContent",
             "pageAnim",

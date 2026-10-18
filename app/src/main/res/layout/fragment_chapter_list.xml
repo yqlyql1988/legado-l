@@ -63,4 +63,19 @@
             tools:ignore="UnusedAttribute" />
     </LinearLayout>
 
+    <TextView
+        android:id="@+id/toc_reading_mark_empty"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:padding="24dp"
+        android:gravity="center"
+        android:text="@string/reading_mark_empty_filter"
+        android:textColor="@color/secondaryText"
+        android:textSize="14sp"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/recycler_view"
+        app:layout_constraintBottom_toBottomOf="@id/recycler_view" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

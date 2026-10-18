@@ -32,6 +32,16 @@
         android:visible="true">
 
         <item
+            android:id="@+id/menu_only_skipped"
+            android:checkable="true"
+            android:title="@string/reading_mark_only_skipped"
+            app:showAsAction="never" />
+        <item
+            android:id="@+id/menu_reading_mark"
+            android:title="@string/reading_mark"
+            app:showAsAction="never" />
+
+        <item
             android:id="@+id/menu_reverse_toc"
             android:checkable="true"
             android:title="@string/reverse_toc"

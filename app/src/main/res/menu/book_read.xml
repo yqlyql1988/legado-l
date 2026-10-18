@@ -50,6 +50,19 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_reading_mark"
+        android:title="@string/reading_mark"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_abandon_here"
+        android:title="@string/reading_mark_abandon_here"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_mark_finished"
+        android:title="@string/reading_mark_finish"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_highlight_rule"
         android:title="@string/highlight_rule"
         app:showAsAction="never" />

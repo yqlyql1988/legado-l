@@ -21,6 +21,55 @@ import java.util.UUID
 @RunWith(AndroidJUnit4::class)
 class MigrationTest {
 
+    @Test
+    fun migrate118To119AddsOnlyEmptyReadingMarksAndPreservesAnnotationsAndDeviceHistory() {
+        val name = "migration-reading-marks"
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        context.deleteDatabase(name)
+        helper.createDatabase(name, 118).apply {
+            execSQL("insert into books (bookUrl, name, author, durChapterIndex, durChapterPos) values ('mark-book', 'Book', 'Author', 8, 345)")
+            execSQL("""insert into bookmarks
+                (time, bookName, bookAuthor, chapterIndex, chapterPos, chapterName, bookText, content)
+                values (123, 'Book', 'Author', 2, 8, 'Chapter', 'Text', 'Note')""")
+            execSQL("""insert into highlights
+                (time, bookUrl, chapterUrl, bookName, bookAuthor, chapterIndex, chapterPos,
+                chapterPosEnd, chapterName, bookText, style, note)
+                values (124, 'mark-book', 'c2', 'Book', 'Author', 2, 8, 18, 'Chapter', 'Text', '', 'Highlight')""")
+            for (device in listOf("device-1", "device-2")) {
+                execSQL("""insert into readRecord (deviceId, bookName, author, readTime, lastRead)
+                    values ('$device', 'Book', 'Author', 300, 400)""")
+                execSQL("""insert into readRecordDaily (deviceId, bookName, author, date, readTime)
+                    values ('$device', 'Book', 'Author', '2026-10-18', 300)""")
+                execSQL("""insert into readRecordHourly (deviceId, bookName, author, date, hour, readTime)
+                    values ('$device', 'Book', 'Author', '2026-10-18', 12, 300)""")
+            }
+            close()
+        }
+        val db = Room.databaseBuilder(context, AppDatabase::class.java, name)
+            .addMigrations(*ALL_MIGRATIONS).build()
+        try {
+            assertTrue(db.bookReadingMarkDao.all().isEmpty())
+            assertEquals(8, db.bookDao.getBook("mark-book")?.durChapterIndex)
+            assertEquals(345, db.bookDao.getBook("mark-book")?.durChapterPos)
+            for (table in listOf("readRecord", "readRecordDaily", "readRecordHourly")) {
+                db.openHelper.readableDatabase.query("select count(*), sum(readTime) from $table where bookName = 'Book'").use {
+                    assertTrue(it.moveToFirst())
+                    assertEquals(2, it.getInt(0))
+                    assertEquals(600, it.getLong(1))
+                }
+            }
+            for (table in listOf("bookmarks", "highlights")) {
+                db.openHelper.readableDatabase.query("select count(*) from $table where bookName = 'Book'").use {
+                    assertTrue(it.moveToFirst())
+                    assertEquals(1, it.getInt(0))
+                }
+            }
+        } finally {
+            db.close()
+            context.deleteDatabase(name)
+        }
+    }
+
     private val TEST_DB = "migration-test"
 
     private val ALL_MIGRATIONS = DatabaseMigrations.migrations

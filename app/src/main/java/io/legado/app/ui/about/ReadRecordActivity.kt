@@ -15,12 +15,15 @@ import android.widget.ImageView
 import androidx.appcompat.widget.SearchView
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import io.legado.app.R
 import io.legado.app.base.BaseActivity
 import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.BookReadingMark
 import io.legado.app.data.entities.ReadRecordShow
 import io.legado.app.data.entities.ReadRecordAuthors
 import io.legado.app.databinding.ActivityReadRecordBinding
@@ -32,6 +35,9 @@ import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.backgroundColor
+import io.legado.app.ui.book.readingmark.ReadingMarkDialog
+import io.legado.app.ui.book.readingmark.readingMarkStatus
+import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.cnCompare
@@ -65,6 +71,7 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
     private val adapter by lazy { RecordAdapter(this) }
     private var dataJob: Job? = null
     private var booksByIdentity: Map<Pair<String, String>, Book> = emptyMap()
+    private var readingMarksByIdentity: Map<Pair<String, String>, BookReadingMark> = emptyMap()
     private var sortMode
         get() = LocalConfig.getInt("readRecordSort")
         set(value) {
@@ -78,6 +85,14 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         initView()
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                appDb.bookReadingMarkDao.flowAll().collect { marks ->
+                    readingMarksByIdentity = marks.associateBy { it.bookName to it.bookAuthor }
+                    adapter.notifyItemRangeChanged(0, adapter.itemCount)
+                }
+            }
+        }
     }
 
     override fun onResume() {
@@ -308,6 +323,8 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
             } else {
                 item.displayAuthor.ifBlank { getString(R.string.read_record_no_author) }
             }
+            val markStatus = readingMarksByIdentity[item.bookName to item.author]
+                ?.status?.takeIf { it != BookReadingMark.UNMARKED }?.let(context::readingMarkStatus)
             binding.compact.root.isVisible = AppConfig.readRecordSimpleLayout
             binding.enhanced.root.isVisible = !AppConfig.readRecordSimpleLayout
             binding.compact.apply {
@@ -316,9 +333,9 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
                 tvAuthor.text = context.getString(R.string.author_show, author)
                 tvReadingTime.text = formatDuring(item.readTime, AppConfig.readRecordUseDays, AppConfig.readRecordShowSeconds)
                 if (item.lastRead > 0) {
-                    tvLastReadTime.text = dateFormat.format(item.lastRead)
+                    tvLastReadTime.text = listOfNotNull(dateFormat.format(item.lastRead), markStatus).joinToString(" · ")
                 } else {
-                    tvLastReadTime.text = ""
+                    tvLastReadTime.text = markStatus.orEmpty()
                 }
             }
             if (!AppConfig.readRecordSimpleLayout) {
@@ -330,7 +347,9 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
                         ?: item.lastChapterTitle?.takeIf { it.isNotBlank() }
                         ?: getString(R.string.read_record_no_chapter)
                     tvReadingTime.text = formatDuring(item.readTime, AppConfig.readRecordUseDays, AppConfig.readRecordShowSeconds)
-                    tvLastReadTime.text = if (item.lastRead > 0) dateFormat.format(item.lastRead) else ""
+                    tvLastReadTime.text = listOfNotNull(
+                        dateFormat.format(item.lastRead).takeIf { item.lastRead > 0 }, markStatus,
+                    ).joinToString(" · ")
                     loadCover(ivCover, item)
                 }
             }
@@ -341,6 +360,18 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
                 root.setOnClickListener {
                     val item = getItemByLayoutPosition(holder.layoutPosition) ?: return@setOnClickListener
                     openRecordedBook(item)
+                }
+                root.setOnLongClickListener {
+                    getItemByLayoutPosition(holder.layoutPosition)?.let { item ->
+                        val book = booksByIdentity[item.bookName to item.author] ?: Book(
+                            name = item.bookName, author = item.author,
+                            durChapterTitle = item.lastChapterTitle,
+                            durChapterIndex = item.lastChapterIndex.coerceAtLeast(0),
+                            durChapterPos = item.lastChapterPos,
+                        )
+                        showDialogFragment(ReadingMarkDialog.newInstance(book))
+                    }
+                    true
                 }
                 compact.tvRemove.setOnClickListener {
                     getItemByLayoutPosition(holder.layoutPosition)?.let { item ->

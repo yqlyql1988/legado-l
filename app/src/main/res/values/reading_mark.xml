@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="reading_mark">阅读标记</string>
+    <string name="reading_mark_unmarked">未标记</string>
+    <string name="reading_mark_reading">在读</string>
+    <string name="reading_mark_abandoned">已弃读</string>
+    <string name="reading_mark_finished">已读完</string>
+    <string name="reading_mark_abandon_here">在此弃读</string>
+    <string name="reading_mark_finish">标记读完</string>
+    <string name="reading_mark_date">标记日期：%1$s</string>
+    <string name="reading_mark_reason">弃读原因（可选）</string>
+    <string name="reading_mark_position">标记位置：%1$s</string>
+    <string name="reading_mark_no_position">尚无阅读位置</string>
+    <string name="reading_mark_current">使用当前阅读位置</string>
+    <string name="reading_mark_locate">跳转到标记位置</string>
+    <string name="reading_mark_unavailable">原章节已变更或原书不可用，暂时无法定位；记录仍完整保留</string>
+    <string name="reading_mark_chapter">第%1$d项 · %2$s</string>
+    <string name="reading_mark_position_detail">%1$s · 已保存章内位置</string>
+    <string name="reading_mark_skipped">跳过未看</string>
+    <string name="reading_mark_skip_count">跳过 %1$d 章</string>
+    <string name="reading_mark_no_skipped">尚未标记未看章节</string>
+    <string name="reading_mark_range">选择章节区间</string>
+    <string name="reading_mark_from">起始章节</string>
+    <string name="reading_mark_to">结束章节</string>
+    <string name="reading_mark_range_invalid">结束章节应在起始章节之后</string>
+    <string name="reading_mark_skip_add">标记为未看</string>
+    <string name="reading_mark_skip_remove">补看后取消标记</string>
+    <string name="reading_mark_skip_one">标记本章未看</string>
+    <string name="reading_mark_unskip_one">取消本章未看标记</string>
+    <string name="reading_mark_only_skipped">只看跳过未看的章节</string>
+    <string name="reading_mark_catalog_hint">长按章节可记录未看；目录菜单可筛选查看</string>
+    <string name="reading_mark_empty_catalog">当前没有可选章节，请先加载目录</string>
+    <string name="reading_mark_range_summary">%1$s — %2$s（%3$d章）</string>
+    <string name="reading_mark_open_chapter">阅读此章节</string>
+    <string name="reading_mark_saved">阅读标记已保存</string>
+    <string name="reading_mark_failed">阅读标记保存失败，请重试</string>
+    <string name="reading_mark_full_title">查看完整章节标题</string>
+    <string name="reading_mark_empty_filter">没有可定位的未看章节，可从阅读标记查看原始记录</string>
+    <string name="reading_mark_clear">清除全部阅读标记</string>
+    <string name="reading_mark_clear_confirm">清除本书的阅读状态、位置、原因和未看章节？</string>
+    <string name="reading_mark_save_before_open">先保存本次阅读标记修改，再跳转到章节？</string>
+    <string name="reading_mark_save_and_open">保存并跳转</string>
+</resources>
