@@ -60,6 +60,8 @@ class CrossPageSelectionUiTest {
     private var cursor: View? = null
     private var downTime = 0L
     private var pointer = floatArrayOf()
+    private var touchOffsetX = 0f
+    private var touchOffsetY = 0f
 
     @Before fun prepare() {
         prefs.edit().putBoolean(PreferKey.crossPageTextSelection, true)
@@ -130,7 +132,8 @@ class CrossPageSelectionUiTest {
         SystemClock.sleep(700)
         onReader { read ->
             assertTrue(read.isTextSelected)
-            y = read.curPage.selectionBottom + 2f
+            x = read.curPage.selectionRight - 2f
+            y = read.curPage.selectionBottom - 2f
             val event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(),
                 MotionEvent.ACTION_MOVE, x, y, 0)
             try { read.onTouchEvent(event) } finally { event.recycle() }
@@ -141,6 +144,52 @@ class CrossPageSelectionUiTest {
                 MotionEvent.ACTION_UP, x, y, 0)
             try { read.onTouchEvent(event) } finally { event.recycle() }
         }
+        verifyTextAndAnchors()
+    }
+
+    @Test fun edgesOutsideTheTwoCornersNeverTurnPages() {
+        onReader {
+            ReadBook.setPageIndex(2)
+            it.upContent(resetPageOffset = true)
+        }
+        await { it.curPage.textPage.index == 2 }
+        val positions = listOf<(ReadView) -> Pair<Float, Float>>(
+            { (it.curPage.selectionLeft + it.curPage.selectionRight) / 2f to it.curPage.selectionTop + 2f },
+            { (it.curPage.selectionLeft + it.curPage.selectionRight) / 2f to it.curPage.selectionBottom - 2f },
+            { it.curPage.selectionRight - 2f to it.curPage.selectionTop + 2f },
+            { it.curPage.selectionLeft + 2f to it.curPage.selectionBottom - 2f },
+            { it.curPage.selectionLeft - 2f to it.curPage.selectionTop + 2f },
+            { it.curPage.selectionRight + 2f to it.curPage.selectionBottom - 2f },
+            { it.curPage.selectionRight - 2f to it.curPage.selectionBottom + 2f },
+            { it.curPage.selectionLeft + 2f to it.curPage.selectionTop - 2f },
+        )
+        for (position in positions) {
+            selectWord()
+            dragHandle(false, false, position)
+            SystemClock.sleep(1000)
+            assertEquals("Only the two text corners may turn pages", 2, pageIndex())
+            release()
+            onReader { assertTrue(it.isTextSelected) }
+        }
+    }
+
+    @Test fun leavingTheCornerCancelsPendingAndRepeatingTurnsAndReentryWaitsAgain() {
+        selectWord()
+        val initial = pageIndex()
+        dragHandle(false, false)
+        SystemClock.sleep(500)
+        moveHandleTo { (it.curPage.selectionLeft + it.curPage.selectionRight) / 2f to it.curPage.selectionBottom - 2f }
+        SystemClock.sleep(500)
+        assertEquals("Leaving must cancel the first turn", initial, pageIndex())
+        moveHandleTo { it.curPage.selectionRight - 2f to it.curPage.selectionBottom - 2f }
+        SystemClock.sleep(500)
+        assertEquals("Reentry must wait the full dwell again", initial, pageIndex())
+        await { it.curPage.textPage.index > initial }
+        moveHandleTo { (it.curPage.selectionLeft + it.curPage.selectionRight) / 2f to it.curPage.selectionBottom - 2f }
+        val stopped = pageIndex()
+        SystemClock.sleep(1200)
+        assertEquals("Leaving must cancel repeating turns", stopped, pageIndex())
+        release()
         verifyTextAndAnchors()
     }
 
@@ -284,7 +333,10 @@ class CrossPageSelectionUiTest {
         }
     }
 
-    private fun dragHandle(start: Boolean, top: Boolean) {
+    private fun dragHandle(
+        start: Boolean, top: Boolean,
+        position: ((ReadView) -> Pair<Float, Float>)? = null,
+    ) {
         onReader { read ->
             val activity = read.context as ReadBookActivity
             cursor = activity.findViewById(if (start) R.id.cursor_left else R.id.cursor_right)
@@ -295,13 +347,35 @@ class CrossPageSelectionUiTest {
             val x = location[0] + target.width / 2f
             val y = location[1] + target.height / 2f
             downTime = SystemClock.uptimeMillis()
+            touchOffsetX = SelectCursorGeometry.touchOffset(target.width / 2f,
+                target.paddingLeft, target.width - target.paddingLeft - target.paddingRight)
+            touchOffsetY = SelectCursorGeometry.touchOffset(target.height / 2f,
+                target.paddingTop, target.height - target.paddingTop - target.paddingBottom)
             dispatch(MotionEvent.ACTION_DOWN, x, y)
-            val readerLocation = IntArray(2)
-            read.getLocationOnScreen(readerLocation)
-            pointer = floatArrayOf(readerLocation[0] + read.width * .65f,
-                readerLocation[1] + (if (top) read.curPage.selectionTop - 2 else read.curPage.selectionBottom + 24))
-            dispatch(MotionEvent.ACTION_MOVE, pointer[0], pointer[1])
+            val point = position?.invoke(read) ?: (
+                if (top) read.curPage.selectionLeft + 2f to read.curPage.selectionTop + 2f
+                else read.curPage.selectionRight - 2f to read.curPage.selectionBottom - 2f)
+            moveHandleTo(read, point)
         }
+    }
+
+    private fun moveHandleTo(position: (ReadView) -> Pair<Float, Float>) {
+        onReader { read -> moveHandleTo(read, position(read)) }
+    }
+
+    private fun moveHandleTo(read: ReadView, point: Pair<Float, Float>) {
+        val target = cursor!!
+        val readerLocation = IntArray(2)
+        read.getLocationOnScreen(readerLocation)
+        val iconWidth = target.width - target.paddingLeft - target.paddingRight
+        val iconHeight = target.height - target.paddingTop - target.paddingBottom
+        val movingStart = if (target.id == R.id.cursor_left) !read.curPage.getReverseStartCursor()
+            else read.curPage.getReverseEndCursor()
+        pointer = floatArrayOf(
+            readerLocation[0] + point.first - touchOffsetX - if (movingStart) iconWidth else -iconWidth,
+            readerLocation[1] + point.second - touchOffsetY + iconHeight,
+        )
+        dispatch(MotionEvent.ACTION_MOVE, pointer[0], pointer[1])
     }
 
     private fun release(action: Int = MotionEvent.ACTION_UP) {

@@ -946,9 +946,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
     private fun updateSelectionEdge(x: Float, y: Float) {
         selectionDragX = x
         selectionDragY = y
-        val direction = if (x in 0f..width.toFloat()) SelectionEdgeWait.direction(y,
-            curPage.selectionTop.toFloat(), curPage.selectionBottom.toFloat(),
-            24.dpToPx().toFloat(), selectionEdgeWait.direction) else 0
+        val direction = selectionEdgeDirection(x, y)
         if (direction != blockedSelectionDirection) {
             blockedSelectionDirection = 0
             selectionEdgeMessage = null
@@ -962,6 +960,12 @@ class ReadView(context: Context, attrs: AttributeSet) :
         invalidate()
     }
 
+    private fun selectionEdgeDirection(x: Float, y: Float) =
+        SelectionEdgeWait.direction(x, y,
+            curPage.selectionLeft.toFloat(), curPage.selectionTop.toFloat(),
+            curPage.selectionRight.toFloat(), curPage.selectionBottom.toFloat(),
+            48.dpToPx().toFloat(), 24.dpToPx().toFloat())
+
     private fun continueSelectionAtEdge() {
         if (!isSelectionDragging || !isTextSelected || !AppConfig.crossPageTextSelection) {
             endSelectionDrag()
@@ -974,6 +978,10 @@ class ReadView(context: Context, attrs: AttributeSet) :
         }
         val direction = selectionEdgeWait.direction
         if (direction == 0) return
+        if (selectionEdgeDirection(selectionDragX, selectionDragY) != direction) {
+            updateSelectionEdge(selectionDragX, selectionDragY)
+            return
+        }
         val moved = if (isScroll) {
             curPage.scrollCrossPageSelection(-direction * 4.dpToPx())
         } else {

@@ -63,13 +63,19 @@ internal class SelectionEdgeWait {
         const val FIRST_WAIT = 800L
         const val REPEAT_WAIT = 1000L
 
-        fun direction(y: Float, top: Float, bottom: Float, band: Float, previous: Int): Int {
-            val hysteresis = band / 3
+        fun direction(
+            x: Float, y: Float,
+            left: Float, top: Float, right: Float, bottom: Float,
+            cornerWidth: Float, cornerHeight: Float,
+        ): Int {
+            if (right <= left || bottom <= top ||
+                x !in left..right || y !in top..bottom
+            ) return 0
+            val width = cornerWidth.coerceAtMost((right - left) / 2)
+            val height = cornerHeight.coerceAtMost((bottom - top) / 2)
             return when {
-                previous < 0 && y < top + band + hysteresis -> -1
-                previous > 0 && y > bottom - band - hysteresis -> 1
-                y < top + band -> -1
-                y > bottom - band -> 1
+                x <= left + width && y <= top + height -> -1
+                x >= right - width && y >= bottom - height -> 1
                 else -> 0
             }
         }

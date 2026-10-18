@@ -1,6 +1,6 @@
 <resources>
     <string name="cross_page_text_selection">跨页选择文字</string>
-    <string name="cross_page_text_selection_summary">拖动选字手柄至正文顶部或底部，停留0.8秒后在同章内翻页，持续停留每秒翻一页</string>
+    <string name="cross_page_text_selection_summary">拖动选字手柄至正文左上角向前翻页、右下角向后翻页；停留0.8秒开始，持续停留每秒翻一页，离开角落立即停止，仅限同章</string>
     <string name="cross_page_selection_count">%1$s · 已选%2$d字</string>
     <string name="cross_page_selection_boundary">已到本章边界</string>
     <string name="cross_page_selection_loading">正在等待章节排版</string>

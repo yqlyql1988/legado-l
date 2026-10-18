@@ -525,8 +525,10 @@ class PageView(context: Context) : FrameLayout(context) {
     internal val selectionChapter get() = binding.contentTextView.selectionChapter
     internal val selectionStartPosition get() = binding.contentTextView.selectionStartPosition
     internal val selectionCharacterCount get() = binding.contentTextView.selectionCharacterCount
-    internal val selectionTop get() = headerHeight + ChapterProvider.visibleRect.top
-    internal val selectionBottom get() = headerHeight + ChapterProvider.visibleRect.bottom
+    internal val selectionLeft get() = imgBgPaddingStart + ChapterProvider.paddingLeft
+    internal val selectionRight get() = imgBgPaddingStart + ChapterProvider.visibleRight
+    internal val selectionTop get() = headerHeight + ChapterProvider.paddingTop
+    internal val selectionBottom get() = headerHeight + ChapterProvider.visibleBottom
 
     fun selectStartMoveIndex(
         relativePagePos: Int,
