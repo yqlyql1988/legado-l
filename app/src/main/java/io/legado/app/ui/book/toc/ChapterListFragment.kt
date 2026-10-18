@@ -7,10 +7,7 @@ import android.graphics.PorterDuff
 import android.os.Bundle
 import android.view.View
 import androidx.fragment.app.activityViewModels
-import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.repeatOnLifecycle
 import io.legado.app.R
 import io.legado.app.base.VMBaseFragment
 import io.legado.app.constant.EventBus
@@ -18,9 +15,6 @@ import io.legado.app.constant.AppLog
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
-import io.legado.app.data.entities.BookReadingMark
-import io.legado.app.data.entities.ReadingMarkResolver
-import io.legado.app.data.entities.withSkipped
 import io.legado.app.databinding.FragmentChapterListBinding
 import io.legado.app.help.audio.AudioCacheManager
 import io.legado.app.help.book.BookHelp
@@ -32,7 +26,6 @@ import io.legado.app.help.book.isVideo
 import io.legado.app.help.book.simulatedTotalChapterNum
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.theme.bottomBackground
-import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.theme.getPrimaryTextColor
 import io.legado.app.model.AudioCacheKey
 import io.legado.app.model.AudioCacheStateChanged
@@ -42,14 +35,10 @@ import io.legado.app.model.localBook.EpubTocNode
 import io.legado.app.model.localBook.PdfOutline
 import io.legado.app.model.localBook.PdfOutlineNode
 import io.legado.app.ui.widget.recycler.UpLinearLayoutManager
-import io.legado.app.ui.book.readingmark.ReadingMarkDialog
 import io.legado.app.ui.widget.recycler.VerticalDivider
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.observeEvent
-import io.legado.app.utils.showDialogFragment
-import io.legado.app.utils.toastOnUi
-import io.legado.app.utils.longToastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers.IO
@@ -88,8 +77,6 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
     private val pendingAudioCacheChanges = linkedMapOf<AudioCacheKey, Boolean>()
     private var pendingScrollItemKey: String? = null
     private var pendingChapterScroll: Int? = null
-    private var readingMarkJob: Job? = null
-    private var readingMark: BookReadingMark? = null
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) = binding.run {
         viewModel.chapterListCallBack = this@ChapterListFragment
@@ -107,7 +94,6 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
     }
 
     override fun onDestroyView() {
-        readingMarkJob?.cancel()
         chapterListJob?.cancel()
         cacheFileJob?.cancel()
         pdfOutlineLoading = false
@@ -149,19 +135,6 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
 
     @SuppressLint("SetTextI18n")
     private fun initBook(book: Book) {
-        readingMarkJob?.cancel()
-        readingMark = null
-        adapter.skippedChapterIndexes = emptySet()
-        readingMarkJob = viewLifecycleOwner.lifecycleScope.launch {
-            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                appDb.bookReadingMarkDao.flowForBook(book.name, book.author).collect { mark ->
-                    readingMark = mark
-                    updateSkippedIndexes()
-                    if (viewModel.onlySkipped) upChapterList(currentSearchKey)
-                    else adapter.notifyItemRangeChanged(0, adapter.itemCount)
-                }
-            }
-        }
         chapterListJob?.cancel()
         cacheFileJob?.cancel()
         pdfOutlineState = null
@@ -208,16 +181,13 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
                 pdfOutlineLoading = false
                 if (outline.any { it.pageIndex != null }) {
                     pdfOutlineState = PdfOutlineListState(outline, book.getTocExpanded())
-                    if (!viewModel.onlySkipped) {
-                        binding.recyclerView.adapter = pdfOutlineAdapter
-                        showPdfOutline()
-                        return@launch
-                    }
+                    binding.recyclerView.adapter = pdfOutlineAdapter
+                    showPdfOutline()
+                    return@launch
                 }
             }
             val chapters = queryChapterList(book)
             chapterList = chapters
-            updateSkippedIndexes()
             tocListState.setFullChapters(
                 chapters = chapters,
                 reverseOrder = book.getReverseToc(),
@@ -228,7 +198,7 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
                 epubToc = epubToc,
             )
             val searchKey = currentSearchKey
-            submitChapterItems(
+            adapter.setItems(
                 if (searchKey == null) {
                     tocListState.showNormal(durChapterIndex)
                 } else {
@@ -236,7 +206,7 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
                         searchResultIndexes = queryChapterIndexes(book, searchKey),
                         currentChapterIndex = durChapterIndex,
                     )
-                }, false
+                }
             )
         }
         cacheFileJob = viewLifecycleOwner.lifecycleScope.launch {
@@ -305,14 +275,11 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
         currentSearchKey = searchKey?.takeIf { it.isNotBlank() }
         // Keep parsing the document when the user searches before the outline is ready.
         if (pdfOutlineLoading || epubTocLoading) return
-        pdfOutlineState?.takeUnless { viewModel.onlySkipped }?.let { state ->
+        pdfOutlineState?.let { state ->
             if (resetCollapse) state.setExpanded(book?.getTocExpanded() != false)
-            binding.tocReadingMarkEmpty.isVisible = false
-            binding.recyclerView.adapter = pdfOutlineAdapter
             showPdfOutline()
             return
         }
-        binding.recyclerView.adapter = adapter
         chapterListJob?.cancel()
         if (replaceAll) adapter.clearDisplayTitle()
         chapterListJob = viewLifecycleOwner.lifecycleScope.launch {
@@ -326,7 +293,6 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
                 if (resetCollapse || !tocListState.hasFullChapters()) {
                     val chapters = queryChapterList(currentBook)
                     chapterList = chapters
-                    updateSkippedIndexes()
                     tocListState.setFullChapters(
                         chapters = chapters,
                         reverseOrder = reverseOrder,
@@ -346,7 +312,6 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
                 if (resetCollapse || !tocListState.hasFullChapters()) {
                     val chapters = queryChapterList(currentBook)
                     chapterList = chapters
-                    updateSkippedIndexes()
                     tocListState.setFullChapters(
                         chapters = chapters,
                         reverseOrder = reverseOrder,
@@ -372,63 +337,10 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
     }
 
     private fun submitChapterItems(items: List<TocListItem>, replaceAll: Boolean) {
-        val visibleItems = if (viewModel.onlySkipped) {
-            val query = currentSearchKey.orEmpty()
-            val ordered = if (book?.let { !it.isEpub && !it.isPdf && it.getReverseTocDisplay() } == true)
-                chapterList.asReversed() else chapterList
-            ordered.filter {
-                !it.isVolume && it.index in adapter.skippedChapterIndexes &&
-                    (query.isBlank() || it.title.contains(query, ignoreCase = true))
-            }.map { TocListItem.Chapter(it, 0) }
-        } else items
-        binding.tocReadingMarkEmpty.isVisible = viewModel.onlySkipped && visibleItems.isEmpty()
         if (replaceAll) {
-            adapter.setItemsNoDiff(visibleItems)
+            adapter.setItemsNoDiff(items)
         } else {
-            adapter.setItems(visibleItems)
-        }
-    }
-
-    private fun updateSkippedIndexes() {
-        val resolver = ReadingMarkResolver(chapterList)
-        adapter.skippedChapterIndexes = readingMark?.skipped.orEmpty()
-            .mapNotNullTo(hashSetOf()) { resolver.resolve(it)?.index }
-    }
-
-    override fun onChapterLongClick(bookChapter: BookChapter) {
-        val current = book ?: return
-        val skipped = bookChapter.index in adapter.skippedChapterIndexes
-        requireContext().selector(bookChapter.title, listOf(
-            getString(if (skipped) R.string.reading_mark_unskip_one else R.string.reading_mark_skip_one),
-            getString(R.string.reading_mark_range),
-            getString(R.string.reading_mark),
-            getString(R.string.reading_mark_full_title),
-        )) { _, which ->
-            when (which) {
-                0 -> viewLifecycleOwner.lifecycleScope.launch {
-                    try {
-                        withContext(IO) {
-                            appDb.runInTransaction {
-                                val stored = appDb.bookDao.getBook(current.bookUrl)
-                                check(stored == null || (stored.name == current.name && stored.author == current.author)) {
-                                    "书籍信息已变更，请重新打开目录"
-                                }
-                                val mark = appDb.bookReadingMarkDao.get(current.name, current.author)
-                                    ?: BookReadingMark(current.name, current.author)
-                                appDb.bookReadingMarkDao.save(mark.withSkipped(
-                                    chapterList, listOf(bookChapter), remove = skipped))
-                            }
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        requireContext().toastOnUi(e.localizedMessage ?: getString(R.string.reading_mark_failed))
-                    }
-                }
-                1 -> showDialogFragment(ReadingMarkDialog.newInstance(current, rangeStart = bookChapter.index))
-                2 -> showDialogFragment(ReadingMarkDialog.newInstance(current))
-                3 -> requireContext().longToastOnUi(bookChapter.title)
-            }
+            adapter.setItems(items)
         }
     }
 

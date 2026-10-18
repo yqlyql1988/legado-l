@@ -24,9 +24,8 @@ class TocReverseNoDiffTest {
 
         assertTrue(activity.contains("replaceAll = true"))
         assertTrue(fragment.contains("if (replaceAll)"))
-        // Both paths receive the same list after applying the optional skipped-chapter filter.
-        assertTrue(fragment.contains("adapter.setItemsNoDiff(visibleItems)"))
-        assertTrue(fragment.contains("adapter.setItems(visibleItems)"))
+        assertTrue(fragment.contains("adapter.setItemsNoDiff(items)"))
+        assertTrue(fragment.contains("adapter.setItems(items)"))
         assertTrue(viewModel.contains("replaceAll: Boolean = false"))
     }
 

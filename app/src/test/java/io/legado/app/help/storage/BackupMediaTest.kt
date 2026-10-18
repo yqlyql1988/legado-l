@@ -87,7 +87,6 @@ class BackupMediaTest {
                 "readRecordHourly.json",
                 "bookReview.json",
                 "bookReviewDeletion.json",
-                "bookReadingMark.json",
                 "readConfig.json",
                 "shareReadConfig.json",
                 "themeConfig.json",

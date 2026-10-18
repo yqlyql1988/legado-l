@@ -763,6 +763,11 @@ class ReadRecordHistoryTest {
 
     @Test
     fun enhancedLayoutFitsNarrowScreenAndLargerText() {
+        val resolver = context.contentResolver
+        val autoRotation = android.provider.Settings.System.getInt(resolver, "accelerometer_rotation", 0)
+        val rotation = android.provider.Settings.System.getInt(resolver, "user_rotation", 0)
+        shell("settings put system accelerometer_rotation 0")
+        shell("settings put system user_rotation 0")
         shell("wm size 720x1280")
         shell("wm density 360")
         shell("settings put system font_scale 1.3")
@@ -781,6 +786,8 @@ class ReadRecordHistoryTest {
             shell("settings put system font_scale 1.0")
             shell("wm density reset")
             shell("wm size reset")
+            shell("settings put system user_rotation $rotation")
+            shell("settings put system accelerometer_rotation $autoRotation")
         }
     }
 

@@ -16,7 +16,6 @@ import io.legado.app.data.dao.BookGroupDao
 import io.legado.app.data.dao.BookHighlightDao
 import io.legado.app.data.dao.BookMemoDao
 import io.legado.app.data.dao.BookReviewDao
-import io.legado.app.data.dao.BookReadingMarkDao
 import io.legado.app.data.dao.BookSourceDao
 import io.legado.app.data.dao.BookmarkDao
 import io.legado.app.data.dao.AutoTaskRuleDao
@@ -44,7 +43,7 @@ import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookHighlight
 import io.legado.app.data.entities.BookMemo
 import io.legado.app.data.entities.BookReview
-import io.legado.app.data.entities.BookReadingMark
+import io.legado.app.data.entities.LegacyReadingMark
 import io.legado.app.data.entities.BookReviewDeletion
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.BookSourceCheckState
@@ -99,7 +98,7 @@ val appDb by lazy {
         RssStar::class, TxtTocRule::class, ReadRecord::class, HttpTTS::class, Cache::class,
         RuleSub::class, DictRule::class, KeyboardAssist::class, Server::class,
         AutoTaskRule::class, BookHighlight::class, HighlightRule::class, BookSourceCheckState::class,
-        BookMemo::class, BookReview::class, BookReviewDeletion::class, BookReadingMark::class,
+        BookMemo::class, BookReview::class, BookReviewDeletion::class, LegacyReadingMark::class,
         HighlightTag::class, HighlightTagLink::class, HighlightTagOrder::class,
         ReadRecordDaily::class, ReadStatisticsState::class, ReadRecordHistory::class, ReadRecordHourly::class],
     views = [BookSourcePart::class],
@@ -182,7 +181,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract val bookHighlightDao: BookHighlightDao
     abstract val bookMemoDao: BookMemoDao
     abstract val bookReviewDao: BookReviewDao
-    abstract val bookReadingMarkDao: BookReadingMarkDao
     abstract val highlightRuleDao: HighlightRuleDao
     abstract val highlightTagDao: HighlightTagDao
     abstract val bookSourceDao: BookSourceDao
