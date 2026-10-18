@@ -355,6 +355,11 @@
                             android:layout_height="wrap_content"
                             android:orientation="vertical">
 
+                            <io.legado.app.ui.book.readingmark.ReadingMarkView
+                                android:id="@+id/reading_mark"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content" />
+
                             <io.legado.app.ui.book.review.BookReviewView
                                 android:id="@+id/book_review"
                                 android:layout_width="match_parent"

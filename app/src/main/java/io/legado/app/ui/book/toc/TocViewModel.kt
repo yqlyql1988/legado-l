@@ -33,6 +33,7 @@ class TocViewModel(application: Application) : BaseViewModel(application) {
     var bookMarkCallBack: BookmarkCallBack? = null
     var highlightCallBack: HighlightCallBack? = null
     var searchKey: String? = null
+    var onlySkipped = false
 
     fun initBook(bookUrl: String) {
         this.bookUrl = bookUrl

@@ -38,6 +38,7 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
 
     val cacheFileNames = hashSetOf<String>()
     val audioCacheKeys = hashSetOf<AudioCacheKey>()
+    var skippedChapterIndexes: Set<Int> = emptySet()
     @Volatile
     private var displayTitleMap = ConcurrentHashMap<String, String>()
     private val handler = Handler(Looper.getMainLooper())
@@ -225,8 +226,12 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
                     tvTag.text = volumeSummary(item)
                     tvTag.visible()
                 } else {
-                    if (!chapter.tag.isNullOrEmpty()) {
-                        tvTag.text = chapter.tag
+                    val tags = listOfNotNull(
+                        context.getString(R.string.reading_mark_skipped).takeIf { chapter.index in skippedChapterIndexes },
+                        chapter.tag?.takeIf { it.isNotEmpty() },
+                    )
+                    if (tags.isNotEmpty()) {
+                        tvTag.text = tags.joinToString(" · ")
                         tvTag.visible()
                     } else {
                         tvTag.gone()
@@ -314,7 +319,8 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
         }
         holder.itemView.setOnLongClickListener {
             getItem(holder.layoutPosition)?.let { item ->
-                context.longToastOnUi(getDisplayTitle(item))
+                if (!item.chapter.isVolume) callback.onChapterLongClick(item.chapter)
+                else context.longToastOnUi(getDisplayTitle(item))
             }
             true
         }
@@ -363,6 +369,7 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
         val isAudioBook: Boolean
         val isAudioCacheStateReady: Boolean
         fun openChapter(bookChapter: BookChapter)
+        fun onChapterLongClick(bookChapter: BookChapter) {}
         fun durChapterIndex(): Int
         fun onListChanged()
         fun onVolumeToggled(volumeIndex: Int)

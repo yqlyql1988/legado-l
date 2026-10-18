@@ -16,6 +16,9 @@ enum class ReaderMenuItem(
     val titleRes: Int
 ) {
     Bookmark("bookmark", intArrayOf(R.id.menu_add_bookmark), R.string.bookmark_add),
+    ReadingMark("readingMark", intArrayOf(R.id.menu_reading_mark), R.string.reading_mark),
+    AbandonHere("abandonHere", intArrayOf(R.id.menu_abandon_here), R.string.reading_mark_abandon_here),
+    MarkFinished("markFinished", intArrayOf(R.id.menu_mark_finished), R.string.reading_mark_finish),
     HighlightRule("highlightRule", intArrayOf(R.id.menu_highlight_rule), R.string.highlight_rule),
     EditContent("editContent", intArrayOf(R.id.menu_edit_content), R.string.edit_content),
     PageAnim("pageAnim", intArrayOf(R.id.menu_page_anim), R.string.book_page_anim),

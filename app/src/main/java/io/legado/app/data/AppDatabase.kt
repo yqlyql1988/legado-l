@@ -16,6 +16,7 @@ import io.legado.app.data.dao.BookGroupDao
 import io.legado.app.data.dao.BookHighlightDao
 import io.legado.app.data.dao.BookMemoDao
 import io.legado.app.data.dao.BookReviewDao
+import io.legado.app.data.dao.BookReadingMarkDao
 import io.legado.app.data.dao.BookSourceDao
 import io.legado.app.data.dao.BookmarkDao
 import io.legado.app.data.dao.AutoTaskRuleDao
@@ -43,6 +44,7 @@ import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookHighlight
 import io.legado.app.data.entities.BookMemo
 import io.legado.app.data.entities.BookReview
+import io.legado.app.data.entities.BookReadingMark
 import io.legado.app.data.entities.BookReviewDeletion
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.BookSourceCheckState
@@ -89,7 +91,7 @@ val appDb by lazy {
 }
 
 @Database(
-    version = 118,
+    version = 119,
     exportSchema = true,
     entities = [Book::class, BookGroup::class, BookSource::class, BookChapter::class,
         ReplaceRule::class, SearchBook::class, SearchKeyword::class, Cookie::class,
@@ -97,7 +99,7 @@ val appDb by lazy {
         RssStar::class, TxtTocRule::class, ReadRecord::class, HttpTTS::class, Cache::class,
         RuleSub::class, DictRule::class, KeyboardAssist::class, Server::class,
         AutoTaskRule::class, BookHighlight::class, HighlightRule::class, BookSourceCheckState::class,
-        BookMemo::class, BookReview::class, BookReviewDeletion::class,
+        BookMemo::class, BookReview::class, BookReviewDeletion::class, BookReadingMark::class,
         HighlightTag::class, HighlightTagLink::class, HighlightTagOrder::class,
         ReadRecordDaily::class, ReadStatisticsState::class, ReadRecordHistory::class, ReadRecordHourly::class],
     views = [BookSourcePart::class],
@@ -168,7 +170,8 @@ val appDb by lazy {
         AutoMigration(from = 113, to = 114, spec = DatabaseMigrations.Migration_113_114::class),
         AutoMigration(from = 114, to = 115),
         AutoMigration(from = 116, to = 117),
-        AutoMigration(from = 117, to = 118)
+        AutoMigration(from = 117, to = 118),
+        AutoMigration(from = 118, to = 119)
     ]
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -179,6 +182,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract val bookHighlightDao: BookHighlightDao
     abstract val bookMemoDao: BookMemoDao
     abstract val bookReviewDao: BookReviewDao
+    abstract val bookReadingMarkDao: BookReadingMarkDao
     abstract val highlightRuleDao: HighlightRuleDao
     abstract val highlightTagDao: HighlightTagDao
     abstract val bookSourceDao: BookSourceDao
