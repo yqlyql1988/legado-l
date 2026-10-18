@@ -21,6 +21,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.DividerItemDecoration
+import androidx.recyclerview.widget.ConcatAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.tabs.TabLayout
 import io.legado.app.R
@@ -31,10 +32,14 @@ import io.legado.app.data.entities.HighlightTagLink
 import io.legado.app.databinding.ActivityAllBookmarkBinding
 import io.legado.app.databinding.ItemBookNoteBinding
 import io.legado.app.databinding.ItemNoteBookBinding
+import io.legado.app.databinding.ItemNoteReviewSummaryBinding
 import io.legado.app.help.HighlightTags
 import io.legado.app.help.book.readProgress
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.ui.book.read.HighlightNoteDialog
+import io.legado.app.ui.book.review.BookReviewEditActivity
+import io.legado.app.ui.book.review.BookReviewEntriesAdapter
+import io.legado.app.ui.book.review.bindBookReviewRating
 import io.legado.app.ui.book.toc.TocActivityResult
 import io.legado.app.ui.book.toc.resolveHighlightChapterIndex
 import io.legado.app.ui.file.HandleFileContract
@@ -65,6 +70,10 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
     override val binding by viewBinding(ActivityAllBookmarkBinding::inflate)
     private val bookAdapter = BooksAdapter()
     private val notesAdapter = NotesAdapter()
+    private val summaryAdapter = ReviewSummaryAdapter()
+    private val allAdapter by lazy { ConcatAdapter(summaryAdapter, notesAdapter) }
+    private val reviewsAdapter = BookReviewEntriesAdapter(this)
+    private var showReviewSummary = false
     private val archiveDivider by lazy {
         DividerItemDecoration(this, DividerItemDecoration.VERTICAL)
     }
@@ -144,7 +153,8 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
         binding.noteTabs.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab) {
                 type = NoteType.entries[tab.position]
-                if (type == NoteType.BOOKMARK) tagId = null
+                if (type == NoteType.BOOKMARK || type == NoteType.REVIEW) tagId = null
+                if (type == NoteType.REVIEW) managing = false
                 selected.clear()
                 render()
                 binding.recyclerView.scrollToPosition(0)
@@ -155,6 +165,7 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
         binding.recyclerView.applyNavigationBarPadding()
         binding.batchActions.applyNavigationBarPadding()
         binding.tvContinue.setOnClickListener { openReading(null) }
+        binding.tvWriteReview.setOnClickListener { writeReview() }
         binding.tvSort.setOnClickListener {
             recent = !recent
             putPrefBoolean("bookNotesRecent", recent)
@@ -216,7 +227,9 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
             binding.titleBar.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
         }
         menuInflater.inflate(R.menu.bookmark, menu)
-        menu.findItem(R.id.menu_manage).isVisible = selectedBook != null
+        menu.findItem(R.id.menu_manage).isVisible = selectedBook != null &&
+            type != NoteType.REVIEW && archive?.notes?.isNotEmpty() == true
+        menu.findItem(R.id.menu_export_notes).isVisible = type != NoteType.REVIEW
         menu.findItem(R.id.menu_manage).setTitle(if (managing) R.string.book_notes_done else R.string.book_notes_manage)
         return super.onCompatCreateOptionsMenu(menu)
     }
@@ -257,41 +270,56 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
         val details = selectedBook != null
         binding.bookHeading.isVisible = details
         binding.noteTabs.isVisible = details
-        binding.tvTagFilter.isVisible = details && type != NoteType.BOOKMARK
+        val reviewing = details && type == NoteType.REVIEW
+        binding.tvTagFilter.isVisible = details && (type == NoteType.ALL || type == NoteType.HIGHLIGHT)
+        binding.tvSort.isVisible = !reviewing
+        binding.reviewActions.isVisible = reviewing
         binding.batchActions.isVisible = details && managing
         binding.titleBar.title = if (managing) getString(R.string.book_notes_selected, selected.size)
             else getString(R.string.book_notes)
         if (details) {
             binding.tvBookName.text = book?.name.orEmpty()
             val shelfBook = book?.book
-            binding.tvBookAuthor.text = if (shelfBook == null) getString(
+            binding.tvBookAuthor.text = listOfNotNull(book?.author?.takeIf { it.isNotBlank() },
+                if (shelfBook == null) getString(
                 if (book?.ambiguous == true) R.string.book_notes_ambiguous
-                else R.string.book_notes_unavailable)
-            else listOfNotNull(book.author.takeIf { it.isNotBlank() },
-                shelfBook.readProgress()?.let {
+                else R.string.book_notes_unavailable) else shelfBook.readProgress()?.let {
                     getString(R.string.book_notes_progress, String.format(Locale.getDefault(), "%.1f%%", it * 100))
                 }).joinToString(" · ")
             binding.tvContinue.isVisible = shelfBook != null
             book?.asBook()?.let { binding.ivCover.load(it, false) }
-            binding.noteTabs.getTabAt(0)?.text = getString(R.string.book_notes_tab_all, book?.notes?.size ?: 0)
+            binding.noteTabs.getTabAt(0)?.text = getString(R.string.book_notes_tab_all,
+                (book?.notes?.size ?: 0) + (book?.reviews?.size ?: 0))
             binding.noteTabs.getTabAt(1)?.text = getString(R.string.book_notes_tab_bookmark, book?.bookmarkCount ?: 0)
             binding.noteTabs.getTabAt(2)?.text = getString(R.string.book_notes_tab_highlight, book?.highlightCount ?: 0)
+            binding.noteTabs.getTabAt(3)?.text = getString(R.string.book_notes_tab_review, book?.reviews?.size ?: 0)
             visibleNotes = filterBookNotes(book?.notes.orEmpty(), type, tagId, query, recent, chapterIndexes)
-            binding.tvSummary.text = getString(R.string.book_notes_count, visibleNotes.size)
+            reviewsAdapter.reviews = book?.matchingReviews(query).orEmpty()
+            showReviewSummary = type == NoteType.ALL && !managing && tagId == null &&
+                (query.isBlank() || reviewsAdapter.reviews.isNotEmpty())
+            summaryAdapter.notifyDataSetChanged()
+            binding.tvSummary.text = if (reviewing) getString(R.string.book_review_count, reviewsAdapter.itemCount)
+                else getString(R.string.book_notes_count, visibleNotes.size)
+            bindBookReviewRating(binding.reviewRatingStars, binding.tvReviewRating, book?.rating)
+            binding.tvWriteReview.setText(if (book?.reviews.isNullOrEmpty()) R.string.book_review_write
+                else R.string.book_review_follow_up)
             binding.tvTagFilter.text = tagId?.let { id ->
                 if (id.isEmpty()) getString(R.string.highlight_filter_untagged)
                 else book?.notes?.flatMap { it.tags }?.firstOrNull { it.id == id }?.name
             } ?: getString(R.string.book_notes_tags)
             binding.tvSort.setText(if (recent) R.string.book_notes_recent else R.string.book_notes_chapter_order)
-            if (binding.recyclerView.adapter !== notesAdapter) {
+            val detailAdapter = if (reviewing) reviewsAdapter else allAdapter
+            if (binding.recyclerView.adapter !== detailAdapter) {
                 binding.recyclerView.removeItemDecoration(archiveDivider)
-                binding.recyclerView.adapter = notesAdapter
+                binding.recyclerView.adapter = detailAdapter
             }
             notesAdapter.notifyDataSetChanged()
         } else {
-            visibleBooks = archives.filter { entry -> entry.notes.any { it.matches(query.trim()) } }
+            showReviewSummary = false
+            visibleBooks = archives.filter { it.matches(query) }
             binding.tvSummary.text = getString(R.string.book_notes_summary, visibleBooks.size,
-                visibleBooks.sumOf { it.bookmarkCount }, visibleBooks.sumOf { it.highlightCount })
+                visibleBooks.sumOf { it.bookmarkCount }, visibleBooks.sumOf { it.highlightCount },
+                visibleBooks.flatMap { it.reviews }.distinctBy { it.id }.size)
             binding.tvSort.setText(R.string.book_notes_recent)
             binding.tvSort.isClickable = false
             if (binding.recyclerView.adapter !== bookAdapter) {
@@ -304,11 +332,17 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
                 restoreBookListState = false
             }
         }
-        binding.tvSort.isClickable = details
-        binding.tvEmpty.isVisible = if (details) visibleNotes.isEmpty() else visibleBooks.isEmpty()
-        binding.tvEmpty.setText(if (query.isNotBlank() || tagId != null) R.string.book_notes_search_empty
-            else R.string.book_notes_empty)
+        binding.tvSort.isClickable = details && !reviewing
+        binding.tvEmpty.isVisible = if (reviewing) reviewsAdapter.itemCount == 0
+            else if (details) visibleNotes.isEmpty() && !showReviewSummary else visibleBooks.isEmpty()
+        binding.tvEmpty.setText(if (reviewing) {
+            if (query.isNotBlank()) R.string.book_review_search_empty else R.string.book_review_book_empty
+        } else if (query.isNotBlank() || tagId != null) R.string.book_notes_search_empty else R.string.book_notes_empty)
         invalidateOptionsMenu()
+    }
+
+    private fun writeReview() {
+        archive?.asBook()?.let { BookReviewEditActivity.create(this, it) }
     }
 
     private fun showTagFilter() {
@@ -478,7 +512,11 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
                 tvName.text = book.name
                 tvAuthor.text = book.author
                 tvAuthor.isVisible = book.author.isNotBlank()
-                tvCounts.text = getString(R.string.book_notes_book_count, book.bookmarkCount, book.highlightCount)
+                tvCounts.text = getString(R.string.book_notes_book_count,
+                    book.bookmarkCount, book.highlightCount, book.reviews.size)
+                tvRating.isVisible = book.rating != null
+                tvRating.text = book.rating?.let { getString(R.string.book_notes_rating, it / 2.0) }
+                tvRating.contentDescription = book.rating?.let { getString(R.string.book_review_score, it / 2.0) }
                 tvDate.text = getString(R.string.book_notes_latest, dateFormat.format(Date(book.latestTime)))
                 root.setOnClickListener {
                     bookListQuery = query
@@ -505,6 +543,30 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
         }
     }
     private class BookHolder(val row: ItemNoteBookBinding) : RecyclerView.ViewHolder(row.root)
+
+    private inner class ReviewSummaryAdapter : RecyclerView.Adapter<ReviewSummaryHolder>() {
+        override fun getItemCount() = if (showReviewSummary) 1 else 0
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = ReviewSummaryHolder(
+            ItemNoteReviewSummaryBinding.inflate(LayoutInflater.from(parent.context), parent, false))
+        override fun onBindViewHolder(holder: ReviewSummaryHolder, position: Int) {
+            val book = archive ?: return
+            val latest = book.matchingReviews(query).firstOrNull()
+            holder.row.run {
+                bindBookReviewRating(ratingStars, tvRating, book.rating, R.string.book_review_none)
+                tvCount.text = getString(R.string.book_review_count, book.reviews.size)
+                tvCount.isVisible = book.reviews.isNotEmpty()
+                tvContent.text = latest?.content ?: getString(R.string.book_review_book_empty)
+                tvDate.text = latest?.let { getString(R.string.book_notes_review_date, it.reviewDate,
+                    getString(if (it.isFollowUp) R.string.book_review_follow_up_label else R.string.book_review_initial)) }
+                tvAll.isVisible = latest != null
+                tvAll.setOnClickListener { binding.noteTabs.getTabAt(NoteType.REVIEW.ordinal)?.select() }
+                tvContent.setOnClickListener { binding.noteTabs.getTabAt(NoteType.REVIEW.ordinal)?.select() }
+                tvAdd.setText(if (book.reviews.isEmpty()) R.string.book_review_write else R.string.book_review_follow_up)
+                tvAdd.setOnClickListener { writeReview() }
+            }
+        }
+    }
+    private class ReviewSummaryHolder(val row: ItemNoteReviewSummaryBinding) : RecyclerView.ViewHolder(row.root)
 
     private inner class NotesAdapter : RecyclerView.Adapter<NoteHolder>() {
         override fun getItemCount() = visibleNotes.size
