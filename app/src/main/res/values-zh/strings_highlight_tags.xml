@@ -6,7 +6,7 @@
     <string name="highlight_tag_book_hint">包含本书与通用标签。拖动仅调整本书顺序，已选标签中靠前的决定样式。</string>
     <string name="highlight_tag_global_hint">所有书籍可用。拖动调整默认顺序，已自定义顺序的书籍不受影响。</string>
     <string name="highlight_tag_edit_global_hint">修改名称、备注和样式后，所有使用此标签的书籍都会更新。</string>
-    <string name="highlight_tag_edit_book_hint">仅在本书中使用，名称、备注和样式独立设置。</string>
+    <string name="highlight_tag_edit_book_hint">仅在本书中使用。通用改为本书时，其他书已使用的标签和顺序各自保留。</string>
     <string name="highlight_tag_delete_book_hint">从本书中解除“%1$s”标签？标注、基础样式和备注仍然保留。</string>
     <string name="highlight_filter_all">全部</string>
     <string name="highlight_filter_untagged">无标签</string>
@@ -18,7 +18,7 @@
     <string name="highlight_tag_edit">编辑标签</string>
     <string name="highlight_tag_name">标签名称</string>
     <string name="highlight_tag_line_color">划线颜色</string>
-    <string name="highlight_tag_duplicate">请填写名称，且不能与已有标签重名。</string>
+    <string name="highlight_tag_duplicate">请填写名称；已有同名标签时，请在“添加标签”中选用。</string>
     <string name="highlight_tag_empty">暂无标签，点击新增标签开始设置。</string>
     <string name="highlight_tag_preview">多标签预览</string>
     <string name="highlight_tag_preview_text">开源阅读</string>
@@ -42,4 +42,25 @@
     <string name="highlight_tag_style_description">%1$s · 粗细 %2$.1f · 距离 %3$.1f</string>
     <string name="highlight_tag_save_failed">标签保存失败，已保留当前修改。</string>
     <string name="highlight_tag_details">标签：%1$s</string>
+    <string name="highlight_tag_common">常用</string>
+    <string name="highlight_tag_mark_common">设为常用：%1$s</string>
+    <string name="highlight_tag_unmark_common">取消常用：%1$s</string>
+    <string name="highlight_tag_book_list">这本书的标签</string>
+    <string name="highlight_tag_library">标签库</string>
+    <string name="highlight_tag_add_to_book">添加标签</string>
+    <string name="highlight_tag_search">输入名称，查找或新建标签</string>
+    <string name="highlight_tag_add_hint">已有标签直接选用；已添加的标签可以定位查看。</string>
+    <string name="highlight_tag_list_hint">点亮星标后，各本书默认显示。其他标签可按需添加；拖动调整这本书的顺序。</string>
+    <string name="highlight_tag_library_hint">所有标签都可复用。编辑名称、样式和说明会同步到使用它的书籍。</string>
+    <string name="highlight_tag_edit_hint">修改名称、样式和标签备注后，使用这个标签的标注会同步更新；标注自己的笔记保留。</string>
+    <string name="highlight_tag_create_named">新建“%1$s”</string>
+    <string name="highlight_tag_already_added">已添加 · 点击定位</string>
+    <string name="highlight_tag_select_existing">添加到这本书</string>
+    <string name="highlight_tag_located">已定位到“%1$s”</string>
+    <string name="highlight_tag_remove_book">从本书移除</string>
+    <string name="highlight_tag_remove_book_hint">从这本书的待选列表隐藏“%1$s”？已有标注的标签、样式和笔记保留，其他书不受影响，之后可重新添加。</string>
+    <string name="highlight_tag_delete_library">从标签库彻底删除</string>
+    <string name="highlight_tag_delete_library_hint">“%1$s”用于 %2$d 本书、%3$d 条标注。彻底删除后，所有书都无法再选用它，已有标注解除该标签关联。标注和笔记保留；显示样式改用其他已选标签，没有其他标签时恢复基础样式。</string>
+    <string name="highlight_tag_use_existing">改用这个标签</string>
+    <string name="highlight_tag_use_existing_hint">这本书已有同名的“%1$s”。改用所选标签后，原有同名标注会采用它的样式和标签备注；标注自己的笔记保留。原标签仍保存在标签库。</string>
 </resources>

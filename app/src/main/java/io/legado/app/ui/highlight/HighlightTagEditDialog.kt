@@ -4,8 +4,6 @@ import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
 import android.view.Menu
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.isVisible
 import com.jaredrummler.android.colorpicker.ColorPickerDialog
@@ -65,32 +63,19 @@ class HighlightTagEditDialog : BaseDialogFragment(R.layout.dialog_highlight_tag_
         }
         binding.etName.setText(tag.name)
         binding.etNote.setText(tag.note)
-        val owner = arguments?.getString("bookUrl").orEmpty()
-        binding.spScope.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item,
-            listOf(getString(R.string.highlight_tag_global), getString(R.string.highlight_tag_book)))
-        binding.spScope.setSelection(if (tag.bookUrl.isEmpty()) 0 else 1)
-        binding.spScope.isEnabled = arguments?.getBoolean("new") == true && owner.isNotEmpty()
-        binding.spScope.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
-            override fun onItemSelected(parent: AdapterView<*>?, item: View?, position: Int, id: Long) {
-                if (binding.spScope.isEnabled) tag = tag.copy(bookUrl = if (position == 0) "" else owner)
-                binding.tvScopeHint.setText(if (tag.bookUrl.isEmpty())
-                    R.string.highlight_tag_edit_global_hint else R.string.highlight_tag_edit_book_hint)
-            }
-        }
         binding.btnStyle.setOnClickListener {
             HighlightStyleDialog().show(childFragmentManager, STYLE_TAG)
         }
         (childFragmentManager.findFragmentByTag(COLOR_TAG) as? ColorPickerDialog)
             ?.setColorPickerDialogListener(this)
-        binding.btnDelete.isVisible = arguments?.getBoolean("new") != true
+        binding.btnDelete.isVisible = arguments?.getBoolean("new") != true &&
+            arguments?.getBoolean("removeFromBook") == true
         binding.btnDelete.setOnClickListener {
             AlertDialog.Builder(requireContext())
-                .setTitle(R.string.highlight_tag_delete_title)
-                .setMessage(getString(if (tag.bookUrl.isEmpty()) R.string.highlight_tag_delete_hint
-                    else R.string.highlight_tag_delete_book_hint, tag.name))
+                .setTitle(R.string.highlight_tag_remove_book)
+                .setMessage(getString(R.string.highlight_tag_remove_book_hint, tag.name))
                 .setNegativeButton(R.string.cancel, null)
-                .setPositiveButton(R.string.delete) { _, _ ->
+                .setPositiveButton(R.string.highlight_tag_remove_book) { _, _ ->
                     (activity as? Callback)?.deleteTag(tag.id)
                     dismiss()
                 }.show()
@@ -132,11 +117,12 @@ class HighlightTagEditDialog : BaseDialogFragment(R.layout.dialog_highlight_tag_
     companion object {
         private const val STYLE_TAG = "highlight-tag-style"
         private const val COLOR_TAG = "highlight-tag-color"
-        fun create(tag: HighlightTag, isNew: Boolean, bookUrl: String = "") = HighlightTagEditDialog().apply {
+        fun create(tag: HighlightTag, isNew: Boolean, bookUrl: String = "", removeFromBook: Boolean = false) = HighlightTagEditDialog().apply {
             arguments = Bundle().apply {
                 putString("tag", GSON.toJson(tag))
                 putBoolean("new", isNew)
                 putString("bookUrl", bookUrl)
+                putBoolean("removeFromBook", removeFromBook)
             }
         }
     }

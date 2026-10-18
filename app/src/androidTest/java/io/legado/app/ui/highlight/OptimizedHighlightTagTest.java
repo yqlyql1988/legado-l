@@ -89,6 +89,8 @@ public class OptimizedHighlightTagTest {
             if (!bookUrl.isEmpty()) intent.putExtra("bookUrl", bookUrl);
             scenario = ActivityScenario.launch(intent);
             onView(withId(id("tv_add"))).perform(click());
+            onView(withId(id("et_tag_search"))).inRoot(isDialog()).perform(replaceText(name), closeSoftKeyboard());
+            onView(withId(id("btn_create_tag"))).inRoot(isDialog()).perform(click());
             onView(withId(id("et_name"))).inRoot(isDialog()).perform(replaceText(name), closeSoftKeyboard());
             String note = "记录这个标签的含义\n多行说明随标签一起备份";
             onView(withId(id("et_note"))).inRoot(isDialog()).perform(replaceText(note), closeSoftKeyboard());

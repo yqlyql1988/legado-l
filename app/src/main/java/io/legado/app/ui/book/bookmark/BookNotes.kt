@@ -72,7 +72,7 @@ internal fun archiveBookNotes(
             highlightsByName[name to author].orEmpty().map { it.bookUrl })
             .filter(String::isNotBlank).distinct()
     val orderedTags = highlights.map { it.bookUrl }.distinct().associateWith { url ->
-        HighlightTags.forBook(tags, url, orders.filter { it.bookUrl == url })
+        HighlightTags.forBook(tags, url, orders.filter { it.bookUrl == url }, includeHidden = true)
     }
     val linksByTime = links.groupBy { it.highlightTime }
     val entries = highlights.map { highlight ->

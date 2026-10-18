@@ -17,7 +17,8 @@ data class HighlightTag(
     val style: String = "",
     val sortOrder: Int = 0,
     @ColumnInfo(defaultValue = "''") val bookUrl: String = "",
-    @ColumnInfo(defaultValue = "''") val note: String = ""
+    @ColumnInfo(defaultValue = "''") val note: String = "",
+    @ColumnInfo(defaultValue = "0") val common: Boolean = bookUrl.isEmpty()
 ) {
     fun styleObj(): HighlightStyle =
         (GSON.fromJsonObject<HighlightStyle>(style).getOrNull() ?: HighlightStyle(
@@ -52,4 +53,7 @@ data class HighlightTagLink(val highlightTime: Long, val tagId: String)
         onDelete = ForeignKey.CASCADE
     )]
 )
-data class HighlightTagOrder(val bookUrl: String, val tagId: String, val sortOrder: Int)
+data class HighlightTagOrder(
+    val bookUrl: String, val tagId: String, val sortOrder: Int,
+    @ColumnInfo(defaultValue = "0") val hidden: Boolean = false
+)

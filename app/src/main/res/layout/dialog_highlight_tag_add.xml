@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
+    <io.legado.app.ui.widget.TitleBar android:id="@+id/title_bar"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        app:attachToActivity="false" app:fitStatusBar="false" app:title="@string/highlight_tag_add_to_book" />
+    <io.legado.app.lib.theme.view.ThemeEditText android:id="@+id/et_tag_search"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginHorizontal="20dp" android:layout_marginTop="12dp"
+        android:hint="@string/highlight_tag_search" android:inputType="text" android:maxLength="24" android:maxLines="1" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:paddingHorizontal="20dp" android:paddingVertical="12dp"
+        android:text="@string/highlight_tag_add_hint" android:textColor="@color/secondaryText" android:textSize="12sp" />
+    <io.legado.app.ui.widget.text.AccentTextView android:id="@+id/btn_create_tag"
+        android:layout_width="match_parent" android:layout_height="48dp"
+        android:paddingHorizontal="20dp" android:gravity="center_vertical"
+        android:background="?attr/selectableItemBackground" android:visibility="gone" />
+    <androidx.recyclerview.widget.RecyclerView android:id="@+id/tag_results"
+        android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
+        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" android:clipToPadding="false" />
+</LinearLayout>

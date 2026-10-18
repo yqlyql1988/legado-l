@@ -328,11 +328,15 @@ object Restore {
                     }
                     // Missing extension files identify an older backup: keep local tags intact.
                     if (highlightTags != null && highlightTagLinks != null) {
+                        val tagJson = File(path, "highlightTag.json").readText()
                         appDb.highlightTagDao.restore(
-                            preserveLegacyTagNotes(File(path, "highlightTag.json").readText(),
+                            preserveLegacyTagNotes(tagJson,
                                 highlightTags, appDb.highlightTagDao.all()),
                             highlightTagLinks, highlights.orEmpty().map { it.time },
-                            highlightTagOrders
+                            highlightTagOrders?.let {
+                                preserveLegacyTagOrders(tagJson, File(path, "highlightTagOrder.json").readText(),
+                                    it, appDb.highlightTagDao.orders())
+                            }
                         )
                     }
                 }

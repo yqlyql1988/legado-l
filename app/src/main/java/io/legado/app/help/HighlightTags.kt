@@ -10,13 +10,28 @@ import io.legado.app.utils.GSON
 
 object HighlightTags {
     fun forBook(
-        tags: List<HighlightTag>, bookUrl: String, orders: List<HighlightTagOrder> = emptyList()
+        tags: List<HighlightTag>, bookUrl: String, orders: List<HighlightTagOrder> = emptyList(),
+        includeHidden: Boolean = false
     ): List<HighlightTag> {
-        val positions = orders.filter { it.bookUrl == bookUrl }.associate { it.tagId to it.sortOrder }
-        return tags.filter { it.bookUrl.isEmpty() || it.bookUrl == bookUrl }
+        val entries = orders.filter { it.bookUrl == bookUrl }.associateBy { it.tagId }
+        val positions = entries.mapValues { it.value.sortOrder }
+        return tags.filter { it.common || it.bookUrl == bookUrl || it.id in positions }
+            .filter { includeHidden || entries[it.id]?.hidden != true }
             .sortedWith(compareBy<HighlightTag> { positions[it.id] ?: Int.MAX_VALUE }
                 .thenBy { it.bookUrl.isNotEmpty() }.thenBy { it.sortOrder }.thenBy { it.id })
             .mapIndexed { index, tag -> tag.copy(sortOrder = index) }
+    }
+
+    /** Same-name choices prefer a selection, an explicit book choice, then the book's own label. */
+    fun choices(
+        tags: List<HighlightTag>, bookUrl: String, preferredIds: Collection<String> = emptyList()
+    ): List<HighlightTag> {
+        val preferred = preferredIds.distinct().withIndex().associate { it.value to it.index }
+        val chosen = tags.groupBy { it.name }.values.map { sameName ->
+            sameName.minWith(compareBy<HighlightTag> { preferred[it.id] ?: Int.MAX_VALUE }
+                .thenBy { it.bookUrl != bookUrl }.thenBy { it.sortOrder }.thenBy { it.id })
+        }.mapTo(hashSetOf()) { it.id }
+        return tags.filter { it.id in chosen }
     }
 
     /** Filtering includes secondary labels, and the empty sentinel matches older annotations. */
@@ -44,12 +59,17 @@ object HighlightTags {
     }
 
     fun seedDefaults(db: SupportSQLiteDatabase) {
+        val hasCommon = db.query("SELECT * FROM highlight_tags LIMIT 0").use {
+            it.getColumnIndex("common") >= 0
+        }
         defaults().forEach { tag ->
             db.insert("highlight_tags", SQLiteDatabase.CONFLICT_IGNORE, ContentValues().apply {
                 put("id", tag.id)
                 put("name", tag.name)
                 put("style", tag.style)
                 put("sortOrder", tag.sortOrder)
+                // Migrations before v120 seed the original table without this column.
+                if (hasCommon) put("common", if (tag.common) 1 else 0)
             })
         }
     }

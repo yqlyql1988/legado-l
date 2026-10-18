@@ -296,12 +296,20 @@ object ReadBook : CoroutineScope by MainScope() {
     }
 
     private fun loadHighlightTags(bookUrl: String) {
-        highlightTags = appDb.highlightTagDao.forBook(bookUrl)
+        highlightTags = appDb.highlightTagDao.forBook(bookUrl, includeHidden = true)
         highlightTagLinks = appDb.highlightTagDao.linksForBook(bookUrl).groupBy { it.highlightTime }
     }
 
     fun highlightTagIds(highlight: BookHighlight): List<String> =
         highlightTagLinks[highlight.time].orEmpty().map { it.tagId }
+
+    fun highlightTagChoices(highlight: BookHighlight): List<HighlightTag> {
+        val orders = appDb.highlightTagDao.ordersForBook(highlight.bookUrl)
+        val selected = highlightTagIds(highlight)
+        val hidden = orders.filter { it.hidden }.mapTo(hashSetOf()) { it.tagId }
+        return HighlightTags.choices(highlightTags.filter { it.id !in hidden || it.id in selected },
+            highlight.bookUrl, selected + orders.filterNot { it.hidden }.map { it.tagId })
+    }
 
     fun effectiveHighlightStyle(highlight: BookHighlight): HighlightStyle =
         HighlightTags.effectiveStyle(highlight, highlightTags, highlightTagIds(highlight))

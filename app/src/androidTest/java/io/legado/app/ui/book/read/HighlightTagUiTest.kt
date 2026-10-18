@@ -313,12 +313,14 @@ class HighlightTagUiTest {
         screenshot("edit-label")
         onView(withId(R.id.btn_ok)).inRoot(isDialog()).perform(click())
         onView(withId(R.id.tv_add)).perform(click())
+        onView(withId(R.id.et_tag_search)).inRoot(isDialog()).perform(replaceText("情节"), closeSoftKeyboard())
+        onView(withId(R.id.btn_create_tag)).inRoot(isDialog()).perform(click())
         onView(withId(R.id.et_name)).inRoot(isDialog()).perform(replaceText("情节"), closeSoftKeyboard())
         onView(withId(R.id.btn_ok)).inRoot(isDialog()).perform(click())
         onView(org.hamcrest.Matchers.allOf(withText("伏笔"),
             isDescendantOfA(withId(R.id.recycler_view)))).perform(click())
         onView(withId(R.id.btn_delete)).inRoot(isDialog()).perform(scrollTo(), click())
-        onView(withText(R.string.highlight_tag_delete_title)).inRoot(isDialog()).check(matches(isDisplayed()))
+        onView(withId(android.R.id.button1)).inRoot(isDialog()).check(matches(withText(R.string.highlight_tag_remove_book)))
         onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
         // Toolbar back must offer to save the same draft as system back.
         onView(withContentDescription(R.string.back)).perform(click())
@@ -331,9 +333,10 @@ class HighlightTagUiTest {
         assertTrue(appDb.highlightTagDao.all().any { it.id == tags.first().id && it.name == "喜欢" })
         assertTrue(appDb.highlightTagDao.all().any { it.name == "情节" && it.bookUrl == book.bookUrl })
         assertFalse(appDb.highlightTagDao.forBook("another-book").any { it.name == "情节" })
-        assertFalse(appDb.highlightTagDao.all().any { it.name == "伏笔" })
-        assertTrue(appDb.highlightTagDao.idsForHighlight(highlight.time).isEmpty())
-        assertEquals(highlight.styleObj(), ReadBook.effectiveHighlightStyle(highlight))
+        assertTrue(appDb.highlightTagDao.all().any { it.name == "伏笔" && it.common })
+        assertFalse(appDb.highlightTagDao.forBook(book.bookUrl).any { it.name == "伏笔" })
+        assertEquals(listOf(tags[2].id), appDb.highlightTagDao.idsForHighlight(highlight.time))
+        assertEquals(tags[2].styleObj(), ReadBook.effectiveHighlightStyle(highlight))
     }
 
     @Test fun tocFiltersSecondaryLabelsLocalLabelsAndUntaggedAnnotationsAlongsideSearch() {

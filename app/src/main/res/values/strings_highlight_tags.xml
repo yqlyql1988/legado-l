@@ -6,7 +6,7 @@
     <string name="highlight_tag_book_hint">Includes shared and book labels. Drag to set this book’s priority; the first selected label determines the style.</string>
     <string name="highlight_tag_global_hint">Shared by all books. Drag to set the default priority for books without their own order.</string>
     <string name="highlight_tag_edit_global_hint">Name, note and style changes apply to all books.</string>
-    <string name="highlight_tag_edit_book_hint">Only available in this book. Its name, note and style are independent.</string>
+    <string name="highlight_tag_edit_book_hint">Only available in this book. When a shared label becomes book-only, other books keep their existing labels and order independently.</string>
     <string name="highlight_tag_delete_book_hint">Remove “%1$s” from this book? Annotations, base styles and notes will be kept.</string>
     <string name="highlight_filter_all">All</string>
     <string name="highlight_filter_untagged">Unlabeled</string>
@@ -18,7 +18,7 @@
     <string name="highlight_tag_edit">Edit label</string>
     <string name="highlight_tag_name">Label name</string>
     <string name="highlight_tag_line_color">Line color</string>
-    <string name="highlight_tag_duplicate">Enter a unique label name.</string>
+    <string name="highlight_tag_duplicate">Enter a name. If it already exists, select it from Add label.</string>
     <string name="highlight_tag_empty">No labels. Add one to get started.</string>
     <string name="highlight_tag_preview">Preview with multiple labels</string>
     <string name="highlight_tag_preview_text">开源阅读</string>
@@ -42,4 +42,25 @@
     <string name="highlight_tag_style_description">%1$s · width %2$.1f · distance %3$.1f</string>
     <string name="highlight_tag_save_failed">Could not save labels. Your changes have been kept.</string>
     <string name="highlight_tag_details">Labels: %1$s</string>
+    <string name="highlight_tag_common">Common</string>
+    <string name="highlight_tag_mark_common">Make common: %1$s</string>
+    <string name="highlight_tag_unmark_common">Remove from common: %1$s</string>
+    <string name="highlight_tag_book_list">Labels for this book</string>
+    <string name="highlight_tag_library">Label library</string>
+    <string name="highlight_tag_add_to_book">Add label</string>
+    <string name="highlight_tag_search">Type a name to find or create a label</string>
+    <string name="highlight_tag_add_hint">Select an existing label, or locate one already added to this book.</string>
+    <string name="highlight_tag_list_hint">Star labels to show them in all books by default. Add other labels as needed; drag to set this book’s order.</string>
+    <string name="highlight_tag_library_hint">Any label can be reused. Name, style and description edits apply to all books using it.</string>
+    <string name="highlight_tag_edit_hint">Changes to this label apply to annotations using it. Each annotation keeps its own note.</string>
+    <string name="highlight_tag_create_named">Create “%1$s”</string>
+    <string name="highlight_tag_already_added">Added · Tap to locate</string>
+    <string name="highlight_tag_select_existing">Add to this book</string>
+    <string name="highlight_tag_located">Located “%1$s”</string>
+    <string name="highlight_tag_remove_book">Remove from this book</string>
+    <string name="highlight_tag_remove_book_hint">Hide “%1$s” from this book’s choices? Existing annotations keep their labels, styles and notes. Other books are unaffected; you can add it again later.</string>
+    <string name="highlight_tag_delete_library">Delete from library permanently</string>
+    <string name="highlight_tag_delete_library_hint">“%1$s” is used in %2$d books and %3$d annotations. Permanent deletion removes it from all choices and annotations. Annotations and notes remain; another selected label determines the style, or the original base style is restored.</string>
+    <string name="highlight_tag_use_existing">Use this label instead</string>
+    <string name="highlight_tag_use_existing_hint">This book already has a label named “%1$s”. Existing annotations with that label will use the selected label’s style and description. Annotation notes remain. The original label stays in the library.</string>
 </resources>
