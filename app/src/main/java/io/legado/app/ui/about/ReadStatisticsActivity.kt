@@ -159,9 +159,16 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
             return true
         }
         if (item.itemId == R.id.menu_statistics_help) {
+            val coverage = snapshot.hourlySummary(period, year, month,
+                if (AppConfig.readStatisticsQualifiedOnly) statisticsMinimum() else 0, day)
+            val scope = getString(if (AppConfig.readStatisticsQualifiedOnly)
+                R.string.read_statistics_scope_qualified else R.string.read_statistics_scope_all)
             alert(R.string.read_statistics_help) {
                 setMessage(getString(R.string.read_statistics_coverage, earliestDate().toString()) +
                     "\n\n" + getString(R.string.read_statistics_scope_explanation) +
+                    "\n\n" + getString(R.string.read_statistics_hour_coverage_title, header.tvPeriod.text, scope) +
+                    "\n" + getString(R.string.read_statistics_hour_coverage,
+                        duration(coverage.duration), duration(coverage.unassignedDuration)) +
                     "\n\n" + getString(R.string.read_statistics_hour_help))
                 okButton()
             }
@@ -454,13 +461,15 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         render()
     }
 
+    private fun statisticsMinimum() = when (period) {
+        ReadStatisticsPeriod.ALL -> AppConfig.readStatisticsAllMinimum
+        ReadStatisticsPeriod.YEAR -> AppConfig.readStatisticsYearMinimum
+        ReadStatisticsPeriod.MONTH -> AppConfig.readStatisticsMonthMinimum
+        ReadStatisticsPeriod.DAY -> AppConfig.readStatisticsDayMinimum
+    }
+
     private fun render() {
-        val minimum = when (period) {
-            ReadStatisticsPeriod.ALL -> AppConfig.readStatisticsAllMinimum
-            ReadStatisticsPeriod.YEAR -> AppConfig.readStatisticsYearMinimum
-            ReadStatisticsPeriod.MONTH -> AppConfig.readStatisticsMonthMinimum
-            ReadStatisticsPeriod.DAY -> AppConfig.readStatisticsDayMinimum
-        }
+        val minimum = statisticsMinimum()
         val all = snapshot.summary(period, year, month, day = day)
         val qualifiedOnly = AppConfig.readStatisticsQualifiedOnly
         val summary = if (qualifiedOnly) snapshot.summary(period, year, month, minimum, day) else all
@@ -624,8 +633,6 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
                 hourLabel(selected.startHour, selected.endHour), duration(selected.duration))
             previousHour.isEnabled = index > 0
             nextHour.isEnabled = index < buckets.lastIndex
-            tvHourCoverage.text = getString(R.string.read_statistics_hour_coverage,
-                duration(hourly.duration), duration(hourly.unassignedDuration))
             toggleHourBooks.setText(if (hourBooksExpanded) R.string.read_statistics_collapse_hour_books
                 else R.string.read_statistics_expand_hour_books)
             toggleHourBooks.setTextColor(contentSecondary)
