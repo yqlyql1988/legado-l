@@ -47,14 +47,6 @@
                 android:textSize="16sp" />
 
             <TextView
-                android:id="@+id/tv_style"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:textColor="@color/secondaryText"
-                android:textSize="12sp" />
-
-            <TextView
                 android:id="@+id/tv_note"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -68,7 +60,7 @@
 
         <io.legado.app.ui.highlight.HighlightTagPreview
             android:id="@+id/tv_preview"
-            android:layout_width="112dp"
+            android:layout_width="88dp"
             android:layout_height="wrap_content"
             android:gravity="center"
             android:importantForAccessibility="no"
@@ -77,4 +69,20 @@
             android:textColor="@color/primaryText"
             android:textSize="16sp" />
     </LinearLayout>
+    <androidx.appcompat.widget.AppCompatImageButton
+        android:id="@+id/btn_common"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:padding="12dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@drawable/ic_star_border"
+        android:contentDescription="@string/highlight_tag_mark_common" />
+    <androidx.appcompat.widget.AppCompatImageButton
+        android:id="@+id/btn_more"
+        android:layout_width="40dp"
+        android:layout_height="48dp"
+        android:padding="10dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@drawable/ic_more_vert"
+        android:contentDescription="@string/more_menu" />
 </LinearLayout>

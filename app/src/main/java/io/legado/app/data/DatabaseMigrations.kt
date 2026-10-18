@@ -14,6 +14,13 @@ import java.util.UUID
 object DatabaseMigrations {
 
     @Suppress("ClassName")
+    class Migration_119_120 : AutoMigrationSpec {
+        override fun onPostMigrate(db: SupportSQLiteDatabase) {
+            db.execSQL("UPDATE highlight_tags SET common = 1 WHERE bookUrl = ''")
+        }
+    }
+
+    @Suppress("ClassName")
     class Migration_113_114 : AutoMigrationSpec {
         override fun onPostMigrate(db: SupportSQLiteDatabase) {
             io.legado.app.help.HighlightTags.seedDefaults(db)

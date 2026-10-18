@@ -8,6 +8,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.data.entities.BookHighlight
 import io.legado.app.data.entities.HighlightTag
 import io.legado.app.data.entities.HighlightTagLink
+import io.legado.app.data.entities.HighlightTagOrder
 import io.legado.app.help.HighlightStyle
 import io.legado.app.help.HighlightTags
 import org.junit.After
@@ -123,6 +124,161 @@ class HighlightTagDatabaseTest {
         dao.restore(dao.all(), listOf(HighlightTagLink(second.time, local.id)),
             listOf(second.time), orders)
         assertTrue(dao.idsForHighlight(second.time).isEmpty())
+    }
+
+    @Test fun commonFlagMakesBookLabelReusableWithoutChangingItsIdentity() {
+        val dao = db.highlightTagDao
+        val local = HighlightTag(id = "share", name = "好看", bookUrl = first.bookUrl, note = "标签说明")
+        dao.saveTag(local)
+        dao.toggle(first.time, local.id)
+        dao.saveTag(local.copy(common = true))
+        assertEquals(local.copy(common = true), dao.all().first { it.id == local.id })
+        assertTrue(dao.forBook(second.bookUrl).any { it.id == local.id })
+        dao.toggle(second.time, local.id)
+        assertEquals(listOf(local.id), dao.idsForHighlight(second.time))
+        dao.saveTag(local)
+        assertEquals(listOf(local.id), dao.idsForHighlight(first.time))
+        assertEquals(listOf(local.id), dao.idsForHighlight(second.time))
+        assertTrue(dao.forBook(second.bookUrl).any { it.id == local.id })
+        assertFalse(dao.forBook("unused").any { it.id == local.id })
+        assertEquals(listOf(first, second), db.bookHighlightDao.all.sortedBy { it.time })
+    }
+
+    @Test fun hidingCommonLabelKeepsCommonFlagLinksNotesAndEffectivePriority() {
+        val dao = db.highlightTagDao
+        val tags = dao.all()
+        tags.take(2).forEach { dao.toggle(first.time, it.id) }
+        val before = HighlightTags.effectiveStyle(first, dao.forBook(first.bookUrl), dao.idsForHighlight(first.time))
+        val entries = dao.forBook(first.bookUrl).mapIndexed { index, tag ->
+            HighlightTagOrder(first.bookUrl, tag.id, index, tag.id == tags.first().id)
+        }
+        dao.saveBookLabels(first.bookUrl, entries)
+        assertTrue(dao.all().first().common)
+        assertFalse(dao.forBook(first.bookUrl).any { it.id == tags.first().id })
+        assertTrue(dao.forBook(second.bookUrl).any { it.id == tags.first().id })
+        assertEquals(tags.take(2).map { it.id }.toSet(), dao.idsForHighlight(first.time).toSet())
+        assertEquals(before, HighlightTags.effectiveStyle(first, dao.forBook(first.bookUrl, true),
+            dao.idsForHighlight(first.time)))
+        dao.saveGlobalOrder(tags.reversed().map { it.id })
+        assertTrue(dao.ordersForBook(first.bookUrl).first { it.tagId == tags.first().id }.hidden)
+        dao.saveOrder(first.bookUrl, dao.forBook(first.bookUrl).map { it.id })
+        assertTrue(dao.ordersForBook(first.bookUrl).any { it.hidden && it.tagId == tags.first().id })
+        assertEquals(first, db.bookHighlightDao.getByBook(first.bookUrl).single())
+    }
+
+    @Test fun anyLibraryLabelCanBeAddedToAnotherBookAndHiddenLabelCanBeReadded() {
+        val dao = db.highlightTagDao
+        val local = HighlightTag(id = "character", name = "张三", bookUrl = first.bookUrl)
+        dao.saveTag(local)
+        assertFalse(dao.canAttach(second.time, local.id))
+        dao.saveBookLabels(second.bookUrl, listOf(HighlightTagOrder(second.bookUrl, local.id, 0)))
+        assertTrue(dao.canAttach(second.time, local.id))
+        dao.toggle(second.time, local.id)
+        dao.saveBookLabels(second.bookUrl, listOf(HighlightTagOrder(second.bookUrl, local.id, 0, true)))
+        assertFalse(dao.canAttach(second.time, local.id))
+        assertEquals(listOf(local.id), dao.idsForHighlight(second.time))
+        // A selected hidden tag can still be unselected from the annotation's popup.
+        dao.toggle(second.time, local.id)
+        assertTrue(dao.idsForHighlight(second.time).isEmpty())
+        dao.saveBookLabels(second.bookUrl, listOf(HighlightTagOrder(second.bookUrl, local.id, 0)))
+        assertEquals(local.id, dao.forBook(second.bookUrl).first().id)
+        assertFalse(dao.all().first { it.id == local.id }.common)
+    }
+
+    @Test fun sameNameLabelsStayIndependentUntilThisBookExplicitlyChoosesAnother() {
+        val dao = db.highlightTagDao
+        val one = HighlightTag(id = "name-a", name = "好看", bookUrl = first.bookUrl, note = "A",
+            style = """{"bold":true}""")
+        val two = HighlightTag(id = "name-b", name = "好看", bookUrl = second.bookUrl, note = "B",
+            style = """{"italic":true}""")
+        dao.saveTag(one)
+        dao.saveTag(two)
+        dao.toggle(first.time, one.id)
+        dao.toggle(second.time, two.id)
+        dao.saveTag(one.copy(common = true))
+        assertEquals(two.id, HighlightTags.choices(dao.forBook(second.bookUrl), second.bookUrl)
+            .single { it.name == "好看" }.id)
+        assertEquals(listOf(two.id), dao.idsForHighlight(second.time))
+        dao.saveBookLabels(second.bookUrl, listOf(HighlightTagOrder(second.bookUrl, one.id, 0),
+            HighlightTagOrder(second.bookUrl, two.id, 1, true)))
+        dao.useLibraryLabel(second.bookUrl, two.id, one.id)
+        assertEquals(listOf(one.id), dao.idsForHighlight(second.time))
+        assertEquals(listOf(one.id), dao.idsForHighlight(first.time))
+        assertEquals(two, dao.all().first { it.id == two.id })
+        assertEquals(second, db.bookHighlightDao.getByBook(second.bookUrl).single())
+    }
+
+    @Test fun libraryDeletionReportsUsageAndKeepsAnnotationsAndBaseStyles() {
+        val dao = db.highlightTagDao
+        val tag = dao.all().first()
+        dao.toggle(first.time, tag.id)
+        dao.toggle(second.time, tag.id)
+        assertEquals(2, dao.usage(tag.id).books)
+        assertEquals(2, dao.usage(tag.id).highlights)
+        dao.saveDefinitions(dao.all().filterNot { it.id == tag.id })
+        assertTrue(dao.links().isEmpty())
+        assertEquals(listOf(first, second), db.bookHighlightDao.all.sortedBy { it.time })
+        assertEquals(first.styleObj(), HighlightTags.effectiveStyle(first, dao.forBook(first.bookUrl), emptyList()))
+    }
+
+    @Test fun backupDataRoundTripsCommonFlagHiddenChoicesAndCrossBookLinks() {
+        val dao = db.highlightTagDao
+        val local = HighlightTag(id = "backup-character", name = "张三", bookUrl = first.bookUrl)
+        dao.saveTag(local)
+        dao.saveBookLabels(second.bookUrl, listOf(HighlightTagOrder(second.bookUrl, local.id, 0, true)))
+        dao.upsertLinks(listOf(HighlightTagLink(second.time, local.id)))
+        val tags = dao.all()
+        val links = dao.links()
+        val orders = dao.orders()
+        val gson = io.legado.app.utils.GSON
+        dao.replaceDefinitions(emptyList())
+        repeat(2) {
+            dao.restore(
+                gson.fromJson(gson.toJson(tags), Array<HighlightTag>::class.java).toList(),
+                gson.fromJson(gson.toJson(links), Array<HighlightTagLink>::class.java).toList(),
+                listOf(first.time, second.time),
+                gson.fromJson(gson.toJson(orders), Array<HighlightTagOrder>::class.java).toList())
+        }
+        assertEquals(tags, dao.all())
+        assertEquals(links, dao.links())
+        assertEquals(orders, dao.orders())
+        assertFalse(dao.forBook(second.bookUrl).any { it.id == local.id })
+        assertTrue(dao.forBook(second.bookUrl, true).any { it.id == local.id })
+    }
+
+    @Test fun upgrade119KeepsLegacyIdsLinksOrdersAndAssignsOnlySharedLabelsAsCommon() {
+        val name = "tag-library-migration"
+        context.deleteDatabase(name)
+        migrations.createDatabase(name, 119).apply {
+            execSQL("""INSERT INTO highlight_tags (id,name,style,sortOrder,bookUrl,note)
+                VALUES ('shared','雷','{}',0,'','共享说明'),('local','张三','{}',1,'book','人物说明')""")
+            execSQL("INSERT INTO highlight_tag_orders VALUES ('book','local',0),('book','shared',1)")
+            execSQL("""INSERT INTO highlights
+                (time,bookUrl,chapterUrl,bookName,bookAuthor,chapterIndex,chapterPos,chapterPosEnd,
+                layoutTitleLength,chapterName,bookText,style,note)
+                VALUES (123,'book','chapter','Book','Author',2,5,8,0,'Chapter','abc','{"fill":19}','旧笔记')""")
+            execSQL("INSERT INTO highlight_tag_links VALUES (123,'local'),(123,'shared')")
+            close()
+        }
+        val upgraded = Room.databaseBuilder(context, AppDatabase::class.java, name)
+            .addMigrations(*DatabaseMigrations.migrations).build()
+        try {
+            val dao = upgraded.highlightTagDao
+            assertTrue(dao.all().first { it.id == "shared" }.common)
+            assertFalse(dao.all().first { it.id == "local" }.common)
+            assertEquals(listOf("local", "shared"), dao.forBook("book").map { it.id })
+            assertTrue(dao.orders().none { it.hidden })
+            assertEquals(setOf("local", "shared"), dao.idsForHighlight(123).toSet())
+            assertEquals("人物说明", dao.all().first { it.id == "local" }.note)
+            assertEquals("旧笔记", upgraded.bookHighlightDao.all.single().note)
+            assertEquals(19, upgraded.bookHighlightDao.all.single().styleObj().fill)
+        } finally { upgraded.close(); context.deleteDatabase(name) }
+    }
+
+    @Test fun freshSchemaSeedsDefaultLabelsAsCommon() {
+        db.highlightTagDao.replaceDefinitions(emptyList())
+        HighlightTags.seedDefaults(db.openHelper.writableDatabase)
+        assertEquals(HighlightTags.defaults(), db.highlightTagDao.all())
     }
 
     @Test fun upgrade114KeepsTagIdsAssociationsAndTreatsExistingTagsAsShared() {

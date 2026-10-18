@@ -2,6 +2,7 @@ package io.legado.app.ui.highlight
 
 import android.annotation.SuppressLint
 import android.os.Bundle
+import android.content.res.ColorStateList
 import android.view.KeyEvent
 import android.view.Menu
 import android.view.MotionEvent
@@ -12,6 +13,8 @@ import android.widget.TextView
 import androidx.activity.addCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.isVisible
+import androidx.core.widget.doAfterTextChanged
+import androidx.appcompat.widget.PopupMenu
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
@@ -30,6 +33,7 @@ import io.legado.app.ui.widget.recycler.VerticalDivider
 import io.legado.app.utils.GSON
 import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.fromJsonArray
+import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.getCompatColor
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.showDialogFragment
@@ -39,14 +43,16 @@ import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class HighlightTagManageActivity : BaseActivity<ActivityHighlightTagBinding>(), HighlightTagEditDialog.Callback {
+class HighlightTagManageActivity : BaseActivity<ActivityHighlightTagBinding>(),
+    HighlightTagEditDialog.Callback, HighlightTagAddDialog.Callback {
     override val binding by viewBinding(ActivityHighlightTagBinding::inflate)
     private val tags = arrayListOf<HighlightTag>()
     private var original = emptyList<HighlightTag>()
-    private var originalOrder = emptyList<String>()
-    private var bookOrder = emptyList<String>()
+    private var originalOrder = emptyList<HighlightTagOrder>()
+    private var bookOrder = emptyList<HighlightTagOrder>()
+    private val replacements = linkedMapOf<String, String>()
     private val bookUrl by lazy { intent.getStringExtra("bookUrl").orEmpty() }
-    private var bookTab = true
+    private var libraryMode = false
     private val adapter = TagAdapter()
     private var saving = false
     private var visibleTags = emptyList<HighlightTag>()
@@ -62,27 +68,30 @@ class HighlightTagManageActivity : BaseActivity<ActivityHighlightTagBinding>(), 
         original = savedInstanceState?.getString("original")?.let { GSON.fromJsonArray<HighlightTag>(it).getOrNull() }
             ?: appDb.highlightTagDao.all()
         tags.addAll(savedInstanceState?.getString("tags")?.let { GSON.fromJsonArray<HighlightTag>(it).getOrNull() } ?: original)
-        originalOrder = savedInstanceState?.getStringArrayList("originalOrder")
-            ?: appDb.highlightTagDao.ordersForBook(bookUrl).map { it.tagId }
-        bookOrder = savedInstanceState?.getStringArrayList("order") ?: originalOrder
-        bookTab = (savedInstanceState?.getBoolean("bookTab") ?: true) && bookUrl.isNotEmpty()
-        binding.tabBook.isVisible = bookUrl.isNotEmpty()
-        binding.tabBook.setOnClickListener { bookTab = true; render() }
-        binding.tabGlobal.setOnClickListener { bookTab = false; render() }
+        originalOrder = savedInstanceState?.getString("originalOrder")?.let {
+            GSON.fromJsonArray<HighlightTagOrder>(it).getOrNull()
+        } ?: appDb.highlightTagDao.ordersForBook(bookUrl)
+        bookOrder = savedInstanceState?.getString("order")?.let {
+            GSON.fromJsonArray<HighlightTagOrder>(it).getOrNull()
+        } ?: originalOrder
+        savedInstanceState?.getString("replacements")?.let {
+            GSON.fromJsonObject<Map<String, String>>(it).getOrNull()?.let(replacements::putAll)
+        }
+        libraryMode = (savedInstanceState?.getBoolean("library") ?: false) || bookUrl.isEmpty()
         binding.recyclerView.adapter = adapter
         binding.recyclerView.addItemDecoration(VerticalDivider(this))
         touchHelper.attachToRecyclerView(binding.recyclerView)
         binding.recyclerView.applyNavigationBarPadding()
-        binding.tvAdd.setOnClickListener {
-            if (!saving) showDialogFragment(HighlightTagEditDialog.create(HighlightTag(
-                style = GSON.toJson(HighlightStyle(underline = HighlightStyle.Underline(color = 0xFF43864C.toInt(), width = 2f))),
-                sortOrder = (tags.maxOfOrNull { it.sortOrder } ?: -1) + 1,
-                bookUrl = if (bookTab) bookUrl else ""
-            ), true, bookUrl))
-        }
+        binding.tvAdd.setOnClickListener { if (!saving) showDialogFragment(HighlightTagAddDialog()) }
+        binding.etLibrarySearch.doAfterTextChanged { if (libraryMode) render() }
         onBackPressedDispatcher.addCallback(this) {
             if (saving) return@addCallback
-            if (tags == original && bookOrder == originalOrder) finish()
+            if (libraryMode && bookUrl.isNotEmpty()) {
+                libraryMode = false
+                render()
+                return@addCallback
+            }
+            if (tags == original && bookOrder == originalOrder && replacements.isEmpty()) finish()
             else AlertDialog.Builder(this@HighlightTagManageActivity).setMessage(R.string.highlight_tag_unsaved)
                 .setPositiveButton(R.string.action_save) { _, _ -> save() }
                 .setNegativeButton(R.string.highlight_tag_discard) { _, _ -> finish() }
@@ -105,30 +114,31 @@ class HighlightTagManageActivity : BaseActivity<ActivityHighlightTagBinding>(), 
             showPreview()
             true
         }
+        if (bookUrl.isNotEmpty()) menu.add(R.string.highlight_tag_library).setOnMenuItemClickListener {
+            libraryMode = true
+            render()
+            true
+        }
         return true
     }
 
     private fun render() {
-        visibleTags = if (bookTab) HighlightTags.forBook(tags, bookUrl,
-            bookOrder.mapIndexed { index, id -> HighlightTagOrder(bookUrl, id, index) })
-            else tags.filter { it.bookUrl.isEmpty() }.sortedWith(compareBy(HighlightTag::sortOrder, HighlightTag::id))
-        binding.tabBook.setTextColor(if (bookTab) accentColor else getCompatColor(R.color.secondaryText))
-        binding.tabGlobal.setTextColor(if (!bookTab) accentColor else getCompatColor(R.color.secondaryText))
-        binding.tabBook.isSelected = bookTab
-        binding.tabGlobal.isSelected = !bookTab
-        binding.tvHint.setText(if (bookTab) R.string.highlight_tag_book_hint else R.string.highlight_tag_global_hint)
+        val query = binding.etLibrarySearch.text.toString().trim()
+        visibleTags = if (!libraryMode) bookChoices() else tags
+            .filter { query.isEmpty() || it.name.contains(query, true) || it.note.contains(query, true) }
+            .sortedWith(compareByDescending<HighlightTag> { it.common }.thenBy { it.sortOrder }.thenBy { it.id })
+        binding.tvListTitle.setText(if (libraryMode) R.string.highlight_tag_library else R.string.highlight_tag_book_list)
+        binding.etLibrarySearch.isVisible = libraryMode
+        binding.tvHint.setText(if (libraryMode) R.string.highlight_tag_library_hint else R.string.highlight_tag_list_hint)
         binding.tvEmpty.isVisible = visibleTags.isEmpty()
         adapter.notifyDataSetChanged()
     }
 
     private fun move(from: Int, to: Int) {
-        if (saving || from !in visibleTags.indices || to !in visibleTags.indices || from == to) return
+        if (saving || libraryMode || from !in visibleTags.indices || to !in visibleTags.indices || from == to) return
         visibleTags = visibleTags.toMutableList().apply { add(to, removeAt(from)) }
-        if (bookTab) bookOrder = visibleTags.map { it.id }
-        else {
-            val positions = visibleTags.mapIndexed { index, tag -> tag.id to index }.toMap()
-            tags.replaceAll { tag -> positions[tag.id]?.let { tag.copy(sortOrder = it) } ?: tag }
-        }
+        val positions = visibleTags.mapIndexed { index, tag -> HighlightTagOrder(bookUrl, tag.id, index) }
+        bookOrder = positions + bookOrder.filter { entry -> positions.none { it.tagId == entry.tagId } }
         adapter.notifyItemMoved(from, to)
     }
 
@@ -174,18 +184,102 @@ class HighlightTagManageActivity : BaseActivity<ActivityHighlightTagBinding>(), 
     }
 
     override fun saveTag(tag: HighlightTag): Boolean {
-        if (saving || tag.name.isBlank() || tags.any { it.id != tag.id && it.name == tag.name &&
-            (it.bookUrl == tag.bookUrl || it.bookUrl.isEmpty() || tag.bookUrl.isEmpty()) }) return false
+        val old = tags.firstOrNull { it.id == tag.id }
+        if (saving || tag.name.isBlank() || (old == null || !old.name.equals(tag.name, true)) &&
+            tags.any { it.id != tag.id && it.name.equals(tag.name, true) }) return false
         val index = tags.indexOfFirst { it.id == tag.id }
         if (index < 0) tags.add(tag) else tags[index] = tag
+        if (index < 0 && bookUrl.isNotEmpty()) putEntry(tag.id, false)
         render()
         return true
     }
 
-    override fun deleteTag(id: String) {
+    private fun bookChoices() = HighlightTags.choices(
+        HighlightTags.forBook(tags, bookUrl, bookOrder), bookUrl,
+        bookOrder.filterNot { it.hidden }.sortedBy { it.sortOrder }.map { it.tagId })
+
+    override fun labelLibrary(): List<HighlightTag> = tags.toList()
+    override fun addedLabelIds(): Set<String> = bookChoices().mapTo(hashSetOf()) { it.id }
+
+    override fun createLabel(name: String) {
         if (saving) return
-        tags.removeAll { it.id == id }
-        bookOrder = bookOrder.filter { it != id }
+        showDialogFragment(HighlightTagEditDialog.create(HighlightTag(
+            name = name, bookUrl = bookUrl, common = bookUrl.isEmpty(),
+            style = GSON.toJson(HighlightStyle(underline = HighlightStyle.Underline(color = 0xFF43864C.toInt(), width = 2f))),
+            sortOrder = (tags.maxOfOrNull { it.sortOrder } ?: -1) + 1
+        ), true, bookUrl))
+    }
+
+    private fun putEntry(id: String, hidden: Boolean) {
+        val previous = bookOrder.associateBy { it.tagId }
+        bookOrder = HighlightTags.forBook(tags, bookUrl, bookOrder, includeHidden = true)
+            .mapIndexed { index, tag ->
+                HighlightTagOrder(bookUrl, tag.id, index, previous[tag.id]?.hidden == true)
+            }
+        val position = bookOrder.firstOrNull { it.tagId == id }?.sortOrder
+            ?: ((bookOrder.maxOfOrNull { it.sortOrder } ?: -1) + 1)
+        bookOrder = bookOrder.filterNot { it.tagId == id } + HighlightTagOrder(bookUrl, id, position, hidden)
+    }
+
+    override fun chooseLabel(id: String) {
+        if (saving) return
+        val tag = tags.firstOrNull { it.id == id } ?: return
+        if (bookUrl.isEmpty()) {
+            showDialogFragment(HighlightTagEditDialog.create(tag, false))
+            return
+        }
+        val other = bookChoices().firstOrNull { it.id != id && it.name.equals(tag.name, true) }
+        fun add() {
+            if (id !in addedLabelIds()) putEntry(id, false)
+            libraryMode = false
+            render()
+            binding.recyclerView.post {
+                val position = visibleTags.indexOfFirst { it.id == id }
+                if (position >= 0) binding.recyclerView.smoothScrollToPosition(position)
+            }
+            toastOnUi(getString(R.string.highlight_tag_located, tag.name))
+        }
+        if (other == null) add()
+        else AlertDialog.Builder(this)
+            .setTitle(R.string.highlight_tag_use_existing)
+            .setMessage(getString(R.string.highlight_tag_use_existing_hint, tag.name))
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.highlight_tag_use_existing) { _, _ ->
+                replacements.replaceAll { _, target -> if (target == other.id) id else target }
+                replacements[other.id] = id
+                replacements.remove(id)
+                putEntry(other.id, true)
+                add()
+            }.show()
+    }
+
+    override fun deleteTag(id: String) {
+        if (saving || bookUrl.isEmpty()) return
+        putEntry(id, true)
+        render()
+    }
+
+    private fun deleteFromLibrary(tag: HighlightTag) {
+        val usage = appDb.highlightTagDao.usage(tag.id)
+        AlertDialog.Builder(this).setTitle(R.string.highlight_tag_delete_library)
+            .setMessage(getString(R.string.highlight_tag_delete_library_hint, tag.name, usage.books, usage.highlights))
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.delete) { _, _ ->
+                tags.removeAll { it.id == tag.id }
+                bookOrder = bookOrder.filterNot { it.tagId == tag.id }
+                render()
+            }.show()
+    }
+
+    private fun toggleCommon(tag: HighlightTag) {
+        if (saving) return
+        if (tag.common && bookUrl.isNotEmpty()) {
+            // Keep this book's current choices after cancelling the global default.
+            val choices = bookChoices()
+            choices.forEach { putEntry(it.id, false) }
+        }
+        val index = tags.indexOfFirst { it.id == tag.id }
+        if (index >= 0) tags[index] = tags[index].copy(common = !tag.common)
         render()
     }
 
@@ -196,9 +290,14 @@ class HighlightTagManageActivity : BaseActivity<ActivityHighlightTagBinding>(), 
             try {
                 withContext(IO) {
                     appDb.runInTransaction {
-                        appDb.highlightTagDao.replaceDefinitions(tags.toList())
+                        // Apply confirmed switches before deleting definitions so removing
+                        // the old library entry cannot cascade away the chosen association.
+                        replacements.forEach { (from, to) ->
+                            appDb.highlightTagDao.useLibraryLabel(bookUrl, from, to)
+                        }
+                        appDb.highlightTagDao.saveDefinitions(tags.toList(), bookUrl)
                         if (bookUrl.isNotEmpty() && bookOrder != originalOrder)
-                            appDb.highlightTagDao.saveOrder(bookUrl, bookOrder)
+                            appDb.highlightTagDao.saveBookLabels(bookUrl, bookOrder)
                     }
                 }
                 ReadBook.upHighlightTags()
@@ -213,9 +312,10 @@ class HighlightTagManageActivity : BaseActivity<ActivityHighlightTagBinding>(), 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("original", GSON.toJson(original))
         outState.putString("tags", GSON.toJson(tags))
-        outState.putStringArrayList("order", ArrayList(bookOrder))
-        outState.putStringArrayList("originalOrder", ArrayList(originalOrder))
-        outState.putBoolean("bookTab", bookTab)
+        outState.putString("order", GSON.toJson(bookOrder))
+        outState.putString("originalOrder", GSON.toJson(originalOrder))
+        outState.putString("replacements", GSON.toJson(replacements))
+        outState.putBoolean("library", libraryMode)
         super.onSaveInstanceState(outState)
     }
 
@@ -231,11 +331,29 @@ class HighlightTagManageActivity : BaseActivity<ActivityHighlightTagBinding>(), 
             holder.row.tvPreview.highlightStyle = tag.styleObj()
             holder.row.tvNote.text = tag.note
             holder.row.tvNote.isVisible = tag.note.isNotBlank()
-            holder.row.tvStyle.text = getString(if (tag.bookUrl.isEmpty()) R.string.highlight_tag_global else R.string.highlight_tag_book)
+            holder.row.btnCommon.setImageResource(if (tag.common) R.drawable.ic_star else R.drawable.ic_star_border)
+            holder.row.btnCommon.imageTintList = ColorStateList.valueOf(
+                if (tag.common) accentColor else getCompatColor(R.color.secondaryText))
+            holder.row.btnCommon.isSelected = tag.common
+            holder.row.btnCommon.contentDescription = getString(if (tag.common)
+                R.string.highlight_tag_unmark_common else R.string.highlight_tag_mark_common, tag.name)
+            holder.row.btnCommon.setOnClickListener { toggleCommon(tags.first { it.id == tag.id }) }
+            holder.row.btnMore.isVisible = libraryMode
+            holder.row.btnMore.imageTintList = ColorStateList.valueOf(getCompatColor(R.color.secondaryText))
+            holder.row.btnMore.setOnClickListener { view ->
+                if (!saving) PopupMenu(this@HighlightTagManageActivity, view).apply {
+                    menu.add(R.string.highlight_tag_delete_library).setOnMenuItemClickListener {
+                        deleteFromLibrary(tag)
+                        true
+                    }
+                    show()
+                }
+            }
             holder.row.editLabel.setOnClickListener {
                 if (!saving) showDialogFragment(HighlightTagEditDialog.create(
-                    tags.first { it.id == tag.id }, false, bookUrl))
+                    tags.first { it.id == tag.id }, false, bookUrl, !libraryMode && bookUrl.isNotEmpty()))
             }
+            holder.row.dragHandle.isVisible = !libraryMode
             holder.row.dragHandle.contentDescription = getString(R.string.highlight_tag_drag, tag.name)
             holder.row.dragHandle.setOnTouchListener { _, event ->
                 if (!saving && event.actionMasked == MotionEvent.ACTION_DOWN) touchHelper.startDrag(holder)

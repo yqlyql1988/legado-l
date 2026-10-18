@@ -105,6 +105,47 @@ class HighlightTagBackupRestoreTest {
             assertEquals(tags, appDb.highlightTagDao.all())
             tagFile.writeText(fullTagJson)
 
+            // A real backup preserves independent common/hidden state and cross-book membership.
+            val dao = appDb.highlightTagDao
+            dao.saveDefinitions(tags.mapIndexed { index, tag ->
+                when (index) { 0 -> tag.copy(common = false)
+                    tags.lastIndex -> tag.copy(common = true)
+                    else -> tag }
+            }, first.bookUrl)
+            dao.saveBookLabels(first.bookUrl, dao.ordersForBook(first.bookUrl).map {
+                it.copy(hidden = it.tagId == tags.first().id)
+            })
+            val libraryTags = dao.all()
+            val libraryOrders = dao.orders()
+            val libraryLinks = dao.links()
+            val stateDirectory = File(directory, "library-state")
+            runBlocking(Dispatchers.IO) { Backup.backupLocked(context, stateDirectory.path, uploadWebDav = false) }
+            val stateUnpacked = File(stateDirectory, "unpacked").apply { mkdirs() }
+            ZipFile(File(stateDirectory, "backup.zip")).use { zip ->
+                for (entryName in listOf("highlight.json", "highlightTag.json", "highlightTagLink.json", "highlightTagOrder.json")) {
+                    File(stateUnpacked, entryName).writeBytes(zip.getInputStream(zip.getEntry(entryName)).use { it.readBytes() })
+                }
+            }
+            dao.replaceDefinitions(emptyList())
+            repeat(2) { runBlocking(Dispatchers.IO) { Restore.restoreLocked(stateUnpacked.path) } }
+            assertEquals(libraryTags, dao.all())
+            assertEquals(libraryOrders, dao.orders())
+            assertEquals(libraryLinks, dao.links())
+            assertFalse(dao.forBook(first.bookUrl).any { it.id == tags.first().id })
+            assertTrue(dao.forBook(second.bookUrl).any { it.id == tags.first().id })
+            // Older backup fields cannot cancel a star or undo a newer per-book hide choice.
+            val oldTags = org.json.JSONArray(File(stateUnpacked, "highlightTag.json").readText())
+            for (index in 0 until oldTags.length()) oldTags.getJSONObject(index).remove("common")
+            File(stateUnpacked, "highlightTag.json").writeText(oldTags.toString())
+            val oldOrders = org.json.JSONArray(File(stateUnpacked, "highlightTagOrder.json").readText())
+            for (index in 0 until oldOrders.length()) oldOrders.getJSONObject(index).remove("hidden")
+            File(stateUnpacked, "highlightTagOrder.json").writeText(oldOrders.toString())
+            repeat(2) { runBlocking(Dispatchers.IO) { Restore.restoreLocked(stateUnpacked.path) } }
+            assertEquals(libraryTags, dao.all())
+            assertEquals(libraryOrders, dao.orders())
+            assertEquals(libraryLinks, dao.links())
+            dao.restore(tags, links, listOf(first.time, second.time), orders)
+
             // A pre-label backup has only highlight.json. Upsert must preserve existing label links.
             File(unpacked, "highlightTag.json").delete()
             File(unpacked, "highlightTagLink.json").delete()

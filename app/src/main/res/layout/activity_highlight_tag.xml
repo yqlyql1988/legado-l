@@ -7,18 +7,19 @@
         app:title="@string/highlight_tag_manage" />
     <LinearLayout android:layout_width="match_parent" android:layout_height="48dp"
         android:gravity="center_vertical" android:paddingHorizontal="16dp">
-        <TextView android:id="@+id/tab_book" android:layout_width="wrap_content" android:layout_height="match_parent"
-            android:minWidth="64dp" android:gravity="center" android:text="@string/highlight_tag_book"
-            android:textSize="15sp" android:textColor="@color/primaryText" android:background="?attr/selectableItemBackground" />
-        <TextView android:id="@+id/tab_global" android:layout_width="wrap_content" android:layout_height="match_parent"
-            android:minWidth="64dp" android:gravity="center" android:text="@string/highlight_tag_global"
-            android:textSize="15sp" android:textColor="@color/primaryText" android:background="?attr/selectableItemBackground" />
+        <TextView android:id="@+id/tv_list_title" android:layout_width="wrap_content" android:layout_height="match_parent"
+            android:gravity="center_vertical" android:text="@string/highlight_tag_book_list"
+            android:textSize="15sp" android:textColor="@color/primaryText" />
         <Space android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
         <io.legado.app.ui.widget.text.AccentTextView android:id="@+id/tv_add"
             android:layout_width="wrap_content" android:layout_height="match_parent" android:paddingHorizontal="12dp"
-            android:gravity="center" android:text="@string/highlight_tag_add" android:background="?attr/selectableItemBackground" />
+            android:gravity="center" android:text="@string/highlight_tag_add_to_book" android:background="?attr/selectableItemBackground" />
     </LinearLayout>
     <View android:layout_width="match_parent" android:layout_height="0.5dp" android:background="@color/bg_divider_line" />
+    <io.legado.app.lib.theme.view.ThemeEditText android:id="@+id/et_library_search"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginHorizontal="20dp" android:hint="@string/highlight_tag_search"
+        android:inputType="text" android:maxLines="1" android:visibility="gone" />
     <TextView android:id="@+id/tv_hint" android:layout_width="match_parent" android:layout_height="wrap_content"
         android:paddingHorizontal="20dp" android:paddingVertical="12dp"
         android:text="@string/highlight_tag_book_hint" android:textColor="@color/secondaryText" android:textSize="12sp" />

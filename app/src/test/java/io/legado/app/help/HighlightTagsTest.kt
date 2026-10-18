@@ -81,4 +81,32 @@ class HighlightTagsTest {
         assertEquals("old", tag.id)
         assertEquals(2, tag.sortOrder)
     }
+
+    @Test fun commonAndBookVisibilityAreIndependentAndHiddenTagsCanStillResolveStyles() {
+        val shared = clue.copy(common = true)
+        val orders = listOf(io.legado.app.data.entities.HighlightTagOrder("book", shared.id, 0, true))
+        assertTrue(HighlightTags.forBook(listOf(shared), "book", orders).isEmpty())
+        assertEquals(listOf(shared), HighlightTags.forBook(listOf(shared), "another"))
+        val retained = HighlightTags.forBook(listOf(shared), "book", orders, includeHidden = true)
+        assertEquals(shared.styleObj(), HighlightTags.effectiveStyle(annotation, retained, listOf(shared.id)))
+        assertTrue(shared.common)
+    }
+
+    @Test fun libraryMembershipAllowsCharacterLabelsInOnlyTheBooksThatAddedThem() {
+        val character = clue.copy(name = "张三", bookUrl = "first", common = false)
+        val second = listOf(io.legado.app.data.entities.HighlightTagOrder("second", character.id, 0))
+        assertEquals(character.id, HighlightTags.forBook(listOf(character), "first").single().id)
+        assertEquals(character.id, HighlightTags.forBook(listOf(character), "second", second).single().id)
+        assertTrue(HighlightTags.forBook(listOf(character), "third", second).isEmpty())
+    }
+
+    @Test fun sameNamePrefersOwnLabelAndExplicitChoiceWithoutMergingTheirSettings() {
+        val common = clue.copy(name = "好看", common = true)
+        val own = appearance.copy(name = "好看", bookUrl = "book", common = false, note = "本书说明")
+        val available = HighlightTags.forBook(listOf(common, own), "book")
+        assertEquals(own.id, HighlightTags.choices(available, "book").single().id)
+        assertEquals(common.id, HighlightTags.choices(available, "book", listOf(common.id)).single().id)
+        assertEquals("本书说明", own.note)
+        assertEquals(2, available.size)
+    }
 }

@@ -166,10 +166,8 @@ class HighlightActionPopup(
 
     private fun showTagNote(tag: HighlightTag) {
         noteDialog?.dismiss()
-        val scope = context.getString(if (tag.bookUrl.isEmpty())
-            R.string.highlight_tag_global else R.string.highlight_tag_book)
         noteDialog = AlertDialog.Builder(context)
-            .setTitle("${tag.name} · $scope")
+            .setTitle(if (tag.common) "${tag.name} · ${context.getString(R.string.highlight_tag_common)}" else tag.name)
             .setMessage(tag.note.ifBlank { context.getString(R.string.highlight_tag_note_empty) })
             .setPositiveButton(R.string.close, null)
             .create().apply {

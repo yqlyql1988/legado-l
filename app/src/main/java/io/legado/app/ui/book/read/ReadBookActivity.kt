@@ -1294,10 +1294,10 @@ class ReadBookActivity : BaseReadBookActivity(),
         }, onTag = { tagId ->
             editingHighlight?.let {
                 ReadBook.toggleHighlightTag(it, tagId)
-                highlightActionPopup?.refreshTags(ReadBook.highlightTags, ReadBook.highlightTagIds(it))
+                highlightActionPopup?.refreshTags(ReadBook.highlightTagChoices(it), ReadBook.highlightTagIds(it))
             }
         }).apply {
-            refreshTags(ReadBook.highlightTags, ReadBook.highlightTagIds(highlight))
+            refreshTags(ReadBook.highlightTagChoices(highlight), ReadBook.highlightTagIds(highlight))
             show(binding.textMenuPosition, binding.readView.curPage.highlightBounds(highlight))
         }
     }
