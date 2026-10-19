@@ -18,12 +18,19 @@ import io.legado.app.utils.getCompatColor
 internal fun Context.highlightTagChip(tag: HighlightTag, selected: Boolean, compact: Boolean = false, click: () -> Unit) =
     TextView(this).apply {
         text = tag.name
-        textSize = 14f
+        textSize = if (compact) 12f else 14f
         isSingleLine = true
         gravity = Gravity.CENTER
-        minHeight = (if (compact) 32 else 44).dpToPx()
+        minHeight = (if (compact) 26 else 44).dpToPx()
         includeFontPadding = !compact
-        setPadding(12.dpToPx(), if (compact) 0 else 6.dpToPx(), 12.dpToPx(), if (compact) 0 else 6.dpToPx())
+        val horizontal = (if (compact) 8 else 12).dpToPx()
+        setPadding(horizontal, if (compact) 0 else 6.dpToPx(), horizontal, if (compact) 0 else 6.dpToPx())
+        if (compact) layoutParams = com.google.android.flexbox.FlexboxLayout.LayoutParams(
+            android.view.ViewGroup.LayoutParams.WRAP_CONTENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply {
+            marginEnd = 6.dpToPx()
+            bottomMargin = 6.dpToPx()
+        }
         setTextColor(context.getCompatColor(R.color.primaryText))
         background = GradientDrawable().apply {
             cornerRadius = 4f.dpToPx()

@@ -48,6 +48,14 @@
             android:textColor="@color/secondaryText"
             android:textSize="12sp" />
 
+        <com.google.android.flexbox.FlexboxLayout
+            android:id="@+id/tag_labels"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:visibility="gone"
+            app:flexWrap="wrap" />
+
     </LinearLayout>
 
 </androidx.cardview.widget.CardView>

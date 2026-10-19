@@ -8,20 +8,25 @@ import io.legado.app.data.entities.HighlightTagOrder
 internal fun preserveLegacyTagNotes(
     json: String, tags: List<HighlightTag>, current: List<HighlightTag>
 ): List<HighlightTag> {
-    val notesPresent = JsonParser.parseString(json).asJsonArray.mapNotNull { element ->
-        val row = element.asJsonObject
+    val rows = JsonParser.parseString(json).asJsonArray.map { it.asJsonObject }
+        .mapNotNull { row -> row.get("id")?.asString?.let { it to row } }.toMap()
+    val notesPresent = rows.values.mapNotNull { row ->
         row.get("id")?.asString?.takeIf { row.has("note") && !row.get("note").isJsonNull }
     }.toHashSet()
     val existing = current.associateBy { it.id }
-    val commonPresent = JsonParser.parseString(json).asJsonArray.mapNotNull { element ->
-        val row = element.asJsonObject
+    val commonPresent = rows.values.mapNotNull { row ->
         row.get("id")?.asString?.takeIf { row.has("common") && !row.get("common").isJsonNull }
     }.toHashSet()
     return tags.map { tag ->
+        val row = rows[tag.id]
         tag.copy(note = if (tag.id in notesPresent) tag.note.orEmpty()
             else existing[tag.id]?.note.orEmpty(),
             common = if (tag.id in commonPresent) tag.common
-                else existing[tag.id]?.common ?: tag.bookUrl.isEmpty())
+                else existing[tag.id]?.common ?: tag.bookUrl.isEmpty(),
+            bookmarkCommon = if (row?.has("bookmarkCommon") == true) tag.bookmarkCommon
+                else existing[tag.id]?.bookmarkCommon ?: false,
+            bookmarkSortOrder = if (row?.has("bookmarkSortOrder") == true) tag.bookmarkSortOrder
+                else existing[tag.id]?.bookmarkSortOrder ?: 0)
     }
 }
 

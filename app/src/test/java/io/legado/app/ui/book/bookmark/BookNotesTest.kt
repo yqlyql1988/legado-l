@@ -133,11 +133,30 @@ class BookNotesTest {
         assertEquals(listOf(2L), result.map { it.time })
         assertTrue(filterBookNotes(notes, NoteType.BOOKMARK, "second", "", false).isEmpty())
     }
-    @Test fun allAndUntaggedHaveDifferentSemanticsAndDoNotIncludeBookmarksAsUntagged() {
+    @Test fun allAndUntaggedIncludeBothNoteTypesWithoutLabels() {
         val notes = archive().single().notes
         assertEquals(2, filterBookNotes(notes, NoteType.ALL, null, "", false).size)
-        assertEquals(1, filterBookNotes(notes, NoteType.ALL, "", "", false).size)
-        assertNotNull(filterBookNotes(notes, NoteType.ALL, "", "", false).single().highlight)
+        assertEquals(2, filterBookNotes(notes, NoteType.ALL, "", "", false).size)
+        assertNotNull(filterBookNotes(notes, NoteType.BOOKMARK, "", "", false).single().bookmark)
+    }
+    @Test fun bookmarkLabelsShareDefinitionsButKeepOwnOrderAndParticipateInSearchFilterAndExport() {
+        val tags = listOf(HighlightTag("clue", "伏笔", common = true, bookmarkCommon = false),
+            HighlightTag("later", "待回看", bookmarkSortOrder = 2))
+        val notes = archiveBookNotes(listOf(bookmark()), listOf(highlight()), listOf(book), tags,
+            listOf(HighlightTagLink(2, "clue")), bookmarkLinks = listOf(
+                io.legado.app.data.entities.BookmarkTagLink(1, "clue"),
+                io.legado.app.data.entities.BookmarkTagLink(1, "later")),
+            bookmarkOrders = listOf(
+                io.legado.app.data.entities.BookmarkTagOrder(book.bookUrl, "later", 0),
+                io.legado.app.data.entities.BookmarkTagOrder(book.bookUrl, "clue", 1)))
+            .single().notes
+        val saved = notes.single { it.bookmark != null }
+        assertEquals(listOf("later", "clue"), saved.tags.map { it.id })
+        assertFalse(saved.tags.last().common)
+        assertEquals(2, filterBookNotes(notes, NoteType.ALL, "clue", "", false).size)
+        assertEquals(saved, filterBookNotes(notes, NoteType.BOOKMARK, "clue", "待回看", false).single())
+        assertTrue(filterBookNotes(notes, NoteType.ALL, "", "", false).isEmpty())
+        assertTrue(notesMarkdown(listOf(saved)).contains("标签：待回看、伏笔"))
     }
     @Test fun searchIncludesQuoteRemarkChapterBookAuthorAndLabelName() {
         val notes = archive(tags = listOf(HighlightTag("label", "重要伏笔")),

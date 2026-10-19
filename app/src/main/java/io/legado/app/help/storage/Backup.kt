@@ -57,6 +57,7 @@ internal fun selectedBackupFileNames(isEnabled: (String) -> Boolean): List<Strin
         if (isEnabled(BackupConfig.annotationContentKey)) {
             addAll(listOf("bookmark.json", "highlight.json", "highlightRule.json",
                 "highlightTag.json", "highlightTagLink.json", "highlightTagOrder.json",
+                "bookmarkTagLink.json", "bookmarkTagOrder.json",
                 ReadingNotes.LOCATION_FILE, ReadingNotes.SOURCE_FILE))
         }
         if (isEnabled(BackupConfig.sourceContentKey)) {
@@ -284,28 +285,29 @@ object Backup {
             backupPath,
         )
         writeListToJson(memos, "bookMemo.json", backupPath, writeEmpty = true)
-        val (annotations, highlightTagOrders, noteExtensions) = appDb.runInTransaction(Callable {
+        val annotationFiles = appDb.runInTransaction(Callable {
             val highlights = appDb.bookHighlightDao.all
             val bookmarks = appDb.bookmarkDao.all
             val highlightIds = highlights.mapTo(hashSetOf()) { it.time }
             val bookmarkIds = bookmarks.mapTo(hashSetOf()) { it.time }
-            Triple(
-                Triple(highlights, appDb.highlightTagDao.all(), appDb.highlightTagDao.links()),
-                appDb.highlightTagDao.orders(),
-                Triple(appDb.readingNoteDao.locations().filter {
+            linkedMapOf(
+                "bookmark.json" to bookmarks,
+                "highlight.json" to highlights,
+                "highlightTag.json" to appDb.highlightTagDao.all(),
+                "highlightTagLink.json" to appDb.highlightTagDao.links(),
+                "highlightTagOrder.json" to appDb.highlightTagDao.orders(),
+                "bookmarkTagLink.json" to appDb.bookmarkTagDao.links(),
+                "bookmarkTagOrder.json" to appDb.bookmarkTagDao.orders(),
+                ReadingNotes.LOCATION_FILE to appDb.readingNoteDao.locations().filter {
                     it.kind == "highlight" && it.noteTime in highlightIds ||
                         it.kind == "bookmark" && it.noteTime in bookmarkIds
-                }, appDb.readingNoteDao.sources(), bookmarks)
+                },
+                ReadingNotes.SOURCE_FILE to appDb.readingNoteDao.sources()
             )
         })
-        val (highlights, highlightTags, highlightTagLinks) = annotations
-        writeListToJson(highlights, "highlight.json", backupPath, writeEmpty = true)
-        writeListToJson(highlightTags, "highlightTag.json", backupPath, writeEmpty = true)
-        writeListToJson(highlightTagLinks, "highlightTagLink.json", backupPath, writeEmpty = true)
-        writeListToJson(highlightTagOrders, "highlightTagOrder.json", backupPath, writeEmpty = true)
-        writeListToJson(noteExtensions.first, ReadingNotes.LOCATION_FILE, backupPath, writeEmpty = true)
-        writeListToJson(noteExtensions.second, ReadingNotes.SOURCE_FILE, backupPath, writeEmpty = true)
-        writeListToJson(noteExtensions.third, "bookmark.json", backupPath)
+        annotationFiles.forEach { (fileName, entries) ->
+            writeListToJson(entries, fileName, backupPath, writeEmpty = true)
+        }
         writeListToJson(
             appDb.highlightRuleDao.all,
             "highlightRule.json",

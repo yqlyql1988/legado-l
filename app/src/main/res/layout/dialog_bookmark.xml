@@ -72,6 +72,33 @@
 
                 </io.legado.app.ui.widget.text.TextInputLayout>
 
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/book_notes_tags"
+                        android:textColor="@color/secondaryText"
+                        android:textSize="13sp" />
+                    <io.legado.app.ui.widget.text.AccentTextView
+                        android:id="@+id/tag_more"
+                        android:layout_width="wrap_content"
+                        android:layout_height="48dp"
+                        android:gravity="center"
+                        android:paddingHorizontal="8dp"
+                        android:text="@string/note_tag_more" />
+                </LinearLayout>
+                <com.google.android.flexbox.FlexboxLayout
+                    android:id="@+id/tag_choices"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:flexWrap="wrap" />
+
             </LinearLayout>
 
         </androidx.core.widget.NestedScrollView>

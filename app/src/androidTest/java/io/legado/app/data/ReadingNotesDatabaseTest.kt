@@ -34,7 +34,7 @@ class ReadingNotesDatabaseTest {
             val db = Room.databaseBuilder(context, AppDatabase::class.java, name)
                 .addMigrations(*DatabaseMigrations.migrations).build()
             try {
-                assertEquals(122, db.openHelper.writableDatabase.version)
+                assertEquals(123, db.openHelper.writableDatabase.version)
                 assertEquals("Memo", db.bookmarkDao.all.single().content)
                 assertEquals("Note", db.bookHighlightDao.all.single().note)
                 assertEquals(33, db.bookHighlightDao.all.single().chapterPos)

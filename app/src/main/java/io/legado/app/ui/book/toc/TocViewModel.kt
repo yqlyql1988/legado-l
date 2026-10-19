@@ -1,5 +1,7 @@
 package io.legado.app.ui.book.toc
 
+import io.legado.app.help.BookmarkTags
+
 
 import android.app.Application
 import android.net.Uri
@@ -130,7 +132,7 @@ class TocViewModel(application: Application) : BaseViewModel(application) {
             val fileName = "bookmark-${book.name} ${book.author}.json"
             val doc = FileDoc.fromUri(treeUri, true)
             doc.createFileIfNotExist(fileName).writeText(
-                GSON.toJson(
+                BookmarkTags.exportJson(
                     appDb.bookmarkDao.getByBook(book.name, book.author)
                 )
             )
@@ -152,10 +154,15 @@ class TocViewModel(application: Application) : BaseViewModel(application) {
                 .getOrThrow()
             fileDoc.use { outputStream ->
                 outputStream.write("## ${book.name} ${book.author}\n\n".toByteArray())
-                appDb.bookmarkDao.getByBook(book.name, book.author).forEach {
+                val bookmarks = appDb.bookmarkDao.getByBook(book.name, book.author)
+                val attached = BookmarkTags.attached(bookmarks)
+                bookmarks.forEach {
                     outputStream.write("#### ${it.chapterName}\n\n".toByteArray())
                     outputStream.write("###### 原文\n ${it.bookText}\n\n".toByteArray())
                     outputStream.write("###### 摘要\n ${it.content}\n\n".toByteArray())
+                    attached[it.time].orEmpty().takeIf { tags -> tags.isNotEmpty() }?.let { tags ->
+                        outputStream.write("标签：${tags.joinToString("、") { tag -> tag.name }}\n\n".toByteArray())
+                    }
                 }
             }
         }.onError {

@@ -14,6 +14,17 @@ import org.junit.Test
 import java.io.File
 
 class HighlightBackupCompatibilityTest {
+    @Test fun `old backups preserve bookmark favorites while explicit new preferences replace them`() {
+        val current = listOf(HighlightTag("label", "伏笔", bookmarkCommon = true, bookmarkSortOrder = 8))
+        val old = """[{"id":"label","name":"伏笔","common":true}]"""
+        val restored = preserveLegacyTagNotes(old, GSON.fromJsonArray<HighlightTag>(old).getOrThrow(), current).single()
+        assertTrue(restored.bookmarkCommon)
+        assertEquals(8, restored.bookmarkSortOrder)
+        val newer = """[{"id":"label","name":"伏笔","bookmarkCommon":false,"bookmarkSortOrder":2}]"""
+        val explicit = preserveLegacyTagNotes(newer, GSON.fromJsonArray<HighlightTag>(newer).getOrThrow(), current).single()
+        assertFalse(explicit.bookmarkCommon)
+        assertEquals(2, explicit.bookmarkSortOrder)
+    }
 
     @Test
     fun `old tag backups preserve local notes while explicit empty notes can clear them`() {

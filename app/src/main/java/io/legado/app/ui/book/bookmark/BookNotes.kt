@@ -3,6 +3,8 @@ package io.legado.app.ui.book.bookmark
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookHighlight
 import io.legado.app.data.entities.Bookmark
+import io.legado.app.data.entities.BookmarkTagLink
+import io.legado.app.data.entities.BookmarkTagOrder
 import io.legado.app.data.entities.BookReview
 import io.legado.app.data.entities.BookReviewArchive
 import io.legado.app.data.entities.bookReviewOrder
@@ -60,7 +62,9 @@ internal data class NoteBook(
 internal fun archiveBookNotes(
     bookmarks: List<Bookmark>, highlights: List<BookHighlight>, books: List<Book>,
     tags: List<HighlightTag>, links: List<HighlightTagLink>,
-    orders: List<HighlightTagOrder> = emptyList(), reviews: List<BookReview> = emptyList()
+    orders: List<HighlightTagOrder> = emptyList(), reviews: List<BookReview> = emptyList(),
+    bookmarkLinks: List<BookmarkTagLink> = emptyList(),
+    bookmarkOrders: List<BookmarkTagOrder> = emptyList()
 ): List<NoteBook> {
     fun metadata(name: String, author: String) = "metadata:${name.length}:$name$author"
     val booksByUrl = books.associateBy { it.bookUrl }
@@ -75,11 +79,21 @@ internal fun archiveBookNotes(
         HighlightTags.forBook(tags, url, orders.filter { it.bookUrl == url }, includeHidden = true)
     }
     val linksByTime = links.groupBy { it.highlightTime }
+    val bookmarkLinksByTime = bookmarkLinks.groupBy { it.bookmarkTime }
+    val bookmarkOrdersByBook = bookmarkOrders.groupBy { it.bookUrl }
     val entries = highlights.map { highlight ->
         val ids = linksByTime[highlight.time].orEmpty().mapTo(hashSetOf()) { it.tagId }
         val attached = orderedTags[highlight.bookUrl].orEmpty().filter { it.id in ids }
         BookNote(highlight = highlight, tags = attached)
-    } + bookmarks.map { BookNote(bookmark = it) }
+    } + bookmarks.map { bookmark ->
+        val ids = bookmarkLinksByTime[bookmark.time].orEmpty().mapTo(hashSetOf()) { it.tagId }
+        val url = legacyOwners(bookmark.bookName, bookmark.bookAuthor).singleOrNull()
+        val positions = bookmarkOrdersByBook[url].orEmpty().associate { it.tagId to it.sortOrder }
+        val attached = tags.filter { it.id in ids }.map { it.forBookmark() }
+            .sortedWith(compareBy<HighlightTag> { positions[it.id] ?: Int.MAX_VALUE }
+                .thenBy { it.sortOrder }.thenBy { it.id })
+        BookNote(bookmark = bookmark, tags = attached)
+    }
     val noteBooks = entries.groupBy { entry ->
         val url = entry.highlight?.bookUrl?.takeIf(String::isNotBlank)
             ?: legacyOwners(entry.bookName, entry.author).singleOrNull()
@@ -111,8 +125,8 @@ internal fun filterBookNotes(
     recentFirst: Boolean, chapterIndexes: Map<String, Int> = emptyMap()
 ): List<BookNote> = notes.filter { entry ->
     (type == NoteType.ALL || entry.type == type) && entry.matches(query.trim()) &&
-        (tagId == null || entry.highlight != null &&
-            if (tagId.isEmpty()) entry.tags.isEmpty() else entry.tags.any { it.id == tagId })
+        (tagId == null || if (tagId.isEmpty()) entry.tags.isEmpty()
+            else entry.tags.any { it.id == tagId })
 }.sortedWith(if (recentFirst) compareByDescending<BookNote> { it.time }.thenBy { it.id }
 else compareBy<BookNote>(
     { it.highlight?.chapterUrl?.takeIf(String::isNotBlank)?.let { url ->

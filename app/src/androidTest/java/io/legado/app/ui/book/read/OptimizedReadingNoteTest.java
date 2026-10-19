@@ -69,7 +69,7 @@ public class OptimizedReadingNoteTest {
         File cache = null;
         ActivityScenario<Activity> scenario = null;
         try {
-            assertEquals(122, db.getVersion());
+            assertEquals(123, db.getVersion());
             Object book = entity("Book");
             set(book, "bookUrl", url);
             set(book, "name", name);

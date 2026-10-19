@@ -7,6 +7,14 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class HighlightTagsTest {
+    @Test fun bookmarkChoicesDoNotInheritAnnotationBookMembership() {
+        val highlightOnly = HighlightTag("highlight-only", "外貌", bookUrl = "book", common = false)
+        assertTrue(HighlightTags.forBook(listOf(highlightOnly.forBookmark()), "book",
+            includeOwned = false).isEmpty())
+        val order = io.legado.app.data.entities.HighlightTagOrder("book", highlightOnly.id, 0)
+        assertEquals(highlightOnly.id, HighlightTags.forBook(listOf(highlightOnly.forBookmark()),
+            "book", listOf(order), includeOwned = false).single().id)
+    }
     private val base = HighlightStyle(fill = 17, bold = true,
         underline = HighlightStyle.Underline(color = 25))
     private val annotation = BookHighlight(time = 1, note = "Keep note").apply { applyStyle(base) }

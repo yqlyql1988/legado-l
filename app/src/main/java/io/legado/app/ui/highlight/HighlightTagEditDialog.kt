@@ -31,6 +31,7 @@ class HighlightTagEditDialog : BaseDialogFragment(R.layout.dialog_highlight_tag_
     private val binding by viewBinding(DialogHighlightTagEditBinding::bind)
     private var tag = HighlightTag()
     private var style = HighlightStyle(underline = HighlightStyle.Underline())
+    private val callback get() = parentFragment as? Callback ?: activity as? Callback
 
     override fun onStart() {
         super.onStart()
@@ -55,13 +56,16 @@ class HighlightTagEditDialog : BaseDialogFragment(R.layout.dialog_highlight_tag_
                 val name = binding.etName.text.toString().trim()
                 val updated = tag.copy(name = name, note = binding.etNote.text.toString().trim(),
                     style = GSON.toJson(style.normalized()))
-                if (name.isEmpty() || (activity as? Callback)?.saveTag(updated) != true)
+                if (name.isEmpty() || callback?.saveTag(updated) != true)
                     binding.etName.error = getString(R.string.highlight_tag_duplicate)
                 else dismiss()
                 true
             }
         }
         binding.etName.setText(tag.name)
+        val bookmarkMode = arguments?.getBoolean("bookmarkMode") == true
+        binding.tagStyleSection.isVisible = !bookmarkMode
+        if (bookmarkMode) binding.tvScopeHint.setText(R.string.note_tag_bookmark_hint)
         binding.etNote.setText(tag.note)
         binding.btnStyle.setOnClickListener {
             HighlightStyleDialog().show(childFragmentManager, STYLE_TAG)
@@ -76,7 +80,7 @@ class HighlightTagEditDialog : BaseDialogFragment(R.layout.dialog_highlight_tag_
                 .setMessage(getString(R.string.highlight_tag_remove_book_hint, tag.name))
                 .setNegativeButton(R.string.cancel, null)
                 .setPositiveButton(R.string.highlight_tag_remove_book) { _, _ ->
-                    (activity as? Callback)?.deleteTag(tag.id)
+                    callback?.deleteTag(tag.id)
                     dismiss()
                 }.show()
         }
@@ -117,12 +121,14 @@ class HighlightTagEditDialog : BaseDialogFragment(R.layout.dialog_highlight_tag_
     companion object {
         private const val STYLE_TAG = "highlight-tag-style"
         private const val COLOR_TAG = "highlight-tag-color"
-        fun create(tag: HighlightTag, isNew: Boolean, bookUrl: String = "", removeFromBook: Boolean = false) = HighlightTagEditDialog().apply {
+        fun create(tag: HighlightTag, isNew: Boolean, bookUrl: String = "", removeFromBook: Boolean = false,
+                   bookmarkMode: Boolean = false) = HighlightTagEditDialog().apply {
             arguments = Bundle().apply {
                 putString("tag", GSON.toJson(tag))
                 putBoolean("new", isNew)
                 putString("bookUrl", bookUrl)
                 putBoolean("removeFromBook", removeFromBook)
+                putBoolean("bookmarkMode", bookmarkMode)
             }
         }
     }
