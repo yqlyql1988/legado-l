@@ -64,8 +64,8 @@ class HighlightTagEditDialog : BaseDialogFragment(R.layout.dialog_highlight_tag_
         }
         binding.etName.setText(tag.name)
         val bookmarkMode = arguments?.getBoolean("bookmarkMode") == true
-        binding.btnStyle.isVisible = !bookmarkMode
-        binding.tvPreview.isVisible = !bookmarkMode
+        binding.tagStyleSection.isVisible = !bookmarkMode
+        if (bookmarkMode) binding.tvScopeHint.setText(R.string.note_tag_bookmark_hint)
         binding.etNote.setText(tag.note)
         binding.btnStyle.setOnClickListener {
             HighlightStyleDialog().show(childFragmentManager, STYLE_TAG)
