@@ -1852,4 +1852,10 @@
     <string name="reimport_book_source">Reimport this book’s source</string>
     <string name="customize_my">Customize My page</string>
     <string name="my_more_items">Move selected items to More</string>
+    <string name="reading_note_position_missing">原文已修改或有多处匹配，已打开章节。可长按书签或标注，选择“手动定位”。</string>
+    <string name="reading_note_relocate">手动定位</string>
+    <string name="reading_note_choose_chapter">选择原文所在章节</string>
+    <string name="reading_note_manual_hint">请选中对应原文，再点击“书签”或“标注”，保存这条笔记的新位置。</string>
+    <string name="reading_note_relocated">已保存当前书源的位置，原摘录、笔记和标签已保留</string>
+    <string name="reading_note_unresolved">尚未找到对应位置，书签和标注内容仍保留。可以手动选择原文位置。</string>
 </resources>
