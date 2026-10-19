@@ -64,6 +64,11 @@ interface BookmarkDao {
     @Update
     fun update(bookmark: Bookmark)
 
+    @Query("""UPDATE bookmarks SET chapterIndex = :chapterIndex, chapterPos = :position,
+        chapterName = :chapterName WHERE time = :time AND bookName = :bookName AND bookAuthor = :author""")
+    fun updateLocation(time: Long, bookName: String, author: String,
+        chapterIndex: Int, position: Int, chapterName: String)
+
     @Delete
     fun delete(vararg bookmark: Bookmark)
 

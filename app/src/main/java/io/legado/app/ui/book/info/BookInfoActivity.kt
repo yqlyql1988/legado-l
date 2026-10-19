@@ -156,6 +156,7 @@ class BookInfoActivity :
                 highlightAnchorText =
                     (it[TocActivityResult.HIGHLIGHT_ANCHOR_TEXT_INDEX] as String)
                         .takeIf(String::isNotEmpty),
+                readingNoteKey = (it[TocActivityResult.READING_NOTE_KEY_INDEX] as String).takeIf(String::isNotEmpty),
             )
         } ?: let {
             if (!viewModel.inBookshelf) {
@@ -1347,6 +1348,7 @@ class BookInfoActivity :
         chapterInVolumeIndex: Int,
         highlightLayoutTitleLength: Int?,
         highlightAnchorText: String?,
+        readingNoteKey: String?,
     ) {
         viewModel.getBook(false)?.let { book ->
             val deferHighlightPosition = highlightLayoutTitleLength != null &&
@@ -1371,7 +1373,8 @@ class BookInfoActivity :
                             index.takeIf { deferHighlightPosition },
                             pos.takeIf { deferHighlightPosition },
                             highlightLayoutTitleLength.takeIf { deferHighlightPosition },
-                            highlightAnchorText.takeIf { deferHighlightPosition }
+                            highlightAnchorText.takeIf { deferHighlightPosition },
+                            readingNoteKey.takeIf { deferHighlightPosition }
                         )
                     }
                 }
@@ -1385,7 +1388,8 @@ class BookInfoActivity :
                         index.takeIf { deferHighlightPosition },
                         pos.takeIf { deferHighlightPosition },
                         highlightLayoutTitleLength.takeIf { deferHighlightPosition },
-                        highlightAnchorText.takeIf { deferHighlightPosition }
+                        highlightAnchorText.takeIf { deferHighlightPosition },
+                        readingNoteKey.takeIf { deferHighlightPosition }
                     )
                 }
             }
@@ -1507,6 +1511,7 @@ class BookInfoActivity :
         highlightChapterPos: Int? = null,
         highlightLayoutTitleLength: Int? = null,
         highlightAnchorText: String? = null,
+        readingNoteKey: String? = null,
     ) {
         when {
             book.isAudio -> readBookResult.launch(
@@ -1535,6 +1540,7 @@ class BookInfoActivity :
                     ) {
                         putExtra("index", highlightIndex)
                         putExtra("chapterPos", highlightChapterPos)
+                        putExtra(TocActivityResult.EXTRA_READING_NOTE_KEY, readingNoteKey)
                         putExtra(
                             TocActivityResult.EXTRA_HIGHLIGHT_LAYOUT_TITLE_LENGTH,
                             highlightLayoutTitleLength

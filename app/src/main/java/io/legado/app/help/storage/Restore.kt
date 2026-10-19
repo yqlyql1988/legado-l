@@ -38,6 +38,9 @@ import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.AppCacheManager
 import io.legado.app.help.DirectLinkUpload
 import io.legado.app.help.HighlightStyle
+import io.legado.app.help.ReadingNotes
+import io.legado.app.data.entities.ReadingNoteLocation
+import io.legado.app.data.entities.ReadingNoteSource
 import io.legado.app.help.LauncherIconHelp
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.normalizeLegacyPersistedCover
@@ -359,6 +362,13 @@ object Restore {
                 AppLog.put("恢复高亮出错\n${it.localizedMessage}", it)
             }
         }
+        val noteLocations = fileToListT<ReadingNoteLocation>(path, ReadingNotes.LOCATION_FILE)
+        val noteSources = fileToListT<ReadingNoteSource>(path, ReadingNotes.SOURCE_FILE)
+        runCatching {
+            appDb.runInTransaction {
+                ReadingNotes.restore(noteLocations, noteSources, appDb.bookHighlightDao.all, appDb.bookmarkDao.all)
+            }
+        }.onFailure { AppLog.put("恢复书签与标注定位信息出错\n${it.localizedMessage}", it) }
         fileToListT<HighlightRule>(path, "highlightRule.json")?.let { rules ->
             kotlin.runCatching {
                 appDb.highlightRuleDao.replaceAll(rules.map(HighlightRule::normalizeForRestore))

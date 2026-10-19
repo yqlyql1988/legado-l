@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 122,
-    "identityHash": "43d5138e2fe2d3a1df6d6e7abddfa73e",
+    "identityHash": "d9d69be285e2d0fef5f44afe641d192e",
     "entities": [
       {
         "tableName": "books",
@@ -2680,7 +2680,7 @@
       },
       {
         "tableName": "highlight_tags",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `style` TEXT NOT NULL, `sortOrder` INTEGER NOT NULL, `bookUrl` TEXT NOT NULL DEFAULT '', `note` TEXT NOT NULL DEFAULT '', `common` INTEGER NOT NULL DEFAULT 0, `bookmarkCommon` INTEGER NOT NULL DEFAULT 0, `bookmarkSortOrder` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `style` TEXT NOT NULL, `sortOrder` INTEGER NOT NULL, `bookUrl` TEXT NOT NULL DEFAULT '', `note` TEXT NOT NULL DEFAULT '', `common` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -2723,20 +2723,6 @@
           {
             "fieldPath": "common",
             "columnName": "common",
-            "affinity": "INTEGER",
-            "notNull": true,
-            "defaultValue": "0"
-          },
-          {
-            "fieldPath": "bookmarkCommon",
-            "columnName": "bookmarkCommon",
-            "affinity": "INTEGER",
-            "notNull": true,
-            "defaultValue": "0"
-          },
-          {
-            "fieldPath": "bookmarkSortOrder",
-            "columnName": "bookmarkSortOrder",
             "affinity": "INTEGER",
             "notNull": true,
             "defaultValue": "0"
@@ -2855,128 +2841,6 @@
             ],
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `index_highlight_tag_orders_tagId` ON `${TABLE_NAME}` (`tagId`)"
-          }
-        ],
-        "foreignKeys": [
-          {
-            "table": "highlight_tags",
-            "onDelete": "CASCADE",
-            "onUpdate": "NO ACTION",
-            "columns": [
-              "tagId"
-            ],
-            "referencedColumns": [
-              "id"
-            ]
-          }
-        ]
-      },
-      {
-        "tableName": "bookmark_tag_links",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`bookmarkTime` INTEGER NOT NULL, `tagId` TEXT NOT NULL, PRIMARY KEY(`bookmarkTime`, `tagId`), FOREIGN KEY(`bookmarkTime`) REFERENCES `bookmarks`(`time`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`tagId`) REFERENCES `highlight_tags`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
-        "fields": [
-          {
-            "fieldPath": "bookmarkTime",
-            "columnName": "bookmarkTime",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "tagId",
-            "columnName": "tagId",
-            "affinity": "TEXT",
-            "notNull": true
-          }
-        ],
-        "primaryKey": {
-          "autoGenerate": false,
-          "columnNames": [
-            "bookmarkTime",
-            "tagId"
-          ]
-        },
-        "indices": [
-          {
-            "name": "index_bookmark_tag_links_tagId",
-            "unique": false,
-            "columnNames": [
-              "tagId"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_bookmark_tag_links_tagId` ON `${TABLE_NAME}` (`tagId`)"
-          }
-        ],
-        "foreignKeys": [
-          {
-            "table": "bookmarks",
-            "onDelete": "CASCADE",
-            "onUpdate": "NO ACTION",
-            "columns": [
-              "bookmarkTime"
-            ],
-            "referencedColumns": [
-              "time"
-            ]
-          },
-          {
-            "table": "highlight_tags",
-            "onDelete": "CASCADE",
-            "onUpdate": "NO ACTION",
-            "columns": [
-              "tagId"
-            ],
-            "referencedColumns": [
-              "id"
-            ]
-          }
-        ]
-      },
-      {
-        "tableName": "bookmark_tag_orders",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`bookUrl` TEXT NOT NULL, `tagId` TEXT NOT NULL, `sortOrder` INTEGER NOT NULL, `hidden` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`bookUrl`, `tagId`), FOREIGN KEY(`tagId`) REFERENCES `highlight_tags`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
-        "fields": [
-          {
-            "fieldPath": "bookUrl",
-            "columnName": "bookUrl",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "tagId",
-            "columnName": "tagId",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "sortOrder",
-            "columnName": "sortOrder",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "hidden",
-            "columnName": "hidden",
-            "affinity": "INTEGER",
-            "notNull": true,
-            "defaultValue": "0"
-          }
-        ],
-        "primaryKey": {
-          "autoGenerate": false,
-          "columnNames": [
-            "bookUrl",
-            "tagId"
-          ]
-        },
-        "indices": [
-          {
-            "name": "index_bookmark_tag_orders_tagId",
-            "unique": false,
-            "columnNames": [
-              "tagId"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_bookmark_tag_orders_tagId` ON `${TABLE_NAME}` (`tagId`)"
           }
         ],
         "foreignKeys": [
@@ -3203,6 +3067,151 @@
             "createSql": "CREATE INDEX IF NOT EXISTS `index_readRecordHourly_date` ON `${TABLE_NAME}` (`date`)"
           }
         ]
+      },
+      {
+        "tableName": "reading_note_locations",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`kind` TEXT NOT NULL, `noteTime` INTEGER NOT NULL, `bookUrl` TEXT NOT NULL, `chapterUrl` TEXT NOT NULL, `chapterIndex` INTEGER NOT NULL, `chapterName` TEXT NOT NULL, `chapterPos` INTEGER NOT NULL, `chapterPosEnd` INTEGER NOT NULL, `layoutTitleLength` INTEGER NOT NULL, `quote` TEXT NOT NULL, `prefix` TEXT NOT NULL, `suffix` TEXT NOT NULL, `verified` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`kind`, `noteTime`, `bookUrl`))",
+        "fields": [
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "noteTime",
+            "columnName": "noteTime",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bookUrl",
+            "columnName": "bookUrl",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "chapterUrl",
+            "columnName": "chapterUrl",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "chapterIndex",
+            "columnName": "chapterIndex",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "chapterName",
+            "columnName": "chapterName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "chapterPos",
+            "columnName": "chapterPos",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "chapterPosEnd",
+            "columnName": "chapterPosEnd",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "layoutTitleLength",
+            "columnName": "layoutTitleLength",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "quote",
+            "columnName": "quote",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "prefix",
+            "columnName": "prefix",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "suffix",
+            "columnName": "suffix",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "verified",
+            "columnName": "verified",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "kind",
+            "noteTime",
+            "bookUrl"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_reading_note_locations_bookUrl",
+            "unique": false,
+            "columnNames": [
+              "bookUrl"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_reading_note_locations_bookUrl` ON `${TABLE_NAME}` (`bookUrl`)"
+          }
+        ]
+      },
+      {
+        "tableName": "reading_note_sources",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`bookUrl` TEXT NOT NULL, `workId` TEXT NOT NULL, `activeBookUrl` TEXT NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`bookUrl`))",
+        "fields": [
+          {
+            "fieldPath": "bookUrl",
+            "columnName": "bookUrl",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "workId",
+            "columnName": "workId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "activeBookUrl",
+            "columnName": "activeBookUrl",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "bookUrl"
+          ]
+        }
       }
     ],
     "views": [
@@ -3213,7 +3222,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '43d5138e2fe2d3a1df6d6e7abddfa73e')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd9d69be285e2d0fef5f44afe641d192e')"
     ]
   }
 }

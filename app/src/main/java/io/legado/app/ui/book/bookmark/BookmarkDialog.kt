@@ -114,6 +114,7 @@ class BookmarkDialog() : BaseDialogFragment(R.layout.dialog_bookmark, true) {
                             appDb.bookmarkDao.insert(bookmark)
                             appDb.bookmarkTagDao.saveLinks(bookmark.time, bookUrl, ids)
                         }
+                        io.legado.app.model.ReadBook.captureBookmarkLocation(bookmark)
                     }
                     dismiss()
                 }
@@ -122,6 +123,7 @@ class BookmarkDialog() : BaseDialogFragment(R.layout.dialog_bookmark, true) {
                 lifecycleScope.launch {
                     withContext(IO) {
                         appDb.bookmarkDao.delete(bookmark)
+                        appDb.readingNoteDao.deleteLocations("bookmark", listOf(bookmark.time))
                     }
                     dismiss()
                 }

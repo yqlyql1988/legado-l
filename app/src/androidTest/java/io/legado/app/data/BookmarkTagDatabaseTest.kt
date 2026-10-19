@@ -114,4 +114,35 @@ class BookmarkTagDatabaseTest {
             }
         } finally { upgraded.close(); context.deleteDatabase(name) }
     }
+
+    @Test fun upgrading122RetainsSourceLocationsAndAddsIndependentBookmarkSettings() {
+        val name = "bookmark-tags-from-location-schema"
+        context.deleteDatabase(name)
+        migrations.createDatabase(name, 122).use { old ->
+            old.execSQL("""INSERT INTO highlight_tags(id,name,style,sortOrder,bookUrl,note,common)
+                VALUES('old','Old tag','{}',4,'','Description',1)""")
+            old.execSQL("""INSERT INTO reading_note_locations
+                (kind,noteTime,bookUrl,chapterUrl,chapterIndex,chapterName,chapterPos,chapterPosEnd,
+                 layoutTitleLength,quote,prefix,suffix,verified,updatedAt)
+                VALUES('bookmark',1,'book','chapter',3,'Chapter',17,22,0,'Quote','Before','After',1,100)""")
+            old.execSQL("""INSERT INTO reading_note_sources(bookUrl,workId,activeBookUrl,updatedAt)
+                VALUES('book','work','another-source',100)""")
+        }
+        val upgraded = Room.databaseBuilder(context, AppDatabase::class.java, name)
+            .addMigrations(*DatabaseMigrations.migrations).build()
+        try {
+            assertEquals(123, upgraded.openHelper.writableDatabase.version)
+            val location = upgraded.readingNoteDao.locations().single()
+            assertEquals("Quote", location.quote)
+            assertEquals(17, location.chapterPos)
+            assertTrue(location.verified)
+            assertEquals("another-source", upgraded.readingNoteDao.sources().single().activeBookUrl)
+            val tag = upgraded.highlightTagDao.all().single()
+            assertTrue(tag.common)
+            assertFalse(tag.bookmarkCommon)
+            assertEquals(4, tag.sortOrder)
+            assertEquals(0, tag.bookmarkSortOrder)
+            assertTrue(upgraded.bookmarkTagDao.links().isEmpty())
+        } finally { upgraded.close(); context.deleteDatabase(name) }
+    }
 }

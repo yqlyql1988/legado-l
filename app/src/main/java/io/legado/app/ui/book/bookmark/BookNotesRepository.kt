@@ -41,9 +41,11 @@ internal object BookNotesRepository {
             appDb.runInTransaction {
                 notes.mapNotNull { it.bookmark }.takeIf { it.isNotEmpty() }?.let {
                     appDb.bookmarkDao.delete(*it.toTypedArray())
+                    appDb.readingNoteDao.deleteLocations("bookmark", it.map { bookmark -> bookmark.time })
                 }
                 notes.mapNotNull { it.highlight }.takeIf { it.isNotEmpty() }?.let {
                     appDb.bookHighlightDao.delete(*it.toTypedArray())
+                    appDb.readingNoteDao.deleteLocations("highlight", it.map { highlight -> highlight.time })
                 }
             }
         }

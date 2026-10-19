@@ -2,6 +2,8 @@ package io.legado.app.ui.highlight
 
 import android.content.Intent
 import android.graphics.Bitmap
+import android.widget.CheckBox
+import org.hamcrest.Matchers.allOf
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.*
 import androidx.test.espresso.Espresso.closeSoftKeyboard
@@ -62,9 +64,9 @@ class NoteTagPickerUiTest {
         onView(withText(R.string.highlight_tag_library)).perform(click())
         onView(withHint(R.string.note_tag_search)).perform(replaceText(library.name))
         closeSoftKeyboard()
-        onView(withText(library.name)).perform(click())
+        onView(allOf(withText(library.name), isAssignableFrom(CheckBox::class.java))).perform(click())
         scenario!!.recreate()
-        onView(withText(library.name)).check(matches(isChecked()))
+        onView(allOf(withText(library.name), isAssignableFrom(CheckBox::class.java))).check(matches(isChecked()))
         onView(withHint(R.string.note_tag_search)).perform(replaceText(""))
         closeSoftKeyboard()
         onView(withText(R.string.note_tag_book_list)).perform(click())

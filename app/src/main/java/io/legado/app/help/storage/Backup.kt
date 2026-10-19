@@ -11,6 +11,7 @@ import io.legado.app.data.appDb
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.DirectLinkUpload
+import io.legado.app.help.ReadingNotes
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.ReadBookConfig
@@ -56,7 +57,8 @@ internal fun selectedBackupFileNames(isEnabled: (String) -> Boolean): List<Strin
         if (isEnabled(BackupConfig.annotationContentKey)) {
             addAll(listOf("bookmark.json", "highlight.json", "highlightRule.json",
                 "highlightTag.json", "highlightTagLink.json", "highlightTagOrder.json",
-                "bookmarkTagLink.json", "bookmarkTagOrder.json"))
+                "bookmarkTagLink.json", "bookmarkTagOrder.json",
+                ReadingNotes.LOCATION_FILE, ReadingNotes.SOURCE_FILE))
         }
         if (isEnabled(BackupConfig.sourceContentKey)) {
             addAll(listOf("bookSource.json", "rssSources.json", "rssStar.json", "sourceSub.json"))
@@ -284,14 +286,23 @@ object Backup {
         )
         writeListToJson(memos, "bookMemo.json", backupPath, writeEmpty = true)
         val annotationFiles = appDb.runInTransaction(Callable {
+            val highlights = appDb.bookHighlightDao.all
+            val bookmarks = appDb.bookmarkDao.all
+            val highlightIds = highlights.mapTo(hashSetOf()) { it.time }
+            val bookmarkIds = bookmarks.mapTo(hashSetOf()) { it.time }
             linkedMapOf(
-                "bookmark.json" to appDb.bookmarkDao.all,
-                "highlight.json" to appDb.bookHighlightDao.all,
+                "bookmark.json" to bookmarks,
+                "highlight.json" to highlights,
                 "highlightTag.json" to appDb.highlightTagDao.all(),
                 "highlightTagLink.json" to appDb.highlightTagDao.links(),
                 "highlightTagOrder.json" to appDb.highlightTagDao.orders(),
                 "bookmarkTagLink.json" to appDb.bookmarkTagDao.links(),
-                "bookmarkTagOrder.json" to appDb.bookmarkTagDao.orders()
+                "bookmarkTagOrder.json" to appDb.bookmarkTagDao.orders(),
+                ReadingNotes.LOCATION_FILE to appDb.readingNoteDao.locations().filter {
+                    it.kind == "highlight" && it.noteTime in highlightIds ||
+                        it.kind == "bookmark" && it.noteTime in bookmarkIds
+                },
+                ReadingNotes.SOURCE_FILE to appDb.readingNoteDao.sources()
             )
         })
         annotationFiles.forEach { (fileName, entries) ->

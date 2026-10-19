@@ -1,5 +1,6 @@
 package io.legado.app.ui.book.read
 
+import io.legado.app.ui.book.bookmark.ReadingNoteNavigation
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.res.Configuration
@@ -17,6 +18,7 @@ import android.view.View
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
+import com.google.android.material.snackbar.Snackbar
 import androidx.appcompat.view.menu.MenuItemImpl
 import androidx.core.view.doOnLayout
 import androidx.core.view.get
@@ -214,7 +216,8 @@ class ReadBookActivity : BaseReadBookActivity(),
                     highlightLayoutTitleLength,
                     (it[TocActivityResult.HIGHLIGHT_ANCHOR_TEXT_INDEX] as String)
                         .takeIf(String::isNotEmpty),
-                    pdfPageIndex = (it[TocActivityResult.PDF_PAGE_INDEX] as Int).takeIf { page -> page >= 0 }
+                    pdfPageIndex = (it[TocActivityResult.PDF_PAGE_INDEX] as Int).takeIf { page -> page >= 0 },
+                    readingNoteKey = (it[TocActivityResult.READING_NOTE_KEY_INDEX] as String).takeIf(String::isNotEmpty)
                 )
             }
         }
@@ -350,6 +353,9 @@ class ReadBookActivity : BaseReadBookActivity(),
         NetworkChangedListener(this)
     }
     private var justInitData: Boolean = false
+    private var relocatingNoteKind: String? = null
+    private var relocatingNoteTime: Long = -1
+    private var relocationHint: Snackbar? = null
     private var syncDialog: AlertDialog? = null
 
     @Suppress("DEPRECATION")
@@ -359,6 +365,8 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("relocatingNoteKind", relocatingNoteKind)
+        outState.putLong("relocatingNoteTime", relocatingNoteTime)
         outState.putBundle("pdfZoom", binding.readView.pdfZoom.save())
         outState.putBundle("aloudControls", aloudControls.save())
         editingHighlight?.let { outState.putParcelable(STATE_EDITING_HIGHLIGHT, it) }
@@ -368,6 +376,11 @@ class ReadBookActivity : BaseReadBookActivity(),
     @SuppressLint("ClickableViewAccessibility")
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
+        relocatingNoteKind = savedInstanceState?.getString("relocatingNoteKind")
+            ?: intent.getStringExtra(ReadingNoteNavigation.EXTRA_KIND)
+        relocatingNoteTime = savedInstanceState?.getLong("relocatingNoteTime", -1)
+            ?: intent.getLongExtra(ReadingNoteNavigation.EXTRA_TIME, -1)
+        showRelocationHint()
         viewModel.pendingSourceReimport.observe(this) { showPendingSourceReimport() }
         viewModel.resourceRefreshing.observe(this) { loading ->
             if (binding.readView.pageFactory.isRefreshingResources != loading) {
@@ -437,6 +450,9 @@ class ReadBookActivity : BaseReadBookActivity(),
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        relocatingNoteKind = intent.getStringExtra(ReadingNoteNavigation.EXTRA_KIND)
+        relocatingNoteTime = intent.getLongExtra(ReadingNoteNavigation.EXTRA_TIME, -1)
+        showRelocationHint()
         editingHighlight = null
         resetBookmarkObserver()
         resetReviewSummaryState()
@@ -1373,6 +1389,43 @@ class ReadBookActivity : BaseReadBookActivity(),
     /**
      * 文本选择菜单操作
      */
+    private fun showRelocationHint() {
+        relocationHint?.dismiss()
+        if (relocatingNoteKind == null || relocatingNoteTime < 0) return
+        relocationHint = Snackbar.make(binding.root, R.string.reading_note_manual_hint, Snackbar.LENGTH_INDEFINITE)
+            .setAction(R.string.cancel) { clearNoteRelocation() }.also { it.show() }
+    }
+
+    private fun clearNoteRelocation() {
+        relocatingNoteKind = null
+        relocatingNoteTime = -1
+        intent.removeExtra(ReadingNoteNavigation.EXTRA_KIND)
+        intent.removeExtra(ReadingNoteNavigation.EXTRA_TIME)
+        relocationHint?.dismiss()
+        relocationHint = null
+    }
+
+    private fun completeNoteRelocation(chapterIndex: Int, start: Int, end: Int, quote: String): Boolean {
+        val kind = relocatingNoteKind ?: return false
+        val time = relocatingNoteTime.takeIf { it >= 0 } ?: return false
+        val sourceUrl = ReadBook.book?.bookUrl
+        lifecycleScope.launch {
+            val saved = withContext(IO) {
+                if (ReadBook.book?.bookUrl != sourceUrl) false
+                else ReadBook.relocateReadingNote(kind, time, chapterIndex, start, end, quote)
+            }
+            if (ReadBook.book?.bookUrl != sourceUrl ||
+                relocatingNoteKind != kind || relocatingNoteTime != time) return@launch
+            if (saved) {
+                clearNoteRelocation()
+                cancelSelect()
+                ReadBook.upHighlightTags()
+                toastOnUi(R.string.reading_note_relocated)
+            } else toastOnUi(R.string.reading_note_unresolved)
+        }
+        return true
+    }
+
     override fun onMenuItemSelected(itemId: Int): Boolean {
         when (itemId) {
             R.id.menu_aloud_from_here -> lifecycleScope.launch {
@@ -1392,6 +1445,8 @@ class ReadBookActivity : BaseReadBookActivity(),
                 if (bookmark == null) {
                     toastOnUi(R.string.create_bookmark_error)
                 } else {
+                    if (completeNoteRelocation(bookmark.chapterIndex, bookmark.chapterPos,
+                            bookmark.chapterPos + bookmark.bookText.length, bookmark.bookText)) return true
                     showDialogFragment(BookmarkDialog(bookmark))
                 }
                 return true
@@ -1409,6 +1464,8 @@ class ReadBookActivity : BaseReadBookActivity(),
                 if (highlight == null) {
                     toastOnUi(R.string.create_highlight_error)
                 } else {
+                    if (completeNoteRelocation(highlight.chapterIndex, highlight.chapterPos,
+                            highlight.chapterPosEnd, highlight.bookText)) return true
                     ReadBook.addHighlight(highlight)
                     binding.root.post {
                         showHighlightActionMenu(highlight, anchorX, anchorY)
@@ -2807,6 +2864,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                             }
                             withContext(IO) {
                                 appDb.bookmarkDao.insert(bookmark)
+                                ReadBook.captureBookmarkLocation(bookmark)
                             }
                             toastOnUi(R.string.bookmark_added)
                             null
@@ -2979,6 +3037,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     override fun onDestroy() {
+        relocationHint?.dismiss()
         super.onDestroy()
         aloudControls.dispose()
         tts?.clearTts()

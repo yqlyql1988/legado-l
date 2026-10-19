@@ -1,5 +1,6 @@
 package io.legado.app.ui.book.bookmark
 
+import io.legado.app.help.ReadingNotes
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -41,7 +42,6 @@ import io.legado.app.ui.book.review.BookReviewEditActivity
 import io.legado.app.ui.book.review.BookReviewEntriesAdapter
 import io.legado.app.ui.book.review.bindBookReviewRating
 import io.legado.app.ui.book.toc.TocActivityResult
-import io.legado.app.ui.book.toc.resolveHighlightChapterIndex
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.highlight.highlightTagChip
 import io.legado.app.ui.highlight.NoteTagPickerDialog
@@ -373,24 +373,23 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
             // Let the reader restore its saved progress. Never pass a note's index/position here.
             startActivityForBook(book)
         } else {
-            val index = note.highlight?.let { highlight ->
-                withContext(IO) {
-                    resolveHighlightChapterIndex(highlight, appDb.bookChapterDao.getChapterList(url)
-                        .associate { it.url to it.index })
-                }
-            } ?: note.bookmark?.chapterIndex
+            val target = withContext(IO) {
+                val legacy = note.highlight?.let(ReadingNotes::legacy)
+                    ?: ReadingNotes.legacy(note.bookmark!!, book.bookUrl)
+                ReadingNotes.target(legacy, appDb.bookChapterDao.getChapterList(url))
+            }
+            val index = target?.chapterIndex
             if (index == null || index < 0 || index >= book.totalChapterNum) {
-                toastOnUi(R.string.book_notes_location_unavailable)
+                ReadingNoteNavigation.unavailable(this, book,
+                    if (note.highlight != null) "highlight" else "bookmark", note.time)
                 return@runTask
             }
             startActivityForBook(book) {
                 putExtra("index", index)
-                putExtra("chapterPos", note.position)
-                note.highlight?.let {
-                    putExtra(TocActivityResult.EXTRA_HIGHLIGHT_LAYOUT_TITLE_LENGTH, it.layoutTitleLength)
-                    putExtra(TocActivityResult.EXTRA_HIGHLIGHT_ANCHOR_TEXT,
-                        it.bookText.takeIf { text -> it.chapterPosEnd - it.chapterPos == text.length }.orEmpty())
-                }
+                putExtra("chapterPos", target.chapterPos)
+                putExtra(TocActivityResult.EXTRA_HIGHLIGHT_LAYOUT_TITLE_LENGTH, target.layoutTitleLength)
+                putExtra(TocActivityResult.EXTRA_HIGHLIGHT_ANCHOR_TEXT, target.quote)
+                putExtra(TocActivityResult.EXTRA_READING_NOTE_KEY, ReadingNotes.key(target))
             }
         }
     }
@@ -414,6 +413,7 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
         popupActionMenu(this) {
             item(getString(R.string.book_notes_view_full), "view")
             item(getString(R.string.edit), "edit")
+            item(getString(R.string.reading_note_relocate), "relocate")
             item(getString(R.string.copy_text), "copy")
             item(getString(R.string.share), "share")
             item(getString(R.string.book_notes_tags), "tags")
@@ -422,6 +422,10 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
         }.show(anchor) { action ->
             when (action) {
                 "view" -> showFullNote(note)
+                "relocate" -> archive?.book?.let { book ->
+                    ReadingNoteNavigation.relocate(this, book,
+                        if (note.highlight != null) "highlight" else "bookmark", note.time)
+                }
                 "edit" -> if (note.bookmark != null) showDialogFragment(BookmarkDialog(note.bookmark, 0))
                     else showDialogFragment(HighlightNoteDialog(note.highlight!!))
                 "copy" -> (getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
