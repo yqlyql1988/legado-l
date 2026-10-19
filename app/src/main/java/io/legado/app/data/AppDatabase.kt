@@ -18,6 +18,9 @@ import io.legado.app.data.dao.BookMemoDao
 import io.legado.app.data.dao.BookReviewDao
 import io.legado.app.data.dao.BookSourceDao
 import io.legado.app.data.dao.BookmarkDao
+import io.legado.app.data.dao.BookmarkTagDao
+import io.legado.app.data.entities.BookmarkTagLink
+import io.legado.app.data.entities.BookmarkTagOrder
 import io.legado.app.data.dao.AutoTaskRuleDao
 import io.legado.app.data.dao.CacheDao
 import io.legado.app.data.dao.CookieDao
@@ -90,7 +93,7 @@ val appDb by lazy {
 }
 
 @Database(
-    version = 121,
+    version = 122,
     exportSchema = true,
     entities = [Book::class, BookGroup::class, BookSource::class, BookChapter::class,
         ReplaceRule::class, SearchBook::class, SearchKeyword::class, Cookie::class,
@@ -100,6 +103,7 @@ val appDb by lazy {
         AutoTaskRule::class, BookHighlight::class, HighlightRule::class, BookSourceCheckState::class,
         BookMemo::class, BookReview::class, BookReviewDeletion::class, LegacyReadingMark::class,
         HighlightTag::class, HighlightTagLink::class, HighlightTagOrder::class,
+        BookmarkTagLink::class, BookmarkTagOrder::class,
         ReadRecordDaily::class, ReadStatisticsState::class, ReadRecordHistory::class, ReadRecordHourly::class],
     views = [BookSourcePart::class],
     autoMigrations = [
@@ -172,7 +176,8 @@ val appDb by lazy {
         AutoMigration(from = 117, to = 118),
         AutoMigration(from = 118, to = 119),
         AutoMigration(from = 119, to = 120, spec = DatabaseMigrations.Migration_119_120::class),
-        AutoMigration(from = 120, to = 121)
+        AutoMigration(from = 120, to = 121),
+        AutoMigration(from = 121, to = 122)
     ]
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -192,6 +197,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract val searchKeywordDao: SearchKeywordDao
     abstract val rssSourceDao: RssSourceDao
     abstract val bookmarkDao: BookmarkDao
+    abstract val bookmarkTagDao: BookmarkTagDao
     abstract val rssArticleDao: RssArticleDao
     abstract val rssStarDao: RssStarDao
     abstract val rssReadRecordDao: RssReadRecordDao

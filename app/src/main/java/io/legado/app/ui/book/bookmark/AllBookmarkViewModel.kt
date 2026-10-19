@@ -5,6 +5,7 @@ import android.net.Uri
 import io.legado.app.base.BaseViewModel
 import io.legado.app.constant.AppLog
 import io.legado.app.data.appDb
+import io.legado.app.help.BookmarkTags
 import io.legado.app.utils.FileDoc
 import io.legado.app.utils.GSON
 import io.legado.app.utils.createFileIfNotExist
@@ -27,7 +28,7 @@ class AllBookmarkViewModel(application: Application) : BaseViewModel(application
             val fileName = "bookmark-${dateFormat.format(Date())}.json"
             val dirDoc = FileDoc.fromUri(treeUri, true)
             dirDoc.createFileIfNotExist(fileName).openOutputStream().getOrThrow().use {
-                GSON.writeToOutputStream(it, appDb.bookmarkDao.all)
+                it.write(BookmarkTags.exportJson(appDb.bookmarkDao.all).toByteArray(Charsets.UTF_8))
             }
         }.onError {
             AppLog.put("导出失败\n${it.localizedMessage}", it, true)
@@ -46,7 +47,9 @@ class AllBookmarkViewModel(application: Application) : BaseViewModel(application
             fileDoc.use { outputStream ->
                 var name = ""
                 var author = ""
-                appDb.bookmarkDao.all.forEach {
+                val bookmarks = appDb.bookmarkDao.all
+                val attached = BookmarkTags.attached(bookmarks)
+                bookmarks.forEach {
                     if (it.bookName != name || it.bookAuthor != author) {
                         name = it.bookName
                         author = it.bookAuthor
@@ -55,6 +58,9 @@ class AllBookmarkViewModel(application: Application) : BaseViewModel(application
                     outputStream.write("#### ${it.chapterName}\n\n".toByteArray())
                     outputStream.write("###### 原文\n ${it.bookText}\n\n".toByteArray())
                     outputStream.write("###### 摘要\n ${it.content}\n\n".toByteArray())
+                    attached[it.time].orEmpty().takeIf { tags -> tags.isNotEmpty() }?.let { tags ->
+                        outputStream.write("标签：${tags.joinToString("、") { tag -> tag.name }}\n\n".toByteArray())
+                    }
                 }
             }
         }.onError {

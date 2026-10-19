@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="bookmark_tags">书签标签</string>
+    <string name="note_tag_new">＋新建</string>
+    <string name="note_tag_book_list">本书标签</string>
+    <string name="note_tag_search">搜索标签名称或说明</string>
+    <string name="note_tag_bookmark_hint">书签和标注共用标签库，常用与排序分别设置</string>
+    <string name="note_tag_more">更多标签</string>
+    <string name="note_tag_delete_hint">“%1$s”用于 %2$d 条标注、%3$d 条书签。删除会移除两边的标签关联，原文和笔记保留。</string>
+    <string name="note_tag_empty">暂无匹配标签，可搜索标签库或新建标签</string>
+</resources>

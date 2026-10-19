@@ -44,6 +44,7 @@ import io.legado.app.ui.book.toc.TocActivityResult
 import io.legado.app.ui.book.toc.resolveHighlightChapterIndex
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.highlight.highlightTagChip
+import io.legado.app.ui.highlight.NoteTagPickerDialog
 import io.legado.app.ui.widget.popupActionMenu
 import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.applyTint
@@ -153,7 +154,7 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
         binding.noteTabs.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab) {
                 type = NoteType.entries[tab.position]
-                if (type == NoteType.BOOKMARK || type == NoteType.REVIEW) tagId = null
+                tagId = null
                 if (type == NoteType.REVIEW) managing = false
                 selected.clear()
                 render()
@@ -271,7 +272,7 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
         binding.bookHeading.isVisible = details
         binding.noteTabs.isVisible = details
         val reviewing = details && type == NoteType.REVIEW
-        binding.tvTagFilter.isVisible = details && (type == NoteType.ALL || type == NoteType.HIGHLIGHT)
+        binding.tvTagFilter.isVisible = details && type != NoteType.REVIEW
         binding.tvSort.isVisible = !reviewing
         binding.reviewActions.isVisible = reviewing
         binding.batchActions.isVisible = details && managing
@@ -346,7 +347,8 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
     }
 
     private fun showTagFilter() {
-        val tags = archive?.notes.orEmpty().flatMap { it.tags }.distinctBy { it.id }
+        val tags = archive?.notes.orEmpty().filter { type == NoteType.ALL || it.type == type }
+            .flatMap { it.tags }.distinctBy { it.id }
         val ids = listOf(null, "") + tags.map { it.id }
         val names = listOf(getString(R.string.highlight_filter_all),
             getString(R.string.highlight_filter_untagged)) + tags.map { it.name }
@@ -414,7 +416,7 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
             item(getString(R.string.edit), "edit")
             item(getString(R.string.copy_text), "copy")
             item(getString(R.string.share), "share")
-            if (note.highlight != null) item(getString(R.string.book_notes_tags), "tags")
+            item(getString(R.string.book_notes_tags), "tags")
             item(getString(R.string.delete), "delete")
             danger("delete")
         }.show(anchor) { action ->
@@ -431,28 +433,10 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
         }
     }
 
-    private fun editTags(note: BookNote) = runTask {
-        val highlight = note.highlight ?: return@runTask
-        val tags = withContext(IO) { appDb.highlightTagDao.forBook(highlight.bookUrl) }
-        if (tags.isEmpty()) { toastOnUi(R.string.book_notes_no_tags); return@runTask }
-        val ids = note.tags.mapTo(linkedSetOf()) { it.id }
-        AlertDialog.Builder(this).setTitle(R.string.book_notes_tags)
-            .setMultiChoiceItems(tags.map { it.name }.toTypedArray(),
-                tags.map { it.id in ids }.toBooleanArray()) { _, index, checked ->
-                if (checked) ids.add(tags[index].id) else ids.remove(tags[index].id)
-            }.setPositiveButton(R.string.ok) { _, _ ->
-                runTask {
-                    withContext(IO) {
-                        appDb.runInTransaction {
-                            appDb.highlightTagDao.deleteLinksForHighlights(listOf(highlight.time))
-                            appDb.highlightTagDao.upsertLinks(ids.filter {
-                                appDb.highlightTagDao.canAttach(highlight.time, it)
-                            }.map { HighlightTagLink(highlight.time, it) })
-                        }
-                    }
-                    BookNotesRepository.refreshReader(setOf(highlight.bookUrl))
-                }
-            }.setNegativeButton(R.string.cancel, null).show()
+    private fun editTags(note: BookNote) {
+        NoteTagPickerDialog.create(note.highlight?.bookUrl ?: archive?.bookUrl.orEmpty(),
+            note.bookmark != null, note.tags.map { it.id }, note.time)
+            .show(supportFragmentManager, "note-tag-picker")
     }
 
     private fun confirmDelete(notes: List<BookNote>) {
@@ -607,10 +591,6 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
                 note.tags.forEach { tag ->
                     tagLabels.addView(highlightTagChip(tag, true, compact = true) {
                         tagId = tag.id
-                        if (type == NoteType.BOOKMARK) {
-                            type = NoteType.HIGHLIGHT
-                            binding.noteTabs.getTabAt(type.ordinal)?.select()
-                        }
                         selected.clear()
                         render()
                     })

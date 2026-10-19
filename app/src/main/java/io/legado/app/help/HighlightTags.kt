@@ -11,11 +11,11 @@ import io.legado.app.utils.GSON
 object HighlightTags {
     fun forBook(
         tags: List<HighlightTag>, bookUrl: String, orders: List<HighlightTagOrder> = emptyList(),
-        includeHidden: Boolean = false
+        includeHidden: Boolean = false, includeOwned: Boolean = true
     ): List<HighlightTag> {
         val entries = orders.filter { it.bookUrl == bookUrl }.associateBy { it.tagId }
         val positions = entries.mapValues { it.value.sortOrder }
-        return tags.filter { it.common || it.bookUrl == bookUrl || it.id in positions }
+        return tags.filter { it.common || includeOwned && it.bookUrl == bookUrl || it.id in positions }
             .filter { includeHidden || entries[it.id]?.hidden != true }
             .sortedWith(compareBy<HighlightTag> { positions[it.id] ?: Int.MAX_VALUE }
                 .thenBy { it.bookUrl.isNotEmpty() }.thenBy { it.sortOrder }.thenBy { it.id })

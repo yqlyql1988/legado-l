@@ -138,6 +138,8 @@ class OtherConfigFragment : PreferenceFragment(),
     override fun onPreferenceTreeClick(preference: Preference): Boolean {
         when (preference.key) {
             "highlightTagManage" -> startActivity(Intent(requireContext(), HighlightTagManageActivity::class.java))
+            "bookmarkTagManage" -> startActivity(Intent(requireContext(), HighlightTagManageActivity::class.java)
+                .putExtra("bookmarkMode", true))
             PreferKey.userAgent -> showUserAgentDialog()
             PreferKey.customHosts -> showCustomHostsDialog()
             PreferKey.videoSetting -> showDialogFragment(SettingsDialog(requireActivity()))

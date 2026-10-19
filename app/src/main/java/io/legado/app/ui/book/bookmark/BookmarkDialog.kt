@@ -1,6 +1,7 @@
 package io.legado.app.ui.book.bookmark
 
 import android.os.Bundle
+import android.content.Intent
 import android.view.View
 import android.view.ViewGroup
 import androidx.lifecycle.lifecycleScope
@@ -8,6 +9,10 @@ import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Bookmark
+import io.legado.app.help.BookmarkTags
+import io.legado.app.ui.highlight.NoteTagPickerDialog
+import io.legado.app.ui.highlight.HighlightTagManageActivity
+import io.legado.app.ui.highlight.highlightTagChip
 import io.legado.app.databinding.DialogBookmarkBinding
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.utils.setLayout
@@ -27,6 +32,32 @@ class BookmarkDialog() : BaseDialogFragment(R.layout.dialog_bookmark, true) {
     }
 
     private val binding by viewBinding(DialogBookmarkBinding::bind)
+    private val selectedTags = linkedSetOf<String>()
+    private var bookUrl = ""
+
+    override fun onResume() {
+        super.onResume()
+        if (view != null) renderTags()
+    }
+
+    private fun renderTags() {
+        val all = appDb.highlightTagDao.all()
+        val choices = (appDb.bookmarkTagDao.forBook(bookUrl) +
+            all.filter { it.id in selectedTags }.map { it.forBookmark() }).distinctBy { it.id }
+        binding.tagChoices.removeAllViews()
+        choices.forEach { tag ->
+            binding.tagChoices.addView(requireContext().highlightTagChip(tag,
+                tag.id in selectedTags, compact = true) {
+                if (!selectedTags.add(tag.id)) selectedTags.remove(tag.id)
+                renderTags()
+            })
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putStringArrayList("selectedTags", ArrayList(selectedTags))
+        super.onSaveInstanceState(outState)
+    }
 
     override fun onStart() {
         super.onStart()
@@ -47,6 +78,24 @@ class BookmarkDialog() : BaseDialogFragment(R.layout.dialog_bookmark, true) {
             return
         }
         val editPos = arguments.getInt("editPos", -1)
+        bookUrl = BookmarkTags.bookUrl(bookmark)
+        selectedTags.addAll(savedInstanceState?.getStringArrayList("selectedTags")
+            ?: appDb.bookmarkTagDao.idsForBookmark(bookmark.time))
+        childFragmentManager.setFragmentResultListener("bookmark-tags", viewLifecycleOwner) { _, result ->
+            selectedTags.clear()
+            selectedTags.addAll(result.getStringArrayList("ids").orEmpty())
+            renderTags()
+        }
+        binding.tagMore.setOnClickListener {
+            NoteTagPickerDialog.create(bookUrl, true, selectedTags, bookmark.time,
+                direct = false, resultKey = "bookmark-tags").show(childFragmentManager, "bookmark-tag-picker")
+        }
+        binding.toolBar.menu.add(R.string.bookmark_tags).setOnMenuItemClickListener {
+            startActivity(Intent(requireContext(), HighlightTagManageActivity::class.java)
+                .putExtra("bookUrl", bookUrl).putExtra("bookmarkMode", true))
+            true
+        }
+        renderTags()
         binding.tvFooterLeft.visible(editPos >= 0)
         binding.run {
             tvChapterName.text = bookmark.chapterName
@@ -58,9 +107,13 @@ class BookmarkDialog() : BaseDialogFragment(R.layout.dialog_bookmark, true) {
             tvOk.setOnClickListener {
                 bookmark.bookText = editBookText.text?.toString() ?: ""
                 bookmark.content = editContent.text?.toString() ?: ""
+                val ids = selectedTags.toList()
                 lifecycleScope.launch {
                     withContext(IO) {
-                        appDb.bookmarkDao.insert(bookmark)
+                        appDb.runInTransaction {
+                            appDb.bookmarkDao.insert(bookmark)
+                            appDb.bookmarkTagDao.saveLinks(bookmark.time, bookUrl, ids)
+                        }
                     }
                     dismiss()
                 }

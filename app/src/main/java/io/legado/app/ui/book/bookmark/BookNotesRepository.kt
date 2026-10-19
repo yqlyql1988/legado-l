@@ -6,6 +6,8 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.HighlightTag
 import io.legado.app.data.entities.HighlightTagLink
 import io.legado.app.data.entities.HighlightTagOrder
+import io.legado.app.data.entities.BookmarkTagLink
+import io.legado.app.data.entities.BookmarkTagOrder
 import io.legado.app.model.ReadBook
 import io.legado.app.utils.FileDoc
 import io.legado.app.utils.createFileIfNotExist
@@ -22,13 +24,16 @@ import java.util.Locale
 internal object BookNotesRepository {
     private data class TagData(
         val tags: List<HighlightTag>, val links: List<HighlightTagLink>,
-        val orders: List<HighlightTagOrder>
+        val orders: List<HighlightTagOrder>,
+        val bookmarkLinks: List<BookmarkTagLink>, val bookmarkOrders: List<BookmarkTagOrder>
     )
     private val tagData = combine(appDb.highlightTagDao.flowAll(),
-        appDb.highlightTagDao.flowLinks(), appDb.highlightTagDao.flowOrders(), ::TagData)
+        appDb.highlightTagDao.flowLinks(), appDb.highlightTagDao.flowOrders(),
+        appDb.bookmarkTagDao.flowLinks(), appDb.bookmarkTagDao.flowOrders(), ::TagData)
     val archives = combine(appDb.bookmarkDao.flowAll(), appDb.bookHighlightDao.flowAll(),
         appDb.bookDao.flowAll(), tagData, appDb.bookReviewDao.flowAll()) { bookmarks, highlights, books, tagData, reviews ->
-        archiveBookNotes(bookmarks, highlights, books, tagData.tags, tagData.links, tagData.orders, reviews)
+        archiveBookNotes(bookmarks, highlights, books, tagData.tags, tagData.links, tagData.orders, reviews,
+            tagData.bookmarkLinks, tagData.bookmarkOrders)
     }.flowOn(IO)
 
     suspend fun delete(notes: List<BookNote>) {

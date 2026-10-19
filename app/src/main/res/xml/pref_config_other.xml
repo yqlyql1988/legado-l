@@ -14,6 +14,11 @@
         android:title="@string/highlight_tag_manage"
         android:summary="@string/highlight_tag_shared" />
 
+    <io.legado.app.lib.prefs.Preference
+        android:key="bookmarkTagManage"
+        android:title="@string/bookmark_tags"
+        android:summary="@string/note_tag_bookmark_hint" />
+
     <io.legado.app.lib.prefs.PreferenceCategory
         android:title="@string/main_activity"
         app:allowDividerAbove="false"

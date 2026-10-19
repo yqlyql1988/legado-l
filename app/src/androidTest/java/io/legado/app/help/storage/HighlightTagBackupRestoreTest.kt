@@ -32,6 +32,9 @@ class HighlightTagBackupRestoreTest {
         val savedTags = appDb.highlightTagDao.all()
         val savedLinks = appDb.highlightTagDao.links()
         val savedOrders = appDb.highlightTagDao.orders()
+        val savedBookmarkLinks = appDb.bookmarkTagDao.links()
+        val savedBookmarkOrders = appDb.bookmarkTagDao.orders()
+        val savedBookmarkTimes = appDb.bookmarkDao.all.map { it.time }
         val savedTimes = appDb.bookHighlightDao.all.map { it.time }
         val directory = File(context.cacheDir, "tag-backup-${UUID.randomUUID()}")
         val first = BookHighlight(bookUrl = "fixture-tag-book-a", bookName = "Tag fixture A",
@@ -182,6 +185,80 @@ class HighlightTagBackupRestoreTest {
         } finally {
             appDb.bookHighlightDao.delete(first, second)
             appDb.highlightTagDao.restore(savedTags, savedLinks, savedTimes, savedOrders)
+            appDb.bookmarkTagDao.restore(savedBookmarkLinks, savedBookmarkTimes, savedBookmarkOrders)
+            BackupConfig.ignoreConfig.clear()
+            BackupConfig.ignoreConfig.putAll(savedIgnore)
+            preferences.edit().apply {
+                if (savedLatest == null) remove(PreferKey.onlyLatestBackup)
+                else putBoolean(PreferKey.onlyLatestBackup, savedLatest as Boolean)
+            }.commit()
+            LocalConfig.lastBackup = savedLocal
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test fun bookmarkBackupRoundTripsScenePreferencesAndOldBackupsKeepLocalAssociations() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val token = UUID.randomUUID().toString()
+        val directory = File(context.cacheDir, "bookmark-tag-backup-$token")
+        val preferences = context.defaultSharedPreferences
+        val savedLatest = preferences.all[PreferKey.onlyLatestBackup]
+        val savedIgnore = HashMap(BackupConfig.ignoreConfig)
+        val savedLocal = LocalConfig.lastBackup
+        val savedTags = appDb.highlightTagDao.all()
+        val savedHighlightLinks = appDb.highlightTagDao.links()
+        val savedHighlightOrders = appDb.highlightTagDao.orders()
+        val savedTimes = appDb.bookHighlightDao.all.map { it.time }
+        val savedLinks = appDb.bookmarkTagDao.links()
+        val savedOrders = appDb.bookmarkTagDao.orders()
+        val savedBookmarkTimes = appDb.bookmarkDao.all.map { it.time }
+        val bookmark = io.legado.app.data.entities.Bookmark(bookName = "Backup $token", bookAuthor = token,
+            chapterIndex = 3, chapterPos = 42, bookText = "原文", content = "保留备注")
+        val tag = HighlightTag("bookmark-$token", "待回看-$token", common = false,
+            bookmarkCommon = true, bookmarkSortOrder = 5, note = "共享说明")
+        val owner = "bookmark-owner-$token"
+        val order = io.legado.app.data.entities.BookmarkTagOrder(owner, tag.id, 2, hidden = true)
+        try {
+            preferences.edit().putBoolean(PreferKey.onlyLatestBackup, true).commit()
+            BackupConfig.contentKeys.forEach { BackupConfig.ignoreConfig[it] = true }
+            BackupConfig.ignoreConfig[BackupConfig.annotationContentKey] = false
+            appDb.bookmarkDao.insert(bookmark)
+            appDb.highlightTagDao.saveTag(tag)
+            appDb.bookmarkTagDao.saveLinks(bookmark.time, "", listOf(tag.id))
+            appDb.bookmarkTagDao.upsertOrders(listOf(order))
+            runBlocking(Dispatchers.IO) { Backup.backupLocked(context, directory.path, uploadWebDav = false) }
+            val unpacked = File(directory, "unpacked").apply { mkdirs() }
+            ZipFile(File(directory, "backup.zip")).use { zip ->
+                for (name in listOf("bookmark.json", "highlight.json", "highlightTag.json",
+                    "highlightTagLink.json", "highlightTagOrder.json", "bookmarkTagLink.json", "bookmarkTagOrder.json")) {
+                    File(unpacked, name).writeBytes(zip.getInputStream(requireNotNull(zip.getEntry(name))).use { it.readBytes() })
+                }
+            }
+            appDb.bookmarkTagDao.clearLinks(bookmark.time)
+            appDb.bookmarkTagDao.clearOrder(owner)
+            appDb.highlightTagDao.saveTag(tag.copy(bookmarkCommon = false, bookmarkSortOrder = 0))
+            repeat(2) { runBlocking(Dispatchers.IO) { Restore.restoreLocked(unpacked.path) } }
+            assertEquals(tag, appDb.highlightTagDao.all().single { it.id == tag.id })
+            assertEquals(listOf(tag.id), appDb.bookmarkTagDao.idsForBookmark(bookmark.time))
+            assertEquals(listOf(order), appDb.bookmarkTagDao.ordersForBook(owner))
+            assertEquals(bookmark, appDb.bookmarkDao.all.single { it.time == bookmark.time })
+            File(unpacked, "bookmarkTagLink.json").delete()
+            File(unpacked, "bookmarkTagOrder.json").delete()
+            val tagFile = File(unpacked, "highlightTag.json")
+            val json = org.json.JSONArray(tagFile.readText())
+            for (i in 0 until json.length()) {
+                json.getJSONObject(i).remove("bookmarkCommon")
+                json.getJSONObject(i).remove("bookmarkSortOrder")
+            }
+            tagFile.writeText(json.toString())
+            repeat(2) { runBlocking(Dispatchers.IO) { Restore.restoreLocked(unpacked.path) } }
+            assertEquals(tag, appDb.highlightTagDao.all().single { it.id == tag.id })
+            assertEquals(listOf(tag.id), appDb.bookmarkTagDao.idsForBookmark(bookmark.time))
+            assertEquals(listOf(order), appDb.bookmarkTagDao.ordersForBook(owner))
+        } finally {
+            appDb.bookmarkDao.delete(bookmark)
+            appDb.highlightTagDao.restore(savedTags, savedHighlightLinks, savedTimes, savedHighlightOrders)
+            appDb.bookmarkTagDao.restore(savedLinks, savedBookmarkTimes, savedOrders)
             BackupConfig.ignoreConfig.clear()
             BackupConfig.ignoreConfig.putAll(savedIgnore)
             preferences.edit().apply {

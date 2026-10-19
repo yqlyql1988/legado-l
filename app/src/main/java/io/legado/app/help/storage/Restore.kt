@@ -311,13 +311,16 @@ object Restore {
         if (reviews != null || reviewDeletions != null) {
             appDb.bookReviewDao.restore(reviews.orEmpty(), reviewDeletions.orEmpty())
         }
-        fileToListT<Bookmark>(path, "bookmark.json")?.let {
+        val bookmarks = fileToListT<Bookmark>(path, "bookmark.json")
+        bookmarks?.let {
             appDb.bookmarkDao.insert(*it.toTypedArray())
         }
         val highlights = fileToListT<BookHighlight>(path, "highlight.json")
         val highlightTags = fileToListT<io.legado.app.data.entities.HighlightTag>(path, "highlightTag.json")
         val highlightTagLinks = fileToListT<io.legado.app.data.entities.HighlightTagLink>(path, "highlightTagLink.json")
         val highlightTagOrders = fileToListT<io.legado.app.data.entities.HighlightTagOrder>(path, "highlightTagOrder.json")
+        val bookmarkTagLinks = fileToListT<io.legado.app.data.entities.BookmarkTagLink>(path, "bookmarkTagLink.json")
+        val bookmarkTagOrders = fileToListT<io.legado.app.data.entities.BookmarkTagOrder>(path, "bookmarkTagOrder.json")
         if (highlights != null || highlightTags != null && highlightTagLinks != null) {
             kotlin.runCatching {
                 appDb.runInTransaction {
@@ -329,9 +332,19 @@ object Restore {
                     // Missing extension files identify an older backup: keep local tags intact.
                     if (highlightTags != null && highlightTagLinks != null) {
                         val tagJson = File(path, "highlightTag.json").readText()
+                        // An older backup cannot express deletion of bookmark-only definitions.
+                        val preservedBookmarkIds = if (bookmarkTagLinks == null)
+                            appDb.bookmarkTagDao.links().mapTo(hashSetOf()) { it.tagId } +
+                                appDb.bookmarkTagDao.orders().map { it.tagId } +
+                                appDb.highlightTagDao.all().filter { it.bookmarkCommon }.map { it.id }
+                            else emptySet()
+                        val incomingIds = highlightTags.mapTo(hashSetOf()) { it.id }
+                        val retained = appDb.highlightTagDao.all().filter {
+                            it.id in preservedBookmarkIds && it.id !in incomingIds
+                        }
                         appDb.highlightTagDao.restore(
                             preserveLegacyTagNotes(tagJson,
-                                highlightTags, appDb.highlightTagDao.all()),
+                                highlightTags, appDb.highlightTagDao.all()) + retained,
                             highlightTagLinks, highlights.orEmpty().map { it.time },
                             highlightTagOrders?.let {
                                 preserveLegacyTagOrders(tagJson, File(path, "highlightTagOrder.json").readText(),
@@ -339,6 +352,8 @@ object Restore {
                             }
                         )
                     }
+                    if (bookmarkTagLinks != null) appDb.bookmarkTagDao.restore(bookmarkTagLinks,
+                        bookmarks.orEmpty().map { it.time }, bookmarkTagOrders)
                 }
             }.onFailure {
                 AppLog.put("恢复高亮出错\n${it.localizedMessage}", it)

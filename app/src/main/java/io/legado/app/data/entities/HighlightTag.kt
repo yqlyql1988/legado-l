@@ -18,8 +18,13 @@ data class HighlightTag(
     val sortOrder: Int = 0,
     @ColumnInfo(defaultValue = "''") val bookUrl: String = "",
     @ColumnInfo(defaultValue = "''") val note: String = "",
-    @ColumnInfo(defaultValue = "0") val common: Boolean = bookUrl.isEmpty()
+    @ColumnInfo(defaultValue = "0") val common: Boolean = bookUrl.isEmpty(),
+    @ColumnInfo(defaultValue = "0") val bookmarkCommon: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val bookmarkSortOrder: Int = 0
 ) {
+    /** A view of the shared definition using the bookmark scene's preferences. */
+    fun forBookmark() = copy(common = bookmarkCommon, sortOrder = bookmarkSortOrder)
+
     fun styleObj(): HighlightStyle =
         (GSON.fromJsonObject<HighlightStyle>(style).getOrNull() ?: HighlightStyle(
             underline = HighlightStyle.Underline()

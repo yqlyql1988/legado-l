@@ -32,7 +32,7 @@ class BookmarkItemLayoutTest {
 
         val fields = content.childElements().associateBy { it.androidAttribute("id") }
         assertEquals(
-            setOf("@+id/tv_chapter_name", "@+id/tv_book_text", "@+id/tv_content"),
+            setOf("@+id/tv_chapter_name", "@+id/tv_book_text", "@+id/tv_content", "@+id/tag_labels"),
             fields.keys
         )
         assertEquals("14sp", fields.getValue("@+id/tv_chapter_name").androidAttribute("textSize"))
@@ -41,7 +41,7 @@ class BookmarkItemLayoutTest {
             assertEquals("12sp", fields.getValue(id).androidAttribute("textSize"))
             assertEquals("@color/secondaryText", fields.getValue(id).androidAttribute("textColor"))
         }
-        fields.values.forEach { field ->
+        fields.filterKeys { it != "@+id/tag_labels" }.values.forEach { field ->
             assertEquals("true", field.androidAttribute("singleLine"))
         }
     }

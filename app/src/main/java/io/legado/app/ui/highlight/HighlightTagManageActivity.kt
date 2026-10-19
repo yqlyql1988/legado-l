@@ -27,6 +27,8 @@ import io.legado.app.databinding.ActivityHighlightTagBinding
 import io.legado.app.databinding.ItemHighlightTagBinding
 import io.legado.app.help.HighlightStyle
 import io.legado.app.help.HighlightTags
+import io.legado.app.help.BookmarkTags
+import io.legado.app.data.entities.BookmarkTagOrder
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.model.ReadBook
 import io.legado.app.ui.widget.recycler.VerticalDivider
@@ -52,6 +54,7 @@ class HighlightTagManageActivity : BaseActivity<ActivityHighlightTagBinding>(),
     private var bookOrder = emptyList<HighlightTagOrder>()
     private val replacements = linkedMapOf<String, String>()
     private val bookUrl by lazy { intent.getStringExtra("bookUrl").orEmpty() }
+    private val bookmarkMode by lazy { intent.getBooleanExtra("bookmarkMode", false) }
     private var libraryMode = false
     private val adapter = TagAdapter()
     private var saving = false
@@ -66,11 +69,12 @@ class HighlightTagManageActivity : BaseActivity<ActivityHighlightTagBinding>(),
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         original = savedInstanceState?.getString("original")?.let { GSON.fromJsonArray<HighlightTag>(it).getOrNull() }
-            ?: appDb.highlightTagDao.all()
+            ?: appDb.highlightTagDao.all().map { if (bookmarkMode) it.forBookmark() else it }
         tags.addAll(savedInstanceState?.getString("tags")?.let { GSON.fromJsonArray<HighlightTag>(it).getOrNull() } ?: original)
         originalOrder = savedInstanceState?.getString("originalOrder")?.let {
             GSON.fromJsonArray<HighlightTagOrder>(it).getOrNull()
-        } ?: appDb.highlightTagDao.ordersForBook(bookUrl)
+        } ?: if (bookmarkMode) appDb.bookmarkTagDao.ordersForBook(bookUrl).map { it.asHighlightOrder() }
+            else appDb.highlightTagDao.ordersForBook(bookUrl)
         bookOrder = savedInstanceState?.getString("order")?.let {
             GSON.fromJsonArray<HighlightTagOrder>(it).getOrNull()
         } ?: originalOrder
@@ -110,7 +114,7 @@ class HighlightTagManageActivity : BaseActivity<ActivityHighlightTagBinding>(),
             setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_ALWAYS)
             setOnMenuItemClickListener { save(); true }
         }
-        menu.add(R.string.highlight_tag_preview).setOnMenuItemClickListener {
+        if (!bookmarkMode) menu.add(R.string.highlight_tag_preview).setOnMenuItemClickListener {
             showPreview()
             true
         }
@@ -123,20 +127,31 @@ class HighlightTagManageActivity : BaseActivity<ActivityHighlightTagBinding>(),
     }
 
     private fun render() {
+        binding.titleBar.title = getString(if (bookmarkMode) R.string.bookmark_tags else R.string.highlight_tag_manage)
         val query = binding.etLibrarySearch.text.toString().trim()
         visibleTags = if (!libraryMode) bookChoices() else tags
             .filter { query.isEmpty() || it.name.contains(query, true) || it.note.contains(query, true) }
             .sortedWith(compareByDescending<HighlightTag> { it.common }.thenBy { it.sortOrder }.thenBy { it.id })
         binding.tvListTitle.setText(if (libraryMode) R.string.highlight_tag_library else R.string.highlight_tag_book_list)
         binding.etLibrarySearch.isVisible = libraryMode
-        binding.tvHint.setText(if (libraryMode) R.string.highlight_tag_library_hint else R.string.highlight_tag_list_hint)
+        binding.tvHint.setText(if (bookmarkMode) R.string.note_tag_bookmark_hint
+            else if (libraryMode) R.string.highlight_tag_library_hint else R.string.highlight_tag_list_hint)
         binding.tvEmpty.isVisible = visibleTags.isEmpty()
         adapter.notifyDataSetChanged()
     }
 
     private fun move(from: Int, to: Int) {
-        if (saving || libraryMode || from !in visibleTags.indices || to !in visibleTags.indices || from == to) return
+        if (saving || libraryMode && (bookUrl.isNotEmpty() || binding.etLibrarySearch.text?.isNotBlank() == true)
+            || from !in visibleTags.indices || to !in visibleTags.indices || from == to) return
         visibleTags = visibleTags.toMutableList().apply { add(to, removeAt(from)) }
+        if (bookUrl.isEmpty()) {
+            visibleTags.forEachIndexed { index, tag ->
+                val at = tags.indexOfFirst { it.id == tag.id }
+                tags[at] = tag.copy(sortOrder = index)
+            }
+            adapter.notifyItemMoved(from, to)
+            return
+        }
         val positions = visibleTags.mapIndexed { index, tag -> HighlightTagOrder(bookUrl, tag.id, index) }
         bookOrder = positions + bookOrder.filter { entry -> positions.none { it.tagId == entry.tagId } }
         adapter.notifyItemMoved(from, to)
@@ -195,7 +210,7 @@ class HighlightTagManageActivity : BaseActivity<ActivityHighlightTagBinding>(),
     }
 
     private fun bookChoices() = HighlightTags.choices(
-        HighlightTags.forBook(tags, bookUrl, bookOrder), bookUrl,
+        HighlightTags.forBook(tags, bookUrl, bookOrder, includeOwned = !bookmarkMode), bookUrl,
         bookOrder.filterNot { it.hidden }.sortedBy { it.sortOrder }.map { it.tagId })
 
     override fun labelLibrary(): List<HighlightTag> = tags.toList()
@@ -204,15 +219,15 @@ class HighlightTagManageActivity : BaseActivity<ActivityHighlightTagBinding>(),
     override fun createLabel(name: String) {
         if (saving) return
         showDialogFragment(HighlightTagEditDialog.create(HighlightTag(
-            name = name, bookUrl = bookUrl, common = bookUrl.isEmpty(),
+            name = name, bookUrl = if (bookmarkMode) "" else bookUrl, common = bookUrl.isEmpty(),
             style = GSON.toJson(HighlightStyle(underline = HighlightStyle.Underline(color = 0xFF43864C.toInt(), width = 2f))),
             sortOrder = (tags.maxOfOrNull { it.sortOrder } ?: -1) + 1
-        ), true, bookUrl))
+        ), true, bookUrl, bookmarkMode = bookmarkMode))
     }
 
     private fun putEntry(id: String, hidden: Boolean) {
         val previous = bookOrder.associateBy { it.tagId }
-        bookOrder = HighlightTags.forBook(tags, bookUrl, bookOrder, includeHidden = true)
+        bookOrder = HighlightTags.forBook(tags, bookUrl, bookOrder, includeHidden = true, includeOwned = !bookmarkMode)
             .mapIndexed { index, tag ->
                 HighlightTagOrder(bookUrl, tag.id, index, previous[tag.id]?.hidden == true)
             }
@@ -225,7 +240,7 @@ class HighlightTagManageActivity : BaseActivity<ActivityHighlightTagBinding>(),
         if (saving) return
         val tag = tags.firstOrNull { it.id == id } ?: return
         if (bookUrl.isEmpty()) {
-            showDialogFragment(HighlightTagEditDialog.create(tag, false))
+            showDialogFragment(HighlightTagEditDialog.create(tag, false, bookmarkMode = bookmarkMode))
             return
         }
         val other = bookChoices().firstOrNull { it.id != id && it.name.equals(tag.name, true) }
@@ -262,7 +277,8 @@ class HighlightTagManageActivity : BaseActivity<ActivityHighlightTagBinding>(),
     private fun deleteFromLibrary(tag: HighlightTag) {
         val usage = appDb.highlightTagDao.usage(tag.id)
         AlertDialog.Builder(this).setTitle(R.string.highlight_tag_delete_library)
-            .setMessage(getString(R.string.highlight_tag_delete_library_hint, tag.name, usage.books, usage.highlights))
+            .setMessage(getString(R.string.note_tag_delete_hint, tag.name, usage.highlights,
+                appDb.bookmarkTagDao.usage(tag.id)))
             .setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.delete) { _, _ ->
                 tags.removeAll { it.id == tag.id }
@@ -293,11 +309,22 @@ class HighlightTagManageActivity : BaseActivity<ActivityHighlightTagBinding>(),
                         // Apply confirmed switches before deleting definitions so removing
                         // the old library entry cannot cascade away the chosen association.
                         replacements.forEach { (from, to) ->
-                            appDb.highlightTagDao.useLibraryLabel(bookUrl, from, to)
+                            if (bookmarkMode) appDb.bookmarkTagDao.useLibraryLabel(bookUrl, from, to)
+                            else appDb.highlightTagDao.useLibraryLabel(bookUrl, from, to)
                         }
-                        appDb.highlightTagDao.saveDefinitions(tags.toList(), bookUrl)
-                        if (bookUrl.isNotEmpty() && bookOrder != originalOrder)
-                            appDb.highlightTagDao.saveBookLabels(bookUrl, bookOrder)
+                        if (bookmarkMode) BookmarkTags.saveDefinitions(tags.toList(), bookUrl)
+                        else {
+                            val current = appDb.highlightTagDao.all().associateBy { it.id }
+                            appDb.highlightTagDao.saveDefinitions(tags.map { tag ->
+                                tag.copy(bookmarkCommon = current[tag.id]?.bookmarkCommon ?: false,
+                                    bookmarkSortOrder = current[tag.id]?.bookmarkSortOrder ?: 0)
+                            }, bookUrl)
+                        }
+                        if (bookUrl.isNotEmpty() && bookOrder != originalOrder) {
+                            if (bookmarkMode) appDb.bookmarkTagDao.saveBookLabels(bookUrl, bookOrder.map {
+                                BookmarkTagOrder(it.bookUrl, it.tagId, it.sortOrder, it.hidden)
+                            }) else appDb.highlightTagDao.saveBookLabels(bookUrl, bookOrder)
+                        }
                     }
                 }
                 ReadBook.upHighlightTags()
@@ -329,6 +356,7 @@ class HighlightTagManageActivity : BaseActivity<ActivityHighlightTagBinding>(),
             val tag = visibleTags[position]
             holder.row.tvName.text = tag.name
             holder.row.tvPreview.highlightStyle = tag.styleObj()
+            holder.row.tvPreview.isVisible = !bookmarkMode
             holder.row.tvNote.text = tag.note
             holder.row.tvNote.isVisible = tag.note.isNotBlank()
             holder.row.btnCommon.setImageResource(if (tag.common) R.drawable.ic_star else R.drawable.ic_star_border)
@@ -351,9 +379,9 @@ class HighlightTagManageActivity : BaseActivity<ActivityHighlightTagBinding>(),
             }
             holder.row.editLabel.setOnClickListener {
                 if (!saving) showDialogFragment(HighlightTagEditDialog.create(
-                    tags.first { it.id == tag.id }, false, bookUrl, !libraryMode && bookUrl.isNotEmpty()))
+                    tags.first { it.id == tag.id }, false, bookUrl, !libraryMode && bookUrl.isNotEmpty(), bookmarkMode))
             }
-            holder.row.dragHandle.isVisible = !libraryMode
+            holder.row.dragHandle.isVisible = !libraryMode || bookUrl.isEmpty()
             holder.row.dragHandle.contentDescription = getString(R.string.highlight_tag_drag, tag.name)
             holder.row.dragHandle.setOnTouchListener { _, event ->
                 if (!saving && event.actionMasked == MotionEvent.ACTION_DOWN) touchHelper.startDrag(holder)

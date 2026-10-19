@@ -6,11 +6,15 @@ import android.os.Bundle
 import android.view.View
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.appcompat.app.AlertDialog
 import io.legado.app.R
 import io.legado.app.base.VMBaseFragment
 import io.legado.app.constant.AppLog
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Bookmark
+import io.legado.app.data.entities.HighlightTag
+import io.legado.app.help.HighlightTags
+import io.legado.app.ui.highlight.HighlightTagManageActivity
 import io.legado.app.databinding.FragmentBookmarkBinding
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.book.bookmark.BookmarkDialog
@@ -23,6 +27,7 @@ import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 
@@ -36,8 +41,17 @@ class BookmarkFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmark
     private var adapter: BookmarkAdapter? = null
     private var bookmarkJob: Job? = null
     private var durChapterIndex = 0
+    private var selectedTag: String? = null
+    private var attached = emptyMap<Long, List<HighlightTag>>()
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
+        selectedTag = savedInstanceState?.getString("tagFilter")
+        binding.tagFilter.setOnClickListener { showTagFilter() }
+        binding.tagManage.setOnClickListener {
+            startActivity(Intent(requireContext(), HighlightTagManageActivity::class.java)
+                .putExtra("bookUrl", viewModel.bookData.value?.bookUrl)
+                .putExtra("bookmarkMode", true))
+        }
         viewModel.bookMarkCallBack = this
         initRecyclerView()
         viewModel.bookData.observe(viewLifecycleOwner) {
@@ -75,12 +89,33 @@ class BookmarkFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmark
         bookmarkJob?.cancel()
         val book = viewModel.bookData.value ?: return
         bookmarkJob = viewLifecycleOwner.lifecycleScope.launch {
-            when {
-                searchKey.isNullOrBlank() -> appDb.bookmarkDao.flowByBook(book.name, book.author)
-                else -> appDb.bookmarkDao.flowSearch(book.name, book.author, searchKey)
+            combine(appDb.bookmarkDao.flowByBook(book.name, book.author),
+                appDb.highlightTagDao.flowAll(), appDb.bookmarkTagDao.flowLinks(),
+                appDb.bookmarkTagDao.flowOrders()) { bookmarks, tags, links, orders ->
+                val byId = tags.associateBy { it.id }
+                val linksByTime = links.groupBy { it.bookmarkTime }
+                val positions = orders.filter { it.bookUrl == book.bookUrl }.associate { it.tagId to it.sortOrder }
+                val labels = bookmarks.associate { bookmark ->
+                    bookmark.time to linksByTime[bookmark.time].orEmpty().mapNotNull { byId[it.tagId] }
+                        .sortedWith(compareBy<HighlightTag> { positions[it.id] ?: Int.MAX_VALUE }
+                            .thenBy { it.bookmarkSortOrder }.thenBy { it.id })
+                }
+                bookmarks to labels
             }.catch {
                 AppLog.put("目录界面获取书签数据失败\n${it.localizedMessage}", it)
-            }.flowOn(IO).collect { bookmarks ->
+            }.flowOn(IO).collect { (all, labels) ->
+                attached = labels
+                adapter?.tags = labels
+                val bookmarks = all.filter { bookmark ->
+                    HighlightTags.matchesFilter(selectedTag, labels[bookmark.time].orEmpty().map { it.id }) &&
+                        (searchKey.isNullOrBlank() || listOf(bookmark.chapterName, bookmark.content,
+                            bookmark.bookText).any { it.contains(searchKey, true) } ||
+                            labels[bookmark.time].orEmpty().any { it.name.contains(searchKey, true) })
+                }
+                binding.tagFilter.text = selectedTag?.let { id ->
+                    if (id.isEmpty()) getString(R.string.highlight_filter_untagged)
+                    else labels.values.flatten().firstOrNull { it.id == id }?.name
+                } ?: getString(R.string.book_notes_tags)
                 adapter?.setItems(bookmarks)
                 val scrollPosition = bookmarks
                     .indexOfLast { it.chapterIndex < durChapterIndex }
@@ -90,6 +125,28 @@ class BookmarkFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmark
         }
     }
 
+    private fun showTagFilter() {
+        val tags = attached.values.flatten().distinctBy { it.id }
+        val ids = listOf(null, "") + tags.map { it.id }
+        val names = listOf(getString(R.string.highlight_filter_all),
+            getString(R.string.highlight_filter_untagged)) + tags.map { it.name }
+        AlertDialog.Builder(requireContext()).setTitle(R.string.book_notes_tag_filter)
+            .setSingleChoiceItems(names.toTypedArray(), ids.indexOf(selectedTag)) { dialog, index ->
+                selectedTag = ids[index]
+                upBookmark(viewModel.searchKey)
+                dialog.dismiss()
+            }.setNegativeButton(R.string.cancel, null).show()
+    }
+
+    override fun onTagClick(id: String) {
+        selectedTag = id
+        upBookmark(viewModel.searchKey)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("tagFilter", selectedTag)
+        super.onSaveInstanceState(outState)
+    }
 
     override fun onClick(bookmark: Bookmark) {
         activity?.run {
