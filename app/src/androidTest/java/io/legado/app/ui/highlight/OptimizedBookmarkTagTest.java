@@ -19,6 +19,7 @@ import java.io.FileOutputStream;
 import java.lang.reflect.Field;
 import java.util.UUID;
 import static androidx.test.espresso.Espresso.*;
+import static androidx.test.espresso.Espresso.closeSoftKeyboard;
 import static androidx.test.espresso.action.ViewActions.*;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.matcher.ViewMatchers.*;
