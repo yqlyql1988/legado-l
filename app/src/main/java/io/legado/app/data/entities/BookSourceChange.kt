@@ -1,5 +1,6 @@
 package io.legado.app.data.entities
 
+import io.legado.app.help.ReadingNotes
 import io.legado.app.data.appDb
 import io.legado.app.model.ReadBook
 
@@ -9,6 +10,7 @@ fun replaceBookAfterSourceChange(
 ) {
     oldBook?.saveReadRecordSnapshot()
     appDb.runInTransaction {
+        if (oldBook != null) ReadingNotes.changeSource(oldBook, newBook, chapters)
         if (oldBook == null) appDb.bookDao.insert(newBook)
         else appDb.bookDao.replace(oldBook, newBook)
         appDb.bookChapterDao.insert(*chapters.toTypedArray())

@@ -75,6 +75,12 @@ interface BookHighlightDao {
     @Update
     fun update(highlight: BookHighlight)
 
+    @Query("""UPDATE highlights SET chapterUrl = :chapterUrl, chapterIndex = :chapterIndex,
+        chapterName = :chapterName, chapterPos = :start, chapterPosEnd = :end,
+        layoutTitleLength = :titleLength WHERE time = :time AND bookUrl = :bookUrl""")
+    fun updateLocation(time: Long, bookUrl: String, chapterUrl: String, chapterIndex: Int,
+        chapterName: String, start: Int, end: Int, titleLength: Int)
+
     @Delete
     fun delete(vararg highlight: BookHighlight)
 }

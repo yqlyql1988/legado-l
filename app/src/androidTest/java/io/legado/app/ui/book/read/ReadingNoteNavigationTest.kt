@@ -1,0 +1,247 @@
+package io.legado.app.ui.book.read
+
+import android.content.Intent
+import android.os.SystemClock
+import android.view.MotionEvent
+import android.view.View
+import androidx.test.core.app.ActivityScenario
+import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.UiController
+import androidx.test.espresso.ViewAction
+import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.matcher.RootMatchers.isPlatformPopup
+import androidx.test.espresso.matcher.ViewMatchers.*
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import io.legado.app.R
+import io.legado.app.constant.BookType
+import io.legado.app.constant.PageAnim
+import io.legado.app.constant.PreferKey
+import io.legado.app.data.appDb
+import io.legado.app.data.entities.*
+import io.legado.app.help.HighlightTextBuilder
+import io.legado.app.help.ReadingNotes
+import io.legado.app.help.TextSelectMenuConfig
+import io.legado.app.help.book.BookHelp
+import io.legado.app.help.config.LocalConfig
+import io.legado.app.model.ReadBook
+import io.legado.app.ui.book.bookmark.ReadingNoteNavigation
+import io.legado.app.ui.book.read.page.ReadView
+import io.legado.app.ui.book.read.page.entities.column.TextBaseColumn
+import io.legado.app.ui.book.toc.TocActivityResult
+import io.legado.app.utils.defaultSharedPreferences
+import org.hamcrest.Matcher
+import org.junit.After
+import org.junit.Assert.*
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import java.util.UUID
+
+@RunWith(AndroidJUnit4::class)
+class ReadingNoteNavigationTest {
+    private val instrumentation = InstrumentationRegistry.getInstrumentation()
+    private val context = instrumentation.targetContext
+    private val prefs = context.defaultSharedPreferences
+    private val savedPrefs = listOf(PreferKey.textSelectAble, PreferKey.longPressSelectParagraph,
+        PreferKey.preDownloadNum, PreferKey.textSelectMenuConfig).associateWith { prefs.all[it] }
+    private val savedHelp = listOf("readHelpVersion", "readMenuHelpVersion").associateWith { LocalConfig.all[it] }
+    private val id = UUID.randomUUID().toString()
+    private val source = BookSource(bookSourceUrl = "https://example.invalid/note-source/$id")
+    private val book = Book(bookUrl = "https://example.invalid/note-book/$id",
+        tocUrl = "https://example.invalid/note-book/$id/toc", origin = source.bookSourceUrl,
+        name = "Note fixture $id", type = BookType.text, totalChapterNum = 1, canUpdate = false)
+        .apply { setPageAnim(PageAnim.noAnim); setUseReplaceRule(false) }
+    private val chapter = BookChapter(bookUrl = book.bookUrl, url = "${book.bookUrl}/new-url",
+        title = "第1章 修订后的章名")
+    private val highlight = BookHighlight(bookUrl = book.bookUrl, bookName = book.name,
+        chapterUrl = "${book.bookUrl}/expired-url?key=old", chapterName = "第一章 旧标题",
+        chapterPos = 8, chapterPosEnd = 15, layoutTitleLength = 0,
+        bookText = "唯一的原文摘录", note = "原笔记必须保留", style = """{"fill":123}""")
+    private val bookmark = Bookmark(time = highlight.time + 1, bookName = book.name,
+        chapterName = highlight.chapterName, chapterPos = 8, bookText = highlight.bookText, content = "原书签备注")
+    private var scenario: ActivityScenario<ReadBookActivity>? = null
+
+    @Before fun before() {
+        prefs.edit().putBoolean(PreferKey.textSelectAble, true)
+            .putBoolean(PreferKey.longPressSelectParagraph, true)
+            .putInt(PreferKey.preDownloadNum, 0)
+            .putString(PreferKey.textSelectMenuConfig, TextSelectMenuConfig.default().toJson()).commit()
+        LocalConfig.edit().putInt("readHelpVersion", 1).putInt("readMenuHelpVersion", 1).commit()
+        appDb.bookSourceDao.insert(source)
+        appDb.bookDao.insert(book)
+        appDb.bookChapterDao.insert(chapter)
+        appDb.bookHighlightDao.insert(highlight)
+        appDb.bookmarkDao.insert(bookmark)
+    }
+
+    @After fun after() {
+        scenario?.close()
+        appDb.bookHighlightDao.delete(*appDb.bookHighlightDao.getByBook(book.bookUrl).toTypedArray())
+        appDb.bookmarkDao.delete(bookmark)
+        appDb.readingNoteDao.deleteLocations("highlight", listOf(highlight.time))
+        appDb.readingNoteDao.deleteLocations("bookmark", listOf(bookmark.time))
+        BookHelp.clearCache(book)
+        appDb.bookDao.delete(book)
+        appDb.bookSourceDao.delete(source)
+        prefs.edit().apply { savedPrefs.forEach { (key, value) ->
+            when (value) { null -> remove(key); is Boolean -> putBoolean(key, value)
+                is Int -> putInt(key, value); is String -> putString(key, value) }
+        } }.commit()
+        LocalConfig.edit().apply { savedHelp.forEach { (key, value) ->
+            if (value == null) remove(key) else putInt(key, value as Int)
+        } }.commit()
+    }
+
+    @Test fun anySourceCanNavigateRenamedChapterAndRepairBothNoteTypes() {
+        val text = (1..45).joinToString("\n") { "修文增加的第${it}段正文。" } + "\n她读到唯一的原文摘录并留下笔记。"
+        BookHelp.saveText(book, chapter, text)
+        val target = requireNotNull(ReadingNotes.target(ReadingNotes.legacy(highlight), listOf(chapter)))
+        assertFalse(target.verified)
+        launch(Intent(context, ReadBookActivity::class.java)
+            .putExtra("bookUrl", book.bookUrl).putExtra("index", target.chapterIndex)
+            .putExtra("chapterPos", target.chapterPos)
+            .putExtra(TocActivityResult.EXTRA_READING_NOTE_KEY, ReadingNotes.key(target))
+            .putExtra(TocActivityResult.EXTRA_HIGHLIGHT_LAYOUT_TITLE_LENGTH, target.layoutTitleLength)
+            .putExtra(TocActivityResult.EXTRA_HIGHLIGHT_ANCHOR_TEXT, target.quote))
+        var expected = -1
+        scenario!!.onActivity {
+            val layout = requireNotNull(ReadBook.curTextChapter)
+            val full = HighlightTextBuilder.build(layout.pages.flatMap { page ->
+                page.lines.map { line -> HighlightTextBuilder.LineInput(line.text, line.isParagraphEnd) }
+            })
+            expected = full.indexOf(highlight.bookText)
+            assertTrue(expected > 100)
+            assertEquals(expected, ReadBook.durChapterPos)
+            assertEquals(1, ReadBook.anchoredHighlightsOfChapter(layout, layout.layoutTitleLength).size)
+        }
+        await {
+            appDb.bookHighlightDao.getByBook(book.bookUrl).single().chapterPos == expected &&
+                appDb.bookmarkDao.getByBook(book.name, book.author).single().chapterPos == expected
+        }
+        assertEquals(highlight.note, appDb.bookHighlightDao.getByBook(book.bookUrl).single().note)
+        assertEquals(highlight.style, appDb.bookHighlightDao.getByBook(book.bookUrl).single().style)
+        assertEquals(bookmark.content, appDb.bookmarkDao.getByBook(book.name, book.author).single().content)
+    }
+
+    @Test fun repeatedTextWithChangedAddressDoesNotUseOldOffsetsWithoutEvidence() {
+        val repeat = highlight.copy(bookText = "重复的一句话")
+        appDb.bookHighlightDao.insert(repeat)
+        BookHelp.saveText(book, chapter, "重复的一句话。\n不同上下文。\n重复的一句话。")
+        launch(Intent(context, ReadBookActivity::class.java)
+            .putExtra("bookUrl", book.bookUrl).putExtra("index", 0).putExtra("chapterPos", repeat.chapterPos)
+            .putExtra(TocActivityResult.EXTRA_HIGHLIGHT_LAYOUT_TITLE_LENGTH, 0)
+            .putExtra(TocActivityResult.EXTRA_HIGHLIGHT_ANCHOR_TEXT, repeat.bookText))
+        scenario!!.onActivity {
+            val layout = requireNotNull(ReadBook.curTextChapter)
+            assertEquals(0, ReadBook.durChapterPos)
+            assertTrue(ReadBook.anchoredHighlightsOfChapter(layout, layout.layoutTitleLength).isEmpty())
+        }
+        assertTrue(appDb.readingNoteDao.locationsForNote("highlight", highlight.time).isEmpty())
+    }
+
+    @Test fun manualSelectionMovesExistingNoteAndKeepsItsExcerptStyleAndMemo() {
+        BookHelp.saveText(book, chapter, "她袖口缝着一小片蓝色丝线。\n这里是作者改写后的正文。")
+        launch(Intent(context, ReadBookActivity::class.java)
+            .putExtra("bookUrl", book.bookUrl).putExtra("index", 0).putExtra("chapterPos", 0)
+            .putExtra(ReadingNoteNavigation.EXTRA_KIND, "highlight")
+            .putExtra(ReadingNoteNavigation.EXTRA_TIME, highlight.time))
+        await {
+            var visible = false
+            scenario!!.onActivity { activity ->
+                visible = activity.findViewById<ReadView>(R.id.read_view).curPage.textPage.lines.any { line ->
+                    line.columns.any { it is TextBaseColumn && it.charData == "袖" }
+                }
+            }
+            visible
+        }
+        onView(withId(R.id.read_view)).perform(object : ViewAction {
+            override fun getConstraints(): Matcher<View> = isDisplayed()
+            override fun getDescription() = "Select replacement text in the reader"
+            override fun perform(ui: UiController, view: View) {
+                val reader = view as ReadView
+                val page = reader.curPage
+                val line = page.textPage.lines.first { row ->
+                    row.columns.any { it is TextBaseColumn && it.charData == "袖" }
+                }
+                val column = line.columns.first { it is TextBaseColumn && it.charData == "袖" }
+                val x = (column.start + column.end) / 2 + page.imgBgPaddingStart
+                val y = (line.lineTop + line.lineBottom) / 2 + page.headerHeight
+                val down = SystemClock.uptimeMillis()
+                fun dispatch(action: Int) {
+                    val event = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, x, y, 0)
+                    try { assertTrue(view.dispatchTouchEvent(event)) } finally { event.recycle() }
+                }
+                dispatch(MotionEvent.ACTION_DOWN)
+                ui.loopMainThreadForAtLeast(750)
+                dispatch(MotionEvent.ACTION_UP)
+                ui.loopMainThreadForAtLeast(200)
+                assertTrue(reader.isTextSelected)
+            }
+        })
+        onView(withText(R.string.highlight)).inRoot(isPlatformPopup()).perform(click())
+        await { appDb.readingNoteDao.locationsForNote("highlight", highlight.time).isNotEmpty() }
+        val saved = appDb.bookHighlightDao.getByBook(book.bookUrl).single()
+        assertEquals(highlight.bookText, saved.bookText)
+        assertEquals(highlight.note, saved.note)
+        assertEquals(highlight.style, saved.style)
+        assertEquals(highlight.time, saved.time)
+        val location = appDb.readingNoteDao.locationsForNote("highlight", highlight.time).single()
+        assertEquals(chapter.url, location.chapterUrl)
+        assertTrue(location.quote.contains("袖"))
+        assertTrue(location.verified)
+    }
+
+    @Test fun noteIdentityKeepsRepeatedQuoteContextAfterEarlierLayoutAlreadyMovedItsPosition() {
+        val quote = "重复的一句话"
+        val repeated = highlight.copy(bookText = quote, chapterPosEnd = highlight.chapterPos + quote.length)
+        appDb.bookHighlightDao.insert(repeated)
+        appDb.readingNoteDao.saveLocations(listOf(ReadingNotes.legacy(repeated).copy(
+            prefix = "第二处之前", suffix = "后文二", updatedAt = 1)))
+        BookHelp.saveText(book, chapter,
+            "第一处之前重复的一句话后文一。\n这里添加了新的前言正文。\n第二处之前重复的一句话后文二。")
+        launch(Intent(context, ReadBookActivity::class.java).putExtra("bookUrl", book.bookUrl))
+        await { appDb.readingNoteDao.locationsForNote("highlight", highlight.time).single().chapterUrl == chapter.url }
+        var expected = -1
+        scenario!!.onActivity {
+            val layout = requireNotNull(ReadBook.curTextChapter)
+            val full = HighlightTextBuilder.build(layout.pages.flatMap { page ->
+                page.lines.map { line -> HighlightTextBuilder.LineInput(line.text, line.isParagraphEnd) }
+            })
+            expected = full.lastIndexOf(quote)
+            assertTrue(expected > repeated.chapterPos)
+            ReadBook.openChapter(0, repeated.chapterPos, highlightLayoutTitleLength = 0,
+                highlightAnchorText = quote, readingNoteKey = ReadingNotes.key(ReadingNotes.legacy(repeated)))
+        }
+        await {
+            var ready = false
+            scenario!!.onActivity {
+                ready = ReadBook.curTextChapter?.isCompleted == true && ReadBook.durChapterPos == expected
+            }
+            ready
+        }
+    }
+
+    private fun launch(intent: Intent) {
+        scenario = ActivityScenario.launch(intent.putExtra("inBookshelf", true))
+        await {
+            var ready = false
+            scenario!!.onActivity {
+                val page = it.findViewById<ReadView>(R.id.read_view).curPage.textPage
+                ready = ReadBook.book?.bookUrl == book.bookUrl && ReadBook.curTextChapter?.isCompleted == true &&
+                    page.textChapter.chapter.bookUrl == book.bookUrl && page.lines.isNotEmpty()
+            }
+            ready
+        }
+        instrumentation.waitForIdleSync()
+    }
+
+    private fun await(condition: () -> Boolean) {
+        val deadline = SystemClock.uptimeMillis() + 20_000
+        do {
+            if (condition()) return
+            SystemClock.sleep(60)
+        } while (SystemClock.uptimeMillis() < deadline)
+        error("Reading note fixture was not ready")
+    }
+}

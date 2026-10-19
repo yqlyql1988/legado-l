@@ -1,5 +1,11 @@
 package io.legado.app.model
 
+import io.legado.app.data.entities.ReadingNoteLocation
+import io.legado.app.help.ReadingNoteAnchor
+import io.legado.app.help.ReadingNoteChapter
+import io.legado.app.help.ReadingNotes
+import io.legado.app.R
+import io.legado.app.data.entities.Bookmark
 import android.util.Log
 import io.legado.app.BuildConfig
 import io.legado.app.constant.AppConst
@@ -170,6 +176,9 @@ object ReadBook : CoroutineScope by MainScope() {
     var callBack: CallBack? = null
     var highlights: List<BookHighlight> = emptyList()
         private set
+    private var noteLocations = emptyList<ReadingNoteLocation>()
+    private var noteBookmarkTargets = emptyList<ReadingNoteLocation>()
+    private var highlightCandidateTargets = emptyMap<Long, ReadingNoteLocation>()
     var highlightTags: List<HighlightTag> = emptyList()
         private set
     private var highlightTagLinks: Map<Long, List<HighlightTagLink>> = emptyMap()
@@ -291,6 +300,15 @@ object ReadBook : CoroutineScope by MainScope() {
     fun loadHighlights(book: Book) {
         invalidateHighlightSpacing()
         highlights = appDb.bookHighlightDao.getByBook(book.bookUrl)
+        noteLocations = appDb.readingNoteDao.locationsForBook(book.bookUrl)
+        val chapters = appDb.bookChapterDao.getChapterList(book.bookUrl)
+        highlightCandidateTargets = highlights.mapNotNull { highlight ->
+            ReadingNotes.target(ReadingNotes.legacy(highlight), chapters)
+                ?.let { highlight.time to it }
+        }.toMap()
+        noteBookmarkTargets = appDb.bookmarkDao.getByBook(book.name, book.author).mapNotNull {
+            ReadingNotes.target(ReadingNotes.legacy(it, book.bookUrl), chapters)
+        }
         loadHighlightTags(book.bookUrl)
         highlightsVersion++
     }
@@ -576,6 +594,7 @@ object ReadBook : CoroutineScope by MainScope() {
     ): List<BookHighlight> {
         val currentBook = book ?: return emptyList()
         val bookChapter = chapter.chapter
+        if (bookChapter.bookUrl != currentBook.bookUrl) return emptyList()
         val legacyBound = highlights.filter {
             it.bindLegacyChapter(currentBook, bookChapter, chapter.title)
         }
@@ -586,7 +605,12 @@ object ReadBook : CoroutineScope by MainScope() {
             }
         }
         val chapterHighlights = highlights
-            .filter { it.isForChapter(currentBook, bookChapter) }
+            .filter {
+                it.isForBook(currentBook) && (
+                    highlightCandidateTargets[it.time]?.chapterUrl == bookChapter.url ||
+                        highlightCandidateTargets[it.time] == null && it.chapterUrl == bookChapter.url
+                    )
+            }
             .sortedWith(compareBy(BookHighlight::chapterPos, BookHighlight::time))
         val titleLength = layoutTitleLength ?: return chapterHighlights
         val pinned = chapterHighlights.filter { it.pinLayoutTitleLength(titleLength) }
@@ -615,7 +639,10 @@ object ReadBook : CoroutineScope by MainScope() {
         }
         val chapterHighlights = highlightsOfChapter(chapter, layoutTitleLength)
         if (!chapter.isCompleted) {
-            return chapterHighlights.map { highlight ->
+            return chapterHighlights.filter { highlight ->
+                highlightCandidateTargets[highlight.time]
+                    ?.verified != false
+            }.map { highlight ->
                 highlight to HighlightAnchor.Anchor(
                     highlight.bodyStart(layoutTitleLength),
                     highlight.bodyEnd(layoutTitleLength)
@@ -627,12 +654,20 @@ object ReadBook : CoroutineScope by MainScope() {
         } else {
             val bodyText = chapterText(chapter).drop(layoutTitleLength)
             chapterHighlights.mapNotNull { highlight ->
-                HighlightAnchor.reanchor(
-                    bodyText,
-                    highlight.bodyStart(layoutTitleLength),
-                    highlight.bodyEnd(layoutTitleLength),
-                    highlight.bookText
-                )?.let { highlight to it }
+                val source = highlightCandidateTargets[highlight.time]
+                    ?: ReadingNotes.legacy(highlight)
+                // Preserve image/HTML selection widths. Cross-source candidates always need text evidence.
+                if (source.verified && source.quote.length != source.chapterPosEnd - source.chapterPos) {
+                    HighlightAnchor.reanchor(bodyText, highlight.bodyStart(layoutTitleLength),
+                        highlight.bodyEnd(layoutTitleLength), highlight.bookText)?.let { highlight to it }
+                } else {
+                    ReadingNotes.captured(source, chapter.chapter, bodyText, layoutTitleLength)
+                        ?.let { resolved ->
+                            recordNoteLocation(resolved)
+                            highlight to HighlightAnchor.Anchor(resolved.chapterPos - layoutTitleLength,
+                                resolved.chapterPosEnd - layoutTitleLength)
+                        }
+                }
             }
         }
         if (highlightsVersion == version) {
@@ -646,6 +681,7 @@ object ReadBook : CoroutineScope by MainScope() {
     fun addHighlight(highlight: BookHighlight) {
         appDb.bookHighlightDao.insert(highlight)
         if (!highlight.isForBook(book)) return
+        captureNoteLocation(ReadingNotes.legacy(highlight))
         highlights = (highlights.filterNot { it.time == highlight.time } + highlight)
             .sortedWith(
                 compareBy(BookHighlight::chapterIndex, BookHighlight::chapterPos, BookHighlight::time)
@@ -666,6 +702,7 @@ object ReadBook : CoroutineScope by MainScope() {
 
     fun removeHighlight(highlight: BookHighlight) {
         appDb.bookHighlightDao.delete(highlight)
+        appDb.readingNoteDao.deleteLocations("highlight", listOf(highlight.time))
         if (!highlight.isForBook(book)) return
         highlights = highlights.filter { it.time != highlight.time }
         highlightsVersion++
@@ -1149,6 +1186,7 @@ object ReadBook : CoroutineScope by MainScope() {
         highlightLayoutTitleLength: Int? = null,
         highlightAnchorText: String? = null,
         pdfPageIndex: Int? = null,
+        readingNoteKey: String? = null,
         success: (() -> Unit)? = null
     ) {
         if (BaseReadAloudService.isRun) {
@@ -1171,12 +1209,23 @@ object ReadBook : CoroutineScope by MainScope() {
             }
             pendingHighlightAnchor = highlightAnchorText?.takeIf(String::isNotEmpty)?.let {
                 book?.let { currentBook ->
+                    val targets = highlightCandidateTargets.values + noteBookmarkTargets
+                    val context = if (readingNoteKey.isNullOrEmpty()) {
+                        targets.filter { target ->
+                            target.chapterIndex == index && target.chapterPos == durChapterPos && target.quote == it
+                        }.distinctBy { target -> Triple(target.prefix, target.suffix, target.verified) }.singleOrNull()
+                    } else {
+                        targets.singleOrNull { target ->
+                            target.chapterIndex == index && ReadingNotes.key(target) == readingNoteKey
+                        }
+                    }
                     PendingHighlightAnchor(
                         currentBook.bookUrl,
                         index,
                         durChapterPos,
                         highlightLayoutTitleLength ?: -1,
-                        it
+                        context?.quote ?: it,
+                        noteLocation = context
                     )
                 }
             }
@@ -1625,6 +1674,7 @@ object ReadBook : CoroutineScope by MainScope() {
                     }
                     ensureContentCurrent(book, contentToken)
                     finishPendingPdfJump(book, textChapter)
+                    reanchorBookmarks(textChapter)
                     val restoredAnchor = resolvePendingHighlightAnchor(book, textChapter)
                     if (upContent) {
                         callBack?.upContent(
@@ -1755,6 +1805,7 @@ object ReadBook : CoroutineScope by MainScope() {
                     }
                     ensureContentCurrent(book, contentToken)
                     finishPendingPdfJump(book, textChapter)
+                    reanchorBookmarks(textChapter)
                     val restoredAnchor = resolvePendingHighlightAnchor(book, textChapter)
                     if (upContent) {
                         callBack?.upContent(
@@ -2121,10 +2172,88 @@ object ReadBook : CoroutineScope by MainScope() {
         }
         if (durChapterPos != expectedPosition) return false
         val bodyPosition = (expectedPosition - currentTitleLength).coerceAtLeast(0)
-        durChapterPos = currentTitleLength +
-            HighlightAnchor.jumpPos(bodyText, bodyPosition, pending.bookText)
+        if (pending.waitForLayout) {
+            durChapterPos = currentTitleLength +
+                HighlightAnchor.jumpPos(bodyText, bodyPosition, pending.bookText)
+        } else {
+            val context = pending.noteLocation
+            val match = ReadingNoteAnchor.find(bodyText, pending.bookText,
+                bodyPosition, context?.prefix.orEmpty(), context?.suffix.orEmpty(),
+                context?.verified ?: false)
+            durChapterPos = if (match == null) {
+                appCtx.toastOnUi(R.string.reading_note_position_missing)
+                0
+            } else currentTitleLength + match.start
+        }
         saveRead()
         return true
+    }
+
+    fun captureBookmarkLocation(bookmark: Bookmark) {
+        val current = book ?: return
+        if (bookmark.bookName != current.name || bookmark.bookAuthor != current.author) return
+        if (noteLocations.any { it.kind == "bookmark" && it.noteTime == bookmark.time }) return
+        captureNoteLocation(ReadingNotes.legacy(bookmark, current.bookUrl))
+    }
+
+    fun relocateReadingNote(kind: String, time: Long, chapterIndex: Int,
+        start: Int, end: Int, quote: String): Boolean {
+        val current = book ?: return false
+        val chapter = curTextChapter?.takeIf {
+            it.isForBook(current) && it.chapter.index == chapterIndex &&
+                it.isCompleted && it.layoutTitleLength >= 0
+        } ?: return false
+        val exists = when (kind) {
+            "bookmark" -> appDb.bookmarkDao.getByBook(current.name, current.author).any { it.time == time }
+            "highlight" -> appDb.bookHighlightDao.getByBook(current.bookUrl).any { it.time == time }
+            else -> false
+        }
+        if (!exists) return false
+        val source = ReadingNoteLocation(
+            kind = kind, noteTime = time, bookUrl = current.bookUrl,
+            chapterIndex = chapterIndex, chapterPos = start, chapterPosEnd = end,
+            layoutTitleLength = chapter.layoutTitleLength, quote = quote, verified = true)
+        val resolved = ReadingNotes.captured(source, chapter.chapter,
+            chapterText(chapter).drop(chapter.layoutTitleLength), chapter.layoutTitleLength) ?: return false
+        if (!ReadingNotes.saveLocation(resolved, current.name, current.author)) return false
+        if (book?.bookUrl == current.bookUrl) loadHighlights(current)
+        return true
+    }
+
+    private fun captureNoteLocation(source: ReadingNoteLocation) {
+        val chapter = curTextChapter?.takeIf {
+            it.isCompleted && it.chapter.bookUrl == source.bookUrl &&
+                it.chapter.index == source.chapterIndex && it.layoutTitleLength >= 0
+        } ?: return
+        val titleLength = chapter.layoutTitleLength
+        val snapshot = source.copy(layoutTitleLength = titleLength, verified = true)
+        ReadingNotes.captured(snapshot, chapter.chapter,
+            chapterText(chapter).drop(titleLength), titleLength)?.let(::recordNoteLocation)
+    }
+
+    private fun reanchorBookmarks(chapter: TextChapter) {
+        if (!chapter.isCompleted || chapter.layoutTitleLength < 0 || !chapter.isForBook(book)) return
+        val titleLength = chapter.layoutTitleLength
+        val body = chapterText(chapter).drop(titleLength)
+        noteBookmarkTargets.filter { it.chapterUrl == chapter.chapter.url }.forEach { source ->
+            ReadingNotes.captured(source, chapter.chapter, body, titleLength)
+                ?.let(::recordNoteLocation)
+        }
+    }
+
+    private fun recordNoteLocation(location: ReadingNoteLocation) {
+        val current = book?.takeIf { it.bookUrl == location.bookUrl } ?: return
+        val old = noteLocations.firstOrNull { it.kind == location.kind && it.noteTime == location.noteTime }
+        if (old?.copy(updatedAt = 0) == location.copy(updatedAt = 0)) return
+        noteLocations = noteLocations.filterNot {
+            it.kind == location.kind && it.noteTime == location.noteTime
+        } + location
+        if (location.kind == "highlight") highlightCandidateTargets =
+            highlightCandidateTargets + (location.noteTime to location)
+        else noteBookmarkTargets = noteBookmarkTargets.filterNot { it.noteTime == location.noteTime } + location
+        executor.execute {
+            ReadingNotes.saveLocation(location, current.name, current.author)
+        }
     }
 
     private fun currentPositionAnchor(): PendingHighlightAnchor? {
@@ -2165,6 +2294,7 @@ object ReadBook : CoroutineScope by MainScope() {
         val bookText: String,
         val waitForLayout: Boolean = false,
         val layoutBodyText: String? = null,
+        val noteLocation: ReadingNoteLocation? = null,
     )
 
     /**
@@ -2244,7 +2374,8 @@ internal fun BookHighlight.isForBook(book: Book?): Boolean {
 }
 
 internal fun BookHighlight.isForChapter(book: Book?, chapter: BookChapter): Boolean {
-    return isForBook(book) && book?.bookUrl == chapter.bookUrl && chapterUrl == chapter.url
+    return isForBook(book) && book?.bookUrl == chapter.bookUrl &&
+        ReadingNoteChapter.sameUrl(chapterUrl, chapter.url)
 }
 
 internal fun BookHighlight.bindLegacyChapter(

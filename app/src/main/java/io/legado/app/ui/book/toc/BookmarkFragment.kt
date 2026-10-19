@@ -1,10 +1,13 @@
 package io.legado.app.ui.book.toc
 
+import io.legado.app.help.ReadingNotes
+import io.legado.app.ui.book.bookmark.ReadingNoteNavigation
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import androidx.fragment.app.activityViewModels
+import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
 import io.legado.app.base.VMBaseFragment
@@ -25,6 +28,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 
 class BookmarkFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmark),
@@ -92,17 +96,40 @@ class BookmarkFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmark
 
 
     override fun onClick(bookmark: Bookmark) {
-        activity?.run {
-            setResult(Activity.RESULT_OK, Intent().apply {
-                putExtra("index", bookmark.chapterIndex)
-                putExtra("chapterPos", bookmark.chapterPos)
-            })
-            finish()
+        val book = viewModel.bookData.value ?: return
+        viewLifecycleOwner.lifecycleScope.launch {
+            val target = withContext(IO) {
+                ReadingNotes.target(ReadingNotes.legacy(bookmark, book.bookUrl),
+                    appDb.bookChapterDao.getChapterList(book.bookUrl))
+            }
+            if (target == null) {
+                activity?.let {
+                    ReadingNoteNavigation.unavailable(it, book, "bookmark", bookmark.time)
+                }
+                return@launch
+            }
+            activity?.run {
+                setResult(Activity.RESULT_OK, Intent().apply {
+                    putExtra("index", target.chapterIndex)
+                    putExtra("chapterPos", target.chapterPos)
+                    putExtra(TocActivityResult.EXTRA_HIGHLIGHT_LAYOUT_TITLE_LENGTH, target.layoutTitleLength)
+                    putExtra(TocActivityResult.EXTRA_HIGHLIGHT_ANCHOR_TEXT, target.quote)
+                    putExtra(TocActivityResult.EXTRA_READING_NOTE_KEY, ReadingNotes.key(target))
+                })
+                finish()
+            }
         }
     }
 
     override fun onLongClick(bookmark: Bookmark, pos: Int) {
-        showDialogFragment(BookmarkDialog(bookmark, pos))
+        AlertDialog.Builder(requireContext())
+            .setItems(arrayOf(getString(R.string.edit), getString(R.string.reading_note_relocate))) { _, position ->
+            if (position == 0) showDialogFragment(BookmarkDialog(bookmark, pos))
+            else viewModel.bookData.value?.let { book ->
+                ReadingNoteNavigation.relocate(
+                    requireActivity(), book, "bookmark", bookmark.time)
+            }
+        }.show()
     }
 
 }

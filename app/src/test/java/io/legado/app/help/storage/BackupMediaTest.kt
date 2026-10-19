@@ -64,6 +64,8 @@ class BackupMediaTest {
                 "highlightTag.json",
                 "highlightTagLink.json",
                 "highlightTagOrder.json",
+                "readingNoteLocation.json",
+                "readingNoteSource.json",
                 "bookSource.json",
                 "rssSources.json",
                 "rssStar.json",

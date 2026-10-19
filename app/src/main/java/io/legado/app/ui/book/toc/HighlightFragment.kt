@@ -1,10 +1,14 @@
 package io.legado.app.ui.book.toc
 
+import io.legado.app.help.ReadingNoteChapter
+import io.legado.app.help.ReadingNotes
+import io.legado.app.ui.book.bookmark.ReadingNoteNavigation
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import androidx.fragment.app.activityViewModels
+import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.lifecycleScope
 import androidx.core.view.isVisible
 import io.legado.app.R
@@ -46,7 +50,7 @@ internal fun resolveHighlightChapterIndex(
     return if (highlight.chapterUrl.isBlank()) {
         highlight.chapterIndex
     } else {
-        chapterIndexes[highlight.chapterUrl]
+        ReadingNoteChapter.exactIndex(highlight.chapterUrl, chapterIndexes)
     }
 }
 
@@ -217,28 +221,48 @@ class HighlightFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_highlig
     override fun onClick(highlight: BookHighlight) {
         val book = viewModel.bookData.value ?: return
         if (!supportsHighlightPosition(book)) return
-        val chapterIndex = resolveHighlightChapterIndex(highlight, chapterIndexes) ?: return
-        activity?.run {
-            setResult(Activity.RESULT_OK, Intent().apply {
-                putExtra("index", chapterIndex)
-                putExtra("chapterPos", highlight.chapterPos)
-                putExtra(
-                    TocActivityResult.EXTRA_HIGHLIGHT_LAYOUT_TITLE_LENGTH,
-                    highlight.layoutTitleLength
-                )
-                putExtra(
-                    TocActivityResult.EXTRA_HIGHLIGHT_ANCHOR_TEXT,
-                    highlight.bookText.takeIf {
-                        highlight.chapterPosEnd - highlight.chapterPos == it.length
-                    }.orEmpty()
-                )
-            })
-            finish()
+        viewLifecycleOwner.lifecycleScope.launch {
+            val target = withContext(IO) {
+                ReadingNotes.target(ReadingNotes.legacy(highlight),
+                    appDb.bookChapterDao.getChapterList(book.bookUrl))
+            }
+            val chapterIndex = target?.chapterIndex
+            if (chapterIndex == null || chapterIndex < 0) {
+                activity?.let {
+                    ReadingNoteNavigation.unavailable(it, book, "highlight", highlight.time)
+                }
+                return@launch
+            }
+            activity?.run {
+                setResult(Activity.RESULT_OK, Intent().apply {
+                    putExtra("index", chapterIndex)
+                    putExtra("chapterPos", target?.chapterPos ?: highlight.chapterPos)
+                    putExtra(TocActivityResult.EXTRA_READING_NOTE_KEY, ReadingNotes.key(target!!))
+                    putExtra(
+                        TocActivityResult.EXTRA_HIGHLIGHT_LAYOUT_TITLE_LENGTH,
+                        target?.layoutTitleLength ?: highlight.layoutTitleLength
+                    )
+                    putExtra(
+                        TocActivityResult.EXTRA_HIGHLIGHT_ANCHOR_TEXT,
+                        target?.quote ?: highlight.bookText.takeIf {
+                            highlight.chapterPosEnd - highlight.chapterPos == it.length
+                        }.orEmpty()
+                    )
+                })
+                finish()
+            }
         }
     }
 
     override fun onLongClick(highlight: BookHighlight) {
-        showDialogFragment(HighlightNoteDialog(highlight))
+        AlertDialog.Builder(requireContext())
+            .setItems(arrayOf(getString(R.string.edit), getString(R.string.reading_note_relocate))) { _, position ->
+            if (position == 0) showDialogFragment(HighlightNoteDialog(highlight))
+            else viewModel.bookData.value?.let { book ->
+                ReadingNoteNavigation.relocate(
+                    requireActivity(), book, "highlight", highlight.time)
+            }
+        }.show()
     }
 
     private fun supportsHighlightPosition(book: Book): Boolean {

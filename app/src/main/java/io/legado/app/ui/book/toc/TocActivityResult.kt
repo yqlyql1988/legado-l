@@ -26,7 +26,8 @@ class TocActivityResult : ActivityResultContract<String, Array<Any>?>() {
                         NO_HIGHLIGHT_LAYOUT_TITLE_LENGTH
                     ),
                     it.getStringExtra(EXTRA_HIGHLIGHT_ANCHOR_TEXT).orEmpty(),
-                    it.getIntExtra(EXTRA_PDF_PAGE_INDEX, -1)
+                    it.getIntExtra(EXTRA_PDF_PAGE_INDEX, -1),
+                    it.getStringExtra(EXTRA_READING_NOTE_KEY).orEmpty()
                 )
             }
         }
@@ -41,5 +42,7 @@ class TocActivityResult : ActivityResultContract<String, Array<Any>?>() {
         const val HIGHLIGHT_ANCHOR_TEXT_INDEX = 6
         const val NO_HIGHLIGHT_LAYOUT_TITLE_LENGTH = Int.MIN_VALUE
         const val EXTRA_HIGHLIGHT_ANCHOR_TEXT = "highlightAnchorText"
+        const val EXTRA_READING_NOTE_KEY = "readingNoteKey"
+        const val READING_NOTE_KEY_INDEX = 8
     }
 }

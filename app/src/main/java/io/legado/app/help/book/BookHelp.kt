@@ -920,7 +920,7 @@ private val regexA by lazy {
     "\\s".toRegex()
 }
 
-private fun getChapterNum(chapterName: String?): Int {
+internal fun getChapterNum(chapterName: String?): Int {
     chapterName ?: return -1
     val chapterName1 = StringUtils.fullToHalf(chapterName).replace(regexA, "")
     return StringUtils.stringToInt(
@@ -949,7 +949,7 @@ private val regexC by lazy {
     "(?!^)(?:[〖【《〔\\[{(][^〖【《〔\\[{()〕》】〗\\]}]+)?[)〕》】〗\\]}]$|^[〖【《〔\\[{(](?:[^〖【《〔\\[{()〕》】〗\\]}]+[〕》】〗\\]})])?(?!$)".toRegex()
 }
 
-private fun getPureChapterName(chapterName: String?): String {
+internal fun getPureChapterName(chapterName: String?): String {
     return if (chapterName == null) "" else StringUtils.fullToHalf(chapterName)
         .replace(regexA, "")
         .replace(regexB, "")
