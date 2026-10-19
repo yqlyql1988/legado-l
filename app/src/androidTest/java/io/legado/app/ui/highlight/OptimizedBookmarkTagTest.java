@@ -144,7 +144,7 @@ public class OptimizedBookmarkTagTest {
             closeSoftKeyboard();
             onView(withText("保存")).perform(click());
             onView(allOf(withText(created), isAssignableFrom(CheckBox.class))).check(matches(isChecked()));
-            onView(withText("确定")).perform(click());
+            onView(withId(android.R.id.button1)).perform(click());
             awaitText(created);
             try (Cursor links = db.rawQuery("SELECT count(*) FROM bookmark_tag_links WHERE bookmarkTime=?",
                     new String[]{String.valueOf(time)})) {
