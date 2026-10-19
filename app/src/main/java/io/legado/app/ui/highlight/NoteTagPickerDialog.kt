@@ -24,6 +24,7 @@ import com.google.android.material.tabs.TabLayout
 import io.legado.app.ui.book.bookmark.BookNotesRepository
 import io.legado.app.ui.widget.text.AccentTextView
 import io.legado.app.utils.dpToPx
+import io.legado.app.utils.applyTint
 import io.legado.app.utils.getCompatColor
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.Dispatchers.IO
@@ -104,6 +105,7 @@ class NoteTagPickerDialog : DialogFragment(), HighlightTagEditDialog.Callback {
             it.note.contains(query.trim(), true) }.forEach { tag ->
             rows.addView(CheckBox(requireContext()).apply {
                 text = tag.name
+                applyTint(context.accentColor)
                 minHeight = 48.dpToPx()
                 isChecked = tag.id in selected
                 isEnabled = !saving
@@ -120,7 +122,7 @@ class NoteTagPickerDialog : DialogFragment(), HighlightTagEditDialog.Callback {
 
     override fun onStart() {
         super.onStart()
-        (dialog as? AlertDialog)?.getButton(AlertDialog.BUTTON_POSITIVE)?.setOnClickListener { save() }
+        (dialog as? AlertDialog)?.applyTint()?.getButton(AlertDialog.BUTTON_POSITIVE)?.setOnClickListener { save() }
     }
 
     private fun save() {
