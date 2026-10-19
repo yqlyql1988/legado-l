@@ -18,6 +18,11 @@ data class ReadRecordHourly(
     val hour: Int = 0,
     @ColumnInfo(defaultValue = "0")
     val readTime: Long = 0L,
+    @ColumnInfo(defaultValue = "0")
+    val deletedTime: Long = 0L,
+    /** Matches the owning day's last reset; pre-reset hour details cannot reappear. */
+    @ColumnInfo(defaultValue = "0")
+    val resetTime: Long = 0L,
 )
 
 data class ReadRecordHourlyShow(

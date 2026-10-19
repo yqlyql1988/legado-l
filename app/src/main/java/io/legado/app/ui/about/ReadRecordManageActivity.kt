@@ -25,6 +25,7 @@ import io.legado.app.databinding.ViewReadStatisticsMinimumBinding
 import io.legado.app.help.book.ReadRecordCoverCache
 import io.legado.app.help.book.ReadRecordFilterItem
 import io.legado.app.help.book.ReadRecordTimeRange
+import io.legado.app.help.book.ReadRecordDeleteScope
 import io.legado.app.help.book.ReadStatisticsSnapshot
 import io.legado.app.help.book.filterReadRecords
 import io.legado.app.help.config.AppConfig
@@ -163,19 +164,22 @@ class ReadRecordManageActivity : BaseActivity<ActivityReadRecordManageBinding>()
 
     private fun confirmDelete(items: List<ReadRecordFilterItem>) {
         if (deleting || items.isEmpty()) return
+        val scope = ReadRecordDeleteScope(range, date, hour)
         val targets = items.map { ReadRecordBook(it.record.bookName, it.record.author) }
         val names = items.take(5).joinToString("\n") { "${it.record.bookName} · ${it.record.displayAuthor}" } +
             if (items.size > 5) "\n" + getString(R.string.read_record_manage_more, items.size - 5) else ""
         alert(R.string.delete) {
-            setMessage(getString(R.string.read_record_manage_confirm, items.size, names,
-                duration(items.sumOf { it.duration }), duration(items.sumOf { it.record.readTime })))
+            setMessage(getString(if (scope.range == ReadRecordTimeRange.ALL)
+                R.string.read_record_manage_confirm_all else R.string.read_record_manage_confirm,
+                items.size, names, rangeLabel(scope.range, scope.date, scope.hour),
+                duration(items.sumOf { it.duration })))
             yesButton {
                 deleting = true
                 updateSelection()
                 lifecycleScope.launch {
                     try {
                         withContext(IO) {
-                            appDb.readRecordDao.deleteBooks(targets)
+                            appDb.readRecordDao.deleteBooksInPeriod(targets, scope)
                             ReadRecordCoverCache.prune()
                         }
                         selected.removeAll(targets.map { it.bookName to it.author }.toSet())

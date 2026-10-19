@@ -94,7 +94,8 @@ internal data class RestoredReadStatistics(
 )
 
 /**
- * Merge each device/day counter by max and preserve the known historical baseline.
+ * Merge gross counters and their removed portions separately. Whole-day resets also
+ * invalidate older hour detail, including hours absent from a partial local backup.
  * Never infer a baseline from an old backup's total: it may already contain some of
  * the dated time. The total also remains a floor for time whose coverage is unknown.
  */
@@ -109,22 +110,42 @@ internal fun mergeReadStatistics(
     currentHourly: List<ReadRecordHourly> = emptyList(),
     incomingHourly: List<ReadRecordHourly>? = null,
 ): RestoredReadStatistics {
+    val dayResets = (currentDaily + incomingDaily.orEmpty()).groupBy { it.date }
+        .mapValues { (_, rows) -> rows.maxOf { it.resetTime } }
+    val hourResets = (currentHourly + incomingHourly.orEmpty()).groupBy { it.date }
+        .mapValues { (day, rows) -> maxOf(dayResets[day] ?: 0, rows.maxOf { it.resetTime }) }
     val mergedHourly = (currentHourly + incomingHourly.orEmpty()).groupBy { it.date to it.hour }
-        .values.map { rows -> rows.maxBy { it.readTime } }
+        .values.mapNotNull { rows ->
+            val active = rows.filter { it.resetTime == hourResets[it.date] }
+            if (active.isEmpty()) return@mapNotNull null
+            val deleted = active.maxOf { it.deletedTime }
+            val gross = active.maxOf { Math.addExact(it.readTime, it.deletedTime) }
+            active.first().copy(readTime = (gross - deleted).coerceAtLeast(0), deletedTime = deleted)
+        }
     val hourlyDays = mergedHourly.groupBy { it.date }.values.map { rows ->
         val first = rows.first()
         ReadRecordDaily(first.deviceId, first.bookName, first.author, first.date,
-            rows.fold(0L) { total, row -> Math.addExact(total, row.readTime) })
+            rows.fold(0L) { total, row -> Math.addExact(total, row.readTime) },
+            Math.addExact(first.resetTime, rows.sumOf { it.deletedTime }), first.resetTime)
     }
     val mergedDaily = (currentDaily + incomingDaily.orEmpty() + hourlyDays)
         .groupBy { it.date }
-        .values.map { rows -> rows.maxBy { it.readTime } }
+        .values.map { rows ->
+            val deleted = rows.maxOf { it.deletedTime }
+            val gross = rows.maxOf { Math.addExact(it.readTime, it.deletedTime) }
+            rows.first().copy(readTime = (gross - deleted).coerceAtLeast(0),
+                deletedTime = deleted, resetTime = rows.maxOf { it.resetTime })
+        }
     val dailyTotal = mergedDaily.sumOf { it.readTime }
     val record = mergeRestoredReadRecord(current, incoming, localDevice)
     val history = listOfNotNull(currentHistory, incomingHistory).maxOrNull()
     val knownTotal = Math.addExact(history ?: 0L, dailyTotal)
-    val total = if (incomingDaily == null) maxOf(record.readTime, knownTotal)
-        else maxOf(current?.readTime ?: 0L, incoming.readTime, knownTotal)
+    val removed = mergedDaily.sumOf { it.deletedTime }
+    val currentGross = Math.addExact(current?.readTime ?: 0, currentDaily.sumOf { it.deletedTime })
+    val incomingGross = Math.addExact(incoming.readTime, incomingDaily.orEmpty().sumOf { it.deletedTime })
+    val gross = if (incomingDaily == null && !localDevice && removed == 0L) incomingGross
+        else maxOf(currentGross, incomingGross)
+    val total = maxOf((gross - removed).coerceAtLeast(0), knownTotal)
     return RestoredReadStatistics(record.copy(readTime = total), mergedDaily, history, mergedHourly)
 }
 

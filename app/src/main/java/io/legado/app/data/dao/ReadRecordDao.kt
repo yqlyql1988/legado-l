@@ -16,6 +16,9 @@ import io.legado.app.help.book.ReadDayDuration
 import io.legado.app.help.book.ReadHourDuration
 import io.legado.app.help.book.isReadStatisticsDate
 import io.legado.app.help.book.mergeReadStatistics
+import io.legado.app.help.book.ReadRecordDeleteScope
+import io.legado.app.help.book.ReadRecordTimeRange
+import io.legado.app.help.book.deleteReadRecordPeriod
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -25,7 +28,7 @@ interface ReadRecordDao {
     val all: List<ReadRecord>
 
     @Query(
-        """select distinct bookName, case when author = '' then coalesce(resolvedAuthor, '') else author end as author from readRecord
+        """select distinct bookName, case when author = '' then coalesce(resolvedAuthor, '') else author end as author from readRecord where readTime > 0
             order by bookName collate localized, author collate localized"""
     )
     fun flowBooks(): Flow<List<ReadRecordBook>>
@@ -45,6 +48,7 @@ interface ReadRecordDao {
                 order by lastRead desc, deviceId, author limit 1)
         group by history.bookName,
             case when history.author = '' then coalesce(history.resolvedAuthor, '') else history.author end
+        having sum(history.readTime) > 0
         order by history.bookName collate localized, author collate localized"""
     )
     val allShow: List<ReadRecordShow>
@@ -67,8 +71,8 @@ interface ReadRecordDao {
                 order by lastRead desc, deviceId, author limit 1)
         group by history.bookName,
             case when history.author = '' then coalesce(history.resolvedAuthor, '') else history.author end
-        having history.bookName like '%' || :searchKey || '%'
-            or (case when history.author = '' then coalesce(history.resolvedAuthor, '') else history.author end) like '%' || :searchKey || '%'
+        having sum(history.readTime) > 0 and (history.bookName like '%' || :searchKey || '%'
+            or (case when history.author = '' then coalesce(history.resolvedAuthor, '') else history.author end) like '%' || :searchKey || '%')
         order by history.bookName collate localized, author collate localized"""
     )
     fun search(searchKey: String): List<ReadRecordShow>
@@ -122,6 +126,33 @@ interface ReadRecordDao {
         books.distinct().forEach { deleteByBook(it.bookName, it.author) }
     }
 
+    @Transaction
+    fun deleteBooksInPeriod(books: List<ReadRecordBook>, scope: ReadRecordDeleteScope): Long {
+        val targets = books.distinct()
+        if (scope.range == ReadRecordTimeRange.ALL) {
+            val removed = targets.sumOf { book ->
+                getRecordsByEffectiveAuthor(book.bookName, book.author).sumOf { it.readTime }
+            }
+            deleteBooks(targets)
+            return removed
+        }
+        var removed = 0L
+        targets.forEach { book ->
+            getRecordsByEffectiveAuthor(book.bookName, book.author).forEach { record ->
+                val change = deleteReadRecordPeriod(record,
+                    getDaily(record.deviceId, record.bookName, record.author),
+                    getHourly(record.deviceId, record.bookName, record.author), scope)
+                if (change.removed > 0) {
+                    update(change.record)
+                    insertDaily(*change.daily.toTypedArray())
+                    insertHourly(*change.hourly.toTypedArray())
+                    removed = Math.addExact(removed, change.removed)
+                }
+            }
+        }
+        return removed
+    }
+
     @Query("select * from readRecord where bookName = :bookName and author = :author")
     fun getRecords(bookName: String, author: String): List<ReadRecord>
 
@@ -163,12 +194,18 @@ interface ReadRecordDao {
             insertDaily(rows.first().copy(
                 bookName = newName, author = newAuthor,
                 readTime = rows.fold(0L) { total, row -> Math.addExact(total, row.readTime) },
+                deletedTime = rows.fold(0L) { total, row -> Math.addExact(total, row.deletedTime) },
+                resetTime = rows.fold(0L) { total, row -> Math.addExact(total, row.resetTime) },
             ))
         }
+        val resets = daily.groupBy { it.deviceId to it.date }
+            .mapValues { (_, rows) -> rows.sumOf { it.resetTime } }
         hourly.groupBy { Triple(it.deviceId, it.date, it.hour) }.values.forEach { rows ->
             insertHourly(rows.first().copy(
                 bookName = newName, author = newAuthor,
                 readTime = rows.fold(0L) { total, row -> Math.addExact(total, row.readTime) },
+                deletedTime = rows.fold(0L) { total, row -> Math.addExact(total, row.deletedTime) },
+                resetTime = resets[rows.first().deviceId to rows.first().date] ?: 0L,
             ))
         }
         histories.groupBy { it.deviceId }.values.forEach { rows ->
@@ -221,6 +258,7 @@ interface ReadRecordDao {
             daily.date, sum(daily.readTime) as readTime
         from readRecordDaily daily join readRecord history
             on daily.deviceId = history.deviceId and daily.bookName = history.bookName and daily.author = history.author
+        where daily.readTime > 0
         group by daily.bookName,
             case when history.author = '' then coalesce(history.resolvedAuthor, '') else history.author end, daily.date"""
     )
@@ -231,6 +269,9 @@ interface ReadRecordDao {
 
     @Query("select readTime from readRecordDaily where deviceId = :deviceId and bookName = :bookName and author = :author and date = :date")
     fun getDailyTime(deviceId: String, bookName: String, author: String, date: String): Long?
+
+    @Query("select * from readRecordDaily where deviceId = :deviceId and bookName = :bookName and author = :author and date = :date")
+    fun getDailyCounter(deviceId: String, bookName: String, author: String, date: String): ReadRecordDaily?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insertDaily(vararg daily: ReadRecordDaily)
@@ -249,6 +290,7 @@ interface ReadRecordDao {
         hourly.date, hourly.hour, sum(hourly.readTime) as readTime
         from readRecordHourly hourly join readRecord history
         on hourly.deviceId = history.deviceId and hourly.bookName = history.bookName and hourly.author = history.author
+        where hourly.readTime > 0
         group by hourly.bookName,
         case when history.author = '' then coalesce(history.resolvedAuthor, '') else history.author end,
         hourly.date, hourly.hour""")
@@ -260,6 +302,10 @@ interface ReadRecordDao {
     @Query("""select readTime from readRecordHourly where deviceId = :deviceId and bookName = :bookName
         and author = :author and date = :date and hour = :hour""")
     fun getHourlyTime(deviceId: String, bookName: String, author: String, date: String, hour: Int): Long?
+
+    @Query("""select * from readRecordHourly where deviceId = :deviceId and bookName = :bookName
+        and author = :author and date = :date and hour = :hour""")
+    fun getHourlyCounter(deviceId: String, bookName: String, author: String, date: String, hour: Int): ReadRecordHourly?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insertHourly(vararg hourly: ReadRecordHourly)
@@ -273,9 +319,12 @@ interface ReadRecordDao {
     @Transaction
     fun addHourly(record: ReadRecord, intervals: List<ReadHourDuration>) {
         intervals.forEach { interval ->
-            val existing = getHourlyTime(record.deviceId, record.bookName, record.author, interval.date, interval.hour) ?: 0L
-            insertHourly(ReadRecordHourly(record.deviceId, record.bookName, record.author, interval.date,
-                interval.hour, Math.addExact(existing, interval.duration)))
+            val reset = getDailyCounter(record.deviceId, record.bookName, record.author, interval.date)?.resetTime ?: 0L
+            val existing = getHourlyCounter(record.deviceId, record.bookName, record.author, interval.date, interval.hour)
+                ?.takeIf { it.resetTime == reset }
+                ?: ReadRecordHourly(record.deviceId, record.bookName, record.author, interval.date,
+                    interval.hour, resetTime = reset)
+            insertHourly(existing.copy(readTime = Math.addExact(existing.readTime, interval.duration)))
         }
     }
 
@@ -295,9 +344,9 @@ interface ReadRecordDao {
     fun addDaily(record: ReadRecord, intervals: List<ReadDayDuration>, intervalEnd: Long = record.lastRead) {
         if (intervals.isEmpty()) return
         intervals.forEach { interval ->
-            val existing = getDailyTime(record.deviceId, record.bookName, record.author, interval.date) ?: 0L
-            val total = Math.addExact(existing, interval.duration)
-            insertDaily(ReadRecordDaily(record.deviceId, record.bookName, record.author, interval.date, total))
+            val existing = getDailyCounter(record.deviceId, record.bookName, record.author, interval.date)
+                ?: ReadRecordDaily(record.deviceId, record.bookName, record.author, interval.date)
+            insertDaily(existing.copy(readTime = Math.addExact(existing.readTime, interval.duration)))
         }
         ensureStatisticsState(ReadStatisticsState(
             record.deviceId, (intervalEnd - intervals.sumOf { it.duration }).coerceAtLeast(0),
@@ -315,14 +364,17 @@ interface ReadRecordDao {
     ) {
         val incomingHourly = hourly.orEmpty().map {
             if (it.deviceId.isBlank()) it.copy(deviceId = localDeviceId) else it
-        }.filter { it.readTime > 0 && it.hour in 0..23 && isReadStatisticsDate(it.date) }
+        }.filter { it.readTime >= 0 && it.deletedTime >= 0 && it.resetTime >= 0 &&
+            (it.readTime > 0 || it.deletedTime > 0 || it.resetTime > 0) &&
+            it.hour in 0..23 && isReadStatisticsDate(it.date) }
             .groupBy { Triple(it.deviceId, it.bookName, it.author) }
         val incomingHistory = history.orEmpty().map {
             if (it.deviceId.isBlank()) it.copy(deviceId = localDeviceId) else it
         }.filter { it.readTime >= 0 }.groupBy { Triple(it.deviceId, it.bookName, it.author) }
         val incomingDaily = daily?.map {
             if (it.deviceId.isBlank()) it.copy(deviceId = localDeviceId) else it
-        }?.filter { it.readTime > 0 && isReadStatisticsDate(it.date) }
+        }?.filter { it.readTime >= 0 && it.deletedTime >= it.resetTime && it.resetTime >= 0 &&
+            (it.readTime > 0 || it.deletedTime > 0) && isReadStatisticsDate(it.date) }
             ?.groupBy { Triple(it.deviceId, it.bookName, it.author) }
         records.forEach { incoming ->
             val current = getRecord(incoming.deviceId, incoming.bookName, incoming.author)
@@ -337,6 +389,8 @@ interface ReadRecordDao {
                 incomingHourly[Triple(incoming.deviceId, incoming.bookName, incoming.author)],
             )
             insert(restored.record)
+            deleteDaily(incoming.deviceId, incoming.bookName, incoming.author)
+            deleteHourly(incoming.deviceId, incoming.bookName, incoming.author)
             insertDaily(*restored.daily.toTypedArray())
             insertHourly(*restored.hourly.toTypedArray())
             restored.historyTime?.let {

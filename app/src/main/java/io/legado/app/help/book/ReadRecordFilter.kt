@@ -7,7 +7,7 @@ enum class ReadRecordTimeRange { HOUR, DAY, MONTH, YEAR, ALL }
 
 data class ReadRecordFilterItem(val record: ReadRecordShow, val duration: Long)
 
-/** Scope chooses books; deleting a selected identity still removes its complete history. */
+/** Qualify books by their time in the period; deletion uses the same period. */
 internal fun ReadStatisticsSnapshot.filterReadRecords(
     range: ReadRecordTimeRange,
     date: LocalDate,
