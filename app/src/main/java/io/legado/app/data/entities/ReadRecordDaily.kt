@@ -17,6 +17,12 @@ data class ReadRecordDaily(
     val date: String = "",
     @ColumnInfo(defaultValue = "0")
     val readTime: Long = 0L,
+    /** Removed portion of the lifetime counter; retained when restoring older backups. */
+    @ColumnInfo(defaultValue = "0")
+    val deletedTime: Long = 0L,
+    /** Lifetime removal counter at the last whole-day deletion, also used by its hours. */
+    @ColumnInfo(defaultValue = "0")
+    val resetTime: Long = 0L,
 )
 
 @Entity(tableName = "readStatisticsState", primaryKeys = ["deviceId"])

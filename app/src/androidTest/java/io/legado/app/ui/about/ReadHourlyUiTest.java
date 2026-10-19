@@ -284,7 +284,7 @@ public class ReadHourlyUiTest {
         }
     }
 
-    @Test public void managementFiltersClearsHiddenSelectionsAndDeletesWholeBookHistory() throws Exception {
+    @Test public void managementFiltersClearsHiddenSelectionsAndSeparatesHourFromCumulativeDeletion() throws Exception {
         try (ActivityScenario<Activity> scenario = launch("ReadRecordManageActivity")) {
             await(scenario, "count", "3本");
             withRow(scenario, first, item -> item.findViewById(id("delete")).performClick());
@@ -317,18 +317,28 @@ public class ReadHourlyUiTest {
             onView(withId(android.R.id.message)).inRoot(isDialog()).check(matches(withText(containsString("各设备"))));
             confirm();
             await(scenario, "count", "筛选到 0本");
-            assertEquals(0L, count(first));
+            assertEquals(2L, count(first));
+            try (Cursor cursor = db.rawQuery("SELECT sum(readTime) FROM readRecord WHERE bookName=?", new String[]{first})) {
+                assertTrue(cursor.moveToFirst());
+                assertEquals(780000L, cursor.getLong(0));
+            }
             assertEquals(1L, count(second));
+            openFilter(scenario);
+            selectSpinner("range", 4);
+            confirm();
+            await(scenario, "count", "筛选到 3本");
+            withRow(scenario, first, item -> item.findViewById(id("delete")).performClick());
+            onView(withId(android.R.id.message)).inRoot(isDialog())
+                .check(matches(withText(containsString("全部阅读记录"))));
+            confirm();
+            await(scenario, "count", "筛选到 2本");
+            assertEquals(0L, count(first));
             for (String table : new String[]{"readRecordHourly", "readRecordDaily", "readRecordHistory"}) {
                 try (Cursor cursor = db.rawQuery("SELECT count(*) FROM " + table + " WHERE bookName=?", new String[]{first})) {
                     assertTrue(cursor.moveToFirst());
                     assertEquals(0, cursor.getInt(0));
                 }
             }
-            openFilter(scenario);
-            selectSpinner("range", 4);
-            confirm();
-            await(scenario, "count", "筛选到 2本");
             screenshot("manage-list");
             withRow(scenario, second, item -> item.findViewById(id("delete")).performClick());
             confirm();
@@ -357,6 +367,49 @@ public class ReadHourlyUiTest {
                 confirm();
                 await(scenario, "count", range == 4 ? "3本" : "2本");
             }
+        }
+    }
+
+    @Test public void managementDayDeletionKeepsOtherDaysAndUndatedTime() throws Exception {
+        try (ActivityScenario<Activity> scenario = launch("ReadRecordManageActivity")) {
+            await(scenario, "count", "3本");
+            openFilter(scenario);
+            selectSpinner("range", 1);
+            selectSpinner("presets", 1);
+            confirm();
+            await(scenario, "count", "2本");
+            withRow(scenario, first, item -> item.findViewById(id("delete")).performClick());
+            onView(withId(android.R.id.message)).inRoot(isDialog())
+                .check(matches(withText(containsString(today.toString()))))
+                .check(matches(withText(containsString("其他时段"))));
+            onView(withId(android.R.id.button2)).inRoot(isDialog()).perform(click());
+            try (Cursor cursor = db.rawQuery("SELECT sum(readTime) FROM readRecord WHERE bookName=?", new String[]{first})) {
+                assertTrue(cursor.moveToFirst());
+                assertEquals(960000L, cursor.getLong(0));
+            }
+            withRow(scenario, first, item -> item.findViewById(id("selected")).performClick());
+            scenario.onActivity(activity -> activity.findViewById(id("delete_selected")).performClick());
+            confirm();
+            await(scenario, "count", "筛选到 1本");
+            try (Cursor cursor = db.rawQuery("SELECT sum(readTime) FROM readRecord WHERE bookName=?", new String[]{first})) {
+                assertTrue(cursor.moveToFirst());
+                assertEquals(780000L, cursor.getLong(0));
+            }
+            try (Cursor cursor = db.rawQuery("SELECT sum(readTime) FROM readRecordDaily WHERE bookName=? AND date=?",
+                new String[]{first, today.minusDays(1).toString()})) {
+                assertTrue(cursor.moveToFirst());
+                assertEquals(300000L, cursor.getLong(0));
+            }
+            try (Cursor cursor = db.rawQuery("SELECT sum(readTime) FROM readRecordHourly WHERE bookName=? AND date=?",
+                new String[]{first, today.toString()})) {
+                assertTrue(cursor.moveToFirst());
+                assertEquals(0L, cursor.getLong(0));
+            }
+            assertEquals(1L, count(second));
+            assertEquals(1L, count(old));
+            scenario.recreate();
+            await(scenario, "count", "筛选到 1本");
+            screenshot("management-scoped-day-deletion");
         }
     }
 }

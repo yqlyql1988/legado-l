@@ -16,10 +16,11 @@
     <string name="read_record_manage_all">全选筛选结果</string>
     <string name="read_record_manage_delete">删除所选（%1$d）</string>
     <string name="read_record_manage_empty">没有符合条件的阅读记录</string>
-    <string name="read_record_manage_explanation">按所选范围内的时长筛选书籍；删除会清理这些书的全部阅读记录。小时及日／月／年筛选仅使用已有明细。</string>
+    <string name="read_record_manage_explanation">按所选范围内的时长筛选书籍；删除仅清理所选时段，并同步扣减日、月、年和累计时长。累计范围删除全部历史。无日期的旧记录保留，仅在累计删除时清理。</string>
     <string name="read_record_manage_times">当前范围：%1$s · 累计：%2$s</string>
     <string name="read_record_manage_delete_one">删除《%1$s》的阅读记录</string>
-    <string name="read_record_manage_confirm">删除选中的 %1$d本书的阅读记录？\n\n%2$s\n\n当前筛选范围时长：%3$s\n这些书的累计时长：%4$s\n\n将删除当前应用中这些书的全部阅读记录，包括各设备的每日和小时明细，不只删除筛选时段。书架中的书籍、书签和标注保留。</string>
+    <string name="read_record_manage_confirm">删除选中的 %1$d本书在所选时段的记录？\n\n%2$s\n\n删除范围：%3$s\n将扣除时长：%4$s\n\n仅删除当前应用已汇总的各设备在此时段的记录，相关小时、日、月、年和累计统计同步更新。其他时段及无日期的旧记录保留。书架、书签、标注和当前阅读进度保留。</string>
+    <string name="read_record_manage_confirm_all">删除选中的 %1$d本书的全部阅读记录？\n\n%2$s\n\n删除范围：%3$s\n将扣除时长：%4$s\n\n将删除当前应用中这些书的全部设备历史，包括无日期的旧记录及每日、小时明细。书架、书签、标注和当前阅读进度保留。</string>
     <string name="read_record_manage_more">另有 %1$d本</string>
     <string name="read_record_manage_failed">删除未完成，请重试</string>
     <string name="read_record_manage_presets">快捷时长</string>

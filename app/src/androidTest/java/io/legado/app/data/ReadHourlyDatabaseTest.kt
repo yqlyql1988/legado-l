@@ -35,7 +35,7 @@ class ReadHourlyDatabaseTest {
             val db = Room.databaseBuilder(context, AppDatabase::class.java, name)
                 .addMigrations(*DatabaseMigrations.migrations).build()
             try {
-                assertEquals(118, db.openHelper.writableDatabase.version)
+                assertEquals(121, db.openHelper.writableDatabase.version)
                 assertEquals(1000L, db.readRecordDao.all.single().readTime)
                 assertEquals(200L, db.readRecordDao.allDaily().single().readTime)
                 assertEquals(800L, db.readRecordDao.allHistory().single().readTime)
