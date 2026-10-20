@@ -2177,7 +2177,8 @@ object ReadBook : CoroutineScope by MainScope() {
                 HighlightAnchor.jumpPos(bodyText, bodyPosition, pending.bookText)
         } else {
             val context = pending.noteLocation
-            val match = ReadingNoteAnchor.find(bodyText, pending.bookText,
+            val quote = context?.let(ReadingNotes::anchorQuote) ?: pending.bookText
+            val match = ReadingNoteAnchor.find(bodyText, quote,
                 bodyPosition, context?.prefix.orEmpty(), context?.suffix.orEmpty(),
                 context?.verified ?: false)
             durChapterPos = if (match == null) {

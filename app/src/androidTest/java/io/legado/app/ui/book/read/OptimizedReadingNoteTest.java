@@ -55,6 +55,14 @@ public class OptimizedReadingNoteTest {
     }
 
     @Test public void optimizedReaderRepairsBothTypesAndKeepsBackupFieldNames() throws Exception {
+        verifyReader(false);
+    }
+
+    @Test public void optimizedReaderReopensLegacyBookmarkContainingChapterTitle() throws Exception {
+        verifyReader(true);
+    }
+
+    private void verifyReader(boolean titleInBookmark) throws Exception {
         try (ActivityScenario<Activity> startup = ActivityScenario.launch(
                 new Intent().setClassName(context.getPackageName(),
                     "io.legado.app.ui.highlight.HighlightTagManageActivity"))) { }
@@ -101,9 +109,10 @@ public class OptimizedReadingNoteTest {
             Object bookmark = entity("Bookmark");
             set(bookmark, "time", time + 1);
             set(bookmark, "bookName", name);
-            set(bookmark, "chapterName", "第一章 旧章名");
+            set(bookmark, "chapterName", titleInBookmark ? "第1章 新章名" : "第一章 旧章名");
             set(bookmark, "chapterPos", 8);
-            set(bookmark, "bookText", quote);
+            String bookmarkQuote = titleInBookmark ? "第1章 新章名\n" + quote : quote;
+            set(bookmark, "bookText", bookmarkQuote);
             set(bookmark, "content", "Keep bookmark");
             insert(db, "bookmarks", bookmark);
             String folder = (String) book.getClass().getMethod("getFolderName").invoke(book);
@@ -116,13 +125,28 @@ public class OptimizedReadingNoteTest {
                 "io.legado.app.ui.book.read.ReadBookActivity")
                 .putExtra("bookUrl", url).putExtra("inBookshelf", true)
                 .putExtra("index", 0).putExtra("chapterPos", 8)
-                .putExtra("highlightLayoutTitleLength", 0).putExtra("highlightAnchorText", quote));
+                .putExtra("highlightLayoutTitleLength", 0)
+                .putExtra("readingNoteKey", (titleInBookmark ? "bookmark:" : "highlight:") +
+                    (titleInBookmark ? time + 1 : time))
+                .putExtra("highlightAnchorText", titleInBookmark ? bookmarkQuote : quote));
             await(() -> {
                 try (Cursor cursor = db.rawQuery("SELECT count(*) FROM reading_note_locations WHERE noteTime IN (?,?) AND verified=1",
                         new String[]{Long.toString(time), Long.toString(time + 1)})) {
                     return cursor.moveToFirst() && cursor.getInt(0) == 2;
                 }
             });
+            await(() -> {
+                try (Cursor cursor = db.rawQuery("SELECT durChapterPos FROM books WHERE bookUrl=?",
+                        new String[]{url})) {
+                    return cursor.moveToFirst() && cursor.getInt(0) > 0;
+                }
+            });
+            try (Cursor cursor = db.rawQuery("SELECT bookText,content FROM bookmarks WHERE time=?",
+                    new String[]{Long.toString(time + 1)})) {
+                assertTrue(cursor.moveToFirst());
+                assertEquals(bookmarkQuote, cursor.getString(0));
+                assertEquals("Keep bookmark", cursor.getString(1));
+            }
             try (Cursor cursor = db.rawQuery("SELECT chapterUrl,chapterPos,bookText,note FROM highlights WHERE time=?",
                     new String[]{Long.toString(time)})) {
                 assertTrue(cursor.moveToFirst());
