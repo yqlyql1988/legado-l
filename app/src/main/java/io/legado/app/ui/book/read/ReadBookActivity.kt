@@ -2822,7 +2822,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                 chapterIndex = ReadBook.durChapterIndex
                 chapterPos = ReadBook.durChapterPos
                 chapterName = page.title
-                bookText = page.text.trim()
+                bookText = page.bookmarkText
             }
             showDialogFragment(BookmarkDialog(bookmark))
         }
@@ -2860,7 +2860,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                                 chapterIndex = page.chapterIndex
                                 chapterPos = pageStart
                                 chapterName = page.title
-                                bookText = page.text.trim()
+                                bookText = page.bookmarkText
                             }
                             withContext(IO) {
                                 appDb.bookmarkDao.insert(bookmark)

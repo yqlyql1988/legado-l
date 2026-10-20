@@ -21,6 +21,23 @@ object ReadingNotes {
 
     fun key(location: ReadingNoteLocation) = "${location.kind}:${location.noteTime}"
 
+    /** Old page bookmarks may include the displayed title, which is absent from bodyText. */
+    fun anchorQuote(location: ReadingNoteLocation): String {
+        val quote = location.quote
+        if (location.kind != BOOKMARK || location.chapterName.isBlank() ||
+            location.layoutTitleLength >= 0 && location.chapterPos >= location.layoutTitleLength
+        ) return quote
+        val title = location.chapterName.filterNot(Char::isWhitespace)
+        var newline = quote.indexOf('\n')
+        while (newline >= 0) {
+            val prefix = quote.substring(0, newline).filterNot(Char::isWhitespace)
+            if (prefix == title) return quote.substring(newline + 1)
+            if (!title.startsWith(prefix)) break
+            newline = quote.indexOf('\n', newline + 1)
+        }
+        return quote
+    }
+
     fun legacy(highlight: BookHighlight) = ReadingNoteLocation(
         kind = HIGHLIGHT, noteTime = highlight.time, bookUrl = highlight.bookUrl,
         chapterUrl = highlight.chapterUrl, chapterIndex = highlight.chapterIndex,
@@ -58,7 +75,7 @@ object ReadingNotes {
         if (location.bookUrl != chapter.bookUrl) return null
         val position = (location.chapterPos -
             location.layoutTitleLength.takeIf { it >= 0 }.let { it ?: titleLength }).coerceAtLeast(0)
-        val match = ReadingNoteAnchor.find(bodyText, location.quote, position,
+        val match = ReadingNoteAnchor.find(bodyText, anchorQuote(location), position,
             location.prefix, location.suffix, location.verified) ?: return null
         return location.copy(
             chapterUrl = chapter.url, chapterIndex = chapter.index, chapterName = chapter.title,

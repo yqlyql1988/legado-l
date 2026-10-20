@@ -8,6 +8,7 @@ import android.text.StaticLayout
 import androidx.annotation.Keep
 import androidx.core.graphics.withTranslation
 import io.legado.app.R
+import io.legado.app.help.HighlightTextBuilder
 import io.legado.app.help.PaintPool
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
@@ -50,6 +51,10 @@ data class TextPage(
     }
 
     val lines: List<TextLine> get() = textLines
+    val bookmarkText: String
+        get() = HighlightTextBuilder.build(textLines.filterNot { it.isTitle }.map {
+            HighlightTextBuilder.LineInput(it.text, it.isParagraphEnd)
+        }).trim().ifBlank { text.trim() }
     val lineSize: Int get() = textLines.size
     val charSize: Int get() = text.length.coerceAtLeast(1)
     val chapterPosition: Int get() = textLines.first().chapterPosition

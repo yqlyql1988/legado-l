@@ -78,7 +78,9 @@ class ReadingNoteNavigationTest {
     @After fun after() {
         scenario?.close()
         appDb.bookHighlightDao.delete(*appDb.bookHighlightDao.getByBook(book.bookUrl).toTypedArray())
-        appDb.bookmarkDao.delete(bookmark)
+        val bookmarks = appDb.bookmarkDao.getByBook(book.name, book.author)
+        appDb.readingNoteDao.deleteLocations("bookmark", bookmarks.map { it.time })
+        appDb.bookmarkDao.delete(*bookmarks.toTypedArray())
         appDb.readingNoteDao.deleteLocations("highlight", listOf(highlight.time))
         appDb.readingNoteDao.deleteLocations("bookmark", listOf(bookmark.time))
         BookHelp.clearCache(book)
@@ -222,14 +224,127 @@ class ReadingNoteNavigationTest {
         }
     }
 
+    @Test fun legacyWholePageBookmarkReopensWithoutTreatingItsTitleAsChangedBody() {
+        BookHelp.saveText(book, chapter,
+            (1..55).joinToString("\n") { "第${it}段唯一正文，用于验证完整页面书签退出后仍能定位。" })
+        launch(Intent(context, ReadBookActivity::class.java).putExtra("bookUrl", book.bookUrl))
+        var legacy = bookmark
+        scenario!!.onActivity { activity ->
+            val page = activity.findViewById<ReadView>(R.id.read_view).curPage.textPage
+            assertTrue(page.lines.any { it.isTitle })
+            assertFalse(page.bookmarkText.startsWith(chapter.title))
+            assertTrue(page.text.trim().startsWith(chapter.title))
+            legacy = bookmark.copy(chapterName = chapter.title,
+                chapterPos = page.chapterPosition, bookText = page.text.trim())
+        }
+        appDb.readingNoteDao.deleteLocations("bookmark", listOf(bookmark.time))
+        appDb.bookmarkDao.insert(legacy)
+        scenario!!.close()
+        scenario = null
+        val target = requireNotNull(ReadingNotes.target(ReadingNotes.legacy(legacy, book.bookUrl), listOf(chapter)))
+        launchBookmark(target)
+        scenario!!.onActivity {
+            val layout = requireNotNull(ReadBook.curTextChapter)
+            assertTrue(ReadBook.durChapterPos >= layout.layoutTitleLength)
+            assertTrue(ReadBook.durChapterPos > 0)
+        }
+        await { appDb.readingNoteDao.locationsForNote("bookmark", bookmark.time).any { it.verified } }
+        val saved = appDb.readingNoteDao.locationsForNote("bookmark", bookmark.time).single()
+        assertFalse(saved.quote.startsWith(chapter.title))
+        assertEquals(legacy.bookText, appDb.bookmarkDao.getByBook(book.name, book.author).single().bookText)
+        assertEquals(legacy.content, appDb.bookmarkDao.getByBook(book.name, book.author).single().content)
+    }
+
+    @Test fun newWholePageBookmarksInDifferentChaptersSurviveClosingAndReopening() {
+        val chapters = (0..2).map { chapter.copy(index = it, url = "${chapter.url}/$it", title = "第${it + 1}章 测试") }
+        appDb.bookDao.insert(book.copy(totalChapterNum = chapters.size))
+        appDb.bookChapterDao.delByBook(book.bookUrl)
+        appDb.bookChapterDao.insert(*chapters.toTypedArray())
+        appDb.bookmarkDao.delete(bookmark)
+        chapters.forEach { row ->
+            BookHelp.saveText(book, row,
+                (1..60).joinToString("\n") { "章节${row.index}的第${it}段唯一正文，跨章整页书签兼容退出和重新打开。" })
+        }
+        chapters.forEach { row ->
+            launch(Intent(context, ReadBookActivity::class.java).putExtra("bookUrl", book.bookUrl)
+                .putExtra("index", row.index).putExtra("chapterPos", 0))
+            scenario!!.onActivity { it.toggleBookmark() }
+            await { appDb.bookmarkDao.getByBook(book.name, book.author).any { it.chapterIndex == row.index } }
+            val created = appDb.bookmarkDao.getByBook(book.name, book.author).single { it.chapterIndex == row.index }
+            assertFalse(created.bookText.startsWith(row.title))
+            await { appDb.readingNoteDao.locationsForNote("bookmark", created.time).any { it.verified } }
+            scenario!!.close()
+            scenario = null
+            val target = requireNotNull(ReadingNotes.target(ReadingNotes.legacy(created, book.bookUrl), chapters))
+            launchBookmark(target)
+            scenario!!.onActivity {
+                assertEquals(row.index, ReadBook.durChapterIndex)
+                assertEquals(target.chapterPos, ReadBook.durChapterPos)
+                assertTrue(ReadBook.durChapterPos > 0)
+            }
+            scenario!!.close()
+            scenario = null
+        }
+    }
+
+    @Test fun middlePageBookmarkKeepsItsBodyExcerptAndPositionAfterReopening() {
+        BookHelp.saveText(book, chapter,
+            (1..90).joinToString("\n") { "第${it}段章中唯一正文，验证书签不会被错误地移到章节开头。" })
+        launch(Intent(context, ReadBookActivity::class.java).putExtra("bookUrl", book.bookUrl))
+        appDb.bookmarkDao.delete(bookmark)
+        scenario!!.onActivity {
+            assertTrue(requireNotNull(ReadBook.curTextChapter).pageSize > 2)
+            ReadBook.skipToPage(2)
+        }
+        await {
+            var ready = false
+            scenario!!.onActivity {
+                ready = it.findViewById<ReadView>(R.id.read_view).curPage.textPage.index == 2
+            }
+            ready
+        }
+        var excerpt = ""
+        scenario!!.onActivity { activity ->
+            val page = activity.findViewById<ReadView>(R.id.read_view).curPage.textPage
+            assertFalse(page.lines.any { it.isTitle })
+            excerpt = page.text.trim()
+            assertEquals(excerpt, page.bookmarkText)
+            activity.toggleBookmark()
+        }
+        await { appDb.bookmarkDao.getByBook(book.name, book.author).isNotEmpty() }
+        val created = appDb.bookmarkDao.getByBook(book.name, book.author).single()
+        assertEquals(excerpt, created.bookText)
+        await { appDb.readingNoteDao.locationsForNote("bookmark", created.time).any { it.verified } }
+        scenario!!.close()
+        scenario = null
+        val target = requireNotNull(ReadingNotes.target(ReadingNotes.legacy(created, book.bookUrl), listOf(chapter)))
+        launchBookmark(target)
+        scenario!!.onActivity {
+            assertEquals(target.chapterPos, ReadBook.durChapterPos)
+            assertTrue(ReadBook.durPageIndex >= 2)
+        }
+    }
+
+    private fun launchBookmark(target: ReadingNoteLocation) {
+        launch(Intent(context, ReadBookActivity::class.java)
+            .putExtra("bookUrl", book.bookUrl).putExtra("index", target.chapterIndex)
+            .putExtra("chapterPos", target.chapterPos)
+            .putExtra(TocActivityResult.EXTRA_READING_NOTE_KEY, ReadingNotes.key(target))
+            .putExtra(TocActivityResult.EXTRA_HIGHLIGHT_LAYOUT_TITLE_LENGTH, target.layoutTitleLength)
+            .putExtra(TocActivityResult.EXTRA_HIGHLIGHT_ANCHOR_TEXT, target.quote))
+    }
+
     private fun launch(intent: Intent) {
+        val expectedChapter = intent.getIntExtra("index", -1)
         scenario = ActivityScenario.launch(intent.putExtra("inBookshelf", true))
         await {
             var ready = false
             scenario!!.onActivity {
                 val page = it.findViewById<ReadView>(R.id.read_view).curPage.textPage
                 ready = ReadBook.book?.bookUrl == book.bookUrl && ReadBook.curTextChapter?.isCompleted == true &&
-                    page.textChapter.chapter.bookUrl == book.bookUrl && page.lines.isNotEmpty()
+                    page.textChapter.chapter.bookUrl == book.bookUrl && page.lines.isNotEmpty() &&
+                    (expectedChapter < 0 || ReadBook.durChapterIndex == expectedChapter &&
+                        page.chapterIndex == expectedChapter)
             }
             ready
         }
@@ -242,6 +357,8 @@ class ReadingNoteNavigationTest {
             if (condition()) return
             SystemClock.sleep(60)
         } while (SystemClock.uptimeMillis() < deadline)
-        error("Reading note fixture was not ready")
+        error("Reading note fixture was not ready: chapter=${ReadBook.durChapterIndex}, " +
+            "size=${ReadBook.chapterSize}, layout=${ReadBook.curTextChapter?.chapter?.index}, " +
+            "completed=${ReadBook.curTextChapter?.isCompleted}")
     }
 }
