@@ -1,6 +1,7 @@
 package io.legado.app.help.book
 
 import io.legado.app.data.entities.ReadRecord
+import io.legado.app.data.entities.ReadRecordAuthors
 import io.legado.app.data.entities.ReadRecordDaily
 import io.legado.app.data.entities.ReadRecordDailyShow
 import io.legado.app.data.entities.ReadRecordHistory
@@ -194,6 +195,19 @@ data class ReadStatisticsSnapshot(
     val startedAt: Long,
     val hourly: List<ReadRecordHourlyShow> = emptyList(),
 ) {
+    /** Restrict an immutable snapshot to one book while preserving its stored identity. */
+    fun forBook(bookName: String, author: String): ReadStatisticsSnapshot {
+        fun matches(candidateName: String, candidateAuthor: String): Boolean =
+            candidateName == bookName && (candidateAuthor == author ||
+                (ReadRecordAuthors.isCombined(candidateAuthor) &&
+                    ReadRecordAuthors.decode(candidateAuthor).contains(author)))
+        return copy(
+            records = records.filter { matches(it.bookName, it.author) },
+            daily = daily.filter { matches(it.bookName, it.author) },
+            hourly = hourly.filter { matches(it.bookName, it.author) },
+        )
+    }
+
     /** Daily rankings use the day's complete records, independently of the month threshold. */
     fun booksForDay(date: String): List<ReadRecordShow> {
         val times = daily.filter { it.date == date }
