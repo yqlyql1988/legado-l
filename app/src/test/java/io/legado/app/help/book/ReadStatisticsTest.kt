@@ -3,6 +3,7 @@ package io.legado.app.help.book
 import io.legado.app.data.entities.ReadRecord
 import io.legado.app.data.entities.ReadRecordDaily
 import io.legado.app.data.entities.ReadRecordDailyShow
+import io.legado.app.data.entities.ReadRecordHourlyShow
 import io.legado.app.data.entities.ReadRecordShow
 import org.junit.Assert.*
 import org.junit.Test
@@ -155,6 +156,40 @@ class ReadStatisticsTest {
         assertEquals(listOf("B", "A"), summary.books.map { it.author })
         assertEquals(300L, summary.duration)
         assertEquals(1, summary.days.size)
+    }
+
+    @Test fun singleBookSnapshotFiltersAllDetailsAndKeepsCombinedAuthorHistory() {
+        val snapshot = ReadStatisticsSnapshot(
+            listOf(
+                ReadRecordShow("Book", 1000, 0, "A"),
+                ReadRecordShow("Book", 2000, 0, "B"),
+                ReadRecordShow("Other", 3000, 0, "A"),
+                ReadRecordShow("Legacy", 4000, 0, "\u001Eauthors:[\"A\",\"B\"]"),
+            ),
+            listOf(
+                ReadRecordDailyShow("Book", "A", "2026-10-17", 100),
+                ReadRecordDailyShow("Book", "B", "2026-10-17", 200),
+                ReadRecordDailyShow("Other", "A", "2026-10-17", 300),
+                ReadRecordDailyShow("Legacy", "\u001Eauthors:[\"A\",\"B\"]", "2026-10-18", 400),
+            ),
+            1,
+            listOf(
+                ReadRecordHourlyShow("Book", "A", "2026-10-17", 9, 100),
+                ReadRecordHourlyShow("Book", "B", "2026-10-17", 10, 200),
+                ReadRecordHourlyShow("Other", "A", "2026-10-17", 11, 300),
+                ReadRecordHourlyShow("Legacy", "\u001Eauthors:[\"A\",\"B\"]", "2026-10-18", 12, 400),
+            ),
+        )
+
+        val filtered = snapshot.forBook("Book", "A")
+        assertEquals(listOf("Book"), filtered.records.map { it.bookName })
+        assertEquals(listOf(100L), filtered.daily.map { it.readTime })
+        assertEquals(listOf(100L), filtered.hourly.map { it.readTime })
+        assertEquals(100L, filtered.summary(ReadStatisticsPeriod.MONTH, 2026, 10).duration)
+
+        val legacy = snapshot.forBook("Legacy", "A")
+        assertEquals(listOf(4000L), legacy.records.map { it.readTime })
+        assertEquals(listOf("2026-10-18"), legacy.daily.map { it.date })
     }
 
     @Test fun thresholdsUseTheSelectedPeriodsAggregatedBookTime() {

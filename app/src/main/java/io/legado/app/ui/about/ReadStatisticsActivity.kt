@@ -1,5 +1,6 @@
 package io.legado.app.ui.about
 
+import android.content.Intent
 import android.content.Context
 import android.app.DatePickerDialog
 import android.content.res.ColorStateList
@@ -68,6 +69,10 @@ import java.time.ZoneId
 import java.util.concurrent.Callable
 
 class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
+    private var singleBookName: String? = null
+    private var singleBookAuthor = ""
+    private val isSingleBook get() = singleBookName != null
+
     override val binding by viewBinding(ActivityReadStatisticsBinding::inflate)
     private val header by lazy {
         ViewReadStatisticsHeaderBinding.inflate(layoutInflater, binding.recyclerView, false)
@@ -89,6 +94,12 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
     private var selectedDay: String? = null
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        singleBookName = intent.getStringExtra(EXTRA_BOOK_NAME)?.takeIf { it.isNotBlank() }
+        singleBookAuthor = intent.getStringExtra(EXTRA_BOOK_AUTHOR).orEmpty()
+        if (savedInstanceState == null && isSingleBook) {
+            period = ReadStatisticsPeriod.MONTH
+            showHours = false
+        }
         savedInstanceState?.let {
             period = ReadStatisticsPeriod.entries.getOrElse(it.getInt("period")) { ReadStatisticsPeriod.DAY }
             year = it.getInt("year", year)
@@ -98,6 +109,9 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
             hourBooksExpanded = it.getBoolean("hourBooksExpanded", false)
             selectedHour = it.getInt("selectedHour", -1)
             if (it.containsKey("day")) selectedDay = it.getString("day")
+        }
+        singleBookName?.let {
+            binding.titleBar.title = getString(R.string.read_statistics_book_title, it)
         }
         adapter.addHeaderView { header }
         binding.recyclerView.adapter = adapter
@@ -129,15 +143,18 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
     override fun onResume() {
         super.onResume()
         dataJob?.cancel()
+        val targetName = singleBookName
+        val targetAuthor = singleBookAuthor
         dataJob = lifecycleScope.launch {
             val loaded = withContext(IO) {
                 val stats = appDb.runInTransaction(Callable {
                     val dao = appDb.readRecordDao
-                    ReadStatisticsSnapshot(
+                    val snapshot = ReadStatisticsSnapshot(
                         dao.allShow, dao.dailyShow(),
                         dao.statisticsStates().map { it.startedAt }.filter { it > 0 }.minOrNull() ?: 0,
                         dao.hourlyShow(),
                     )
+                    if (targetName == null) snapshot else snapshot.forBook(targetName, targetAuthor)
                 })
                 stats to appDb.bookDao.all.sortedBy { it.durChapterTime }.associateBy { it.name to it.author }
             }
@@ -150,6 +167,7 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
 
     override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.read_statistics, menu)
+        menu.findItem(R.id.menu_statistics_ranking)?.isVisible = !isSingleBook
         return super.onCompatCreateOptionsMenu(menu)
     }
 
@@ -159,9 +177,10 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
             return true
         }
         if (item.itemId == R.id.menu_statistics_help) {
+            val qualifiedOnly = qualifiedOnly()
             val coverage = snapshot.hourlySummary(period, year, month,
-                if (AppConfig.readStatisticsQualifiedOnly) statisticsMinimum() else 0, day)
-            val scope = getString(if (AppConfig.readStatisticsQualifiedOnly)
+                if (qualifiedOnly) statisticsMinimum() else 0, day)
+            val scope = getString(if (qualifiedOnly)
                 R.string.read_statistics_scope_qualified else R.string.read_statistics_scope_all)
             alert(R.string.read_statistics_help) {
                 setMessage(getString(R.string.read_statistics_coverage, earliestDate().toString()) +
@@ -451,8 +470,10 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
             }
         }
 
+    private fun qualifiedOnly() = !isSingleBook && AppConfig.readStatisticsQualifiedOnly
+
     private fun scopeCount(count: Int) = getString(R.string.read_statistics_rank_scope,
-        getString(if (AppConfig.readStatisticsQualifiedOnly) R.string.read_statistics_scope_qualified
+        getString(if (qualifiedOnly()) R.string.read_statistics_scope_qualified
             else R.string.read_statistics_scope_all), count)
 
     private fun selectScope(qualifiedOnly: Boolean) {
@@ -471,7 +492,7 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
     private fun render() {
         val minimum = statisticsMinimum()
         val all = snapshot.summary(period, year, month, day = day)
-        val qualifiedOnly = AppConfig.readStatisticsQualifiedOnly
+        val qualifiedOnly = qualifiedOnly()
         val summary = if (qualifiedOnly) snapshot.summary(period, year, month, minimum, day) else all
         val visibleBooks = summary.books
         header.statisticsScope.background = rounded(
@@ -499,6 +520,7 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         val today = LocalDate.now()
         val first = earliestDate()
         with(header) {
+            statisticsScope.isVisible = !isSingleBook
             tvPeriod.text = when (period) {
                 ReadStatisticsPeriod.ALL -> getString(R.string.read_statistics_all_period)
                 ReadStatisticsPeriod.YEAR -> getString(R.string.read_statistics_year_period, year)
@@ -548,10 +570,14 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
             tvHistory.isVisible = period == ReadStatisticsPeriod.ALL && summary.historyDuration > 0
             tvHistory.text = getString(R.string.read_statistics_history, duration(summary.historyDuration))
             tvRankTitle.setText(when (period) {
-                ReadStatisticsPeriod.ALL -> R.string.read_statistics_all_books
-                ReadStatisticsPeriod.YEAR -> R.string.read_statistics_year_books
-                ReadStatisticsPeriod.MONTH -> R.string.read_statistics_month_books
-                ReadStatisticsPeriod.DAY -> R.string.read_statistics_day_books
+                ReadStatisticsPeriod.ALL -> if (isSingleBook) R.string.read_statistics_book_days
+                    else R.string.read_statistics_all_books
+                ReadStatisticsPeriod.YEAR -> if (isSingleBook) R.string.read_statistics_book_days
+                    else R.string.read_statistics_year_books
+                ReadStatisticsPeriod.MONTH -> if (isSingleBook) R.string.read_statistics_book_days
+                    else R.string.read_statistics_month_books
+                ReadStatisticsPeriod.DAY -> if (isSingleBook) R.string.read_statistics_book_days
+                    else R.string.read_statistics_day_books
             })
             tvRankScope.text = scopeCount(visibleBooks.size)
             tvEmpty.isVisible = visibleBooks.isEmpty()
@@ -764,7 +790,7 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
             return
         }
         val dayBooks = snapshot.booksForDay(day)
-        val books = if (AppConfig.readStatisticsQualifiedOnly)
+        val books = if (qualifiedOnly())
             dayBooks.visibleReadStatisticsBooks(AppConfig.readStatisticsDayMinimum) else dayBooks
         header.tvSelectedDay.text = getString(
             R.string.read_statistics_selected_day, day, duration(books.sumOf { it.readTime }),
@@ -813,5 +839,16 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
                 getItemByLayoutPosition(holder.layoutPosition)?.let { openRecordedBook(it) }
             }
         }
+    }
+
+    companion object {
+        private const val EXTRA_BOOK_NAME = "bookName"
+        private const val EXTRA_BOOK_AUTHOR = "bookAuthor"
+
+        fun intent(context: Context, book: Book) =
+            Intent(context, ReadStatisticsActivity::class.java).apply {
+                putExtra(EXTRA_BOOK_NAME, book.name)
+                putExtra(EXTRA_BOOK_AUTHOR, book.author)
+            }
     }
 }

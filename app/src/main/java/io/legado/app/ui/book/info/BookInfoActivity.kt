@@ -75,6 +75,7 @@ import io.legado.app.model.AutoTask
 import io.legado.app.model.BookCover
 import io.legado.app.model.remote.RemoteBookWebDav
 import io.legado.app.ui.about.AppLogDialog
+import io.legado.app.ui.about.ReadStatisticsActivity
 import io.legado.app.ui.autoTask.AutoTaskEditActivity
 import io.legado.app.ui.autoTask.ImportAutoTaskDialog
 import io.legado.app.ui.book.audio.AudioPlayActivity
@@ -368,6 +369,10 @@ class BookInfoActivity :
                         startActivity(Intent.createChooser(intent, it.name))
                     }
                 }
+            }
+
+            R.id.menu_read_statistics -> viewModel.getBook()?.let {
+                startActivity(ReadStatisticsActivity.intent(this, it))
             }
 
             R.id.menu_refresh -> {

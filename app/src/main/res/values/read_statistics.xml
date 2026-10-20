@@ -2,6 +2,8 @@
 <resources>
     <string name="read_statistics">阅读统计</string>
     <string name="read_statistics_open">查看统计 ›</string>
+    <string name="read_statistics_book_menu">本书阅读日历</string>
+    <string name="read_statistics_book_title">阅读日历 · %1$s</string>
     <string name="read_statistics_all">累计</string>
     <string name="read_statistics_year">年度</string>
     <string name="read_statistics_month">月度</string>
@@ -29,6 +31,7 @@
     <string name="read_statistics_days">已记录天数</string>
     <string name="read_statistics_books">读过的书</string>
     <string name="read_statistics_average">明细日均</string>
+    <string name="read_statistics_book_days">本书阅读日</string>
     <string name="read_statistics_day_count">%1$d天</string>
     <string name="read_statistics_book_count">%1$d本</string>
     <string name="read_statistics_history">历史未分期时长：%1$s</string>

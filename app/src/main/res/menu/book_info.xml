@@ -21,6 +21,11 @@
         app:showAsAction="ifRoom" />
 
     <item
+        android:id="@+id/menu_read_statistics"
+        android:title="@string/read_statistics_book_menu"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_upload"
         android:title="@string/upload_to_remote"
         app:showAsAction="never" />
