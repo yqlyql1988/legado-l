@@ -344,6 +344,9 @@
         <activity
             android:name=".ui.book.bookmark.AllBookmarkActivity"
             android:launchMode="singleTop" />
+        <activity
+            android:name=".ui.book.bookmark.ReadingNoteTaskActivity"
+            android:launchMode="standard" />
         <!-- 缓存界面 -->
         <activity
             android:name=".ui.book.cache.CacheActivity"

@@ -1,6 +1,7 @@
 package io.legado.app.ui.book.bookmark
 
 import io.legado.app.help.ReadingNotes
+import android.content.Intent
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -173,6 +174,9 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
             render()
             binding.recyclerView.scrollToPosition(0)
         }
+        binding.tvTaskCenter.setOnClickListener {
+            startActivity(Intent(this, ReadingNoteTaskActivity::class.java))
+        }
         binding.tvTagFilter.setOnClickListener { showTagFilter() }
         binding.btnSelectAll.setOnClickListener {
             if (visibleNotes.all { it.id in selected }) selected.clear()
@@ -230,6 +234,7 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
         menuInflater.inflate(R.menu.bookmark, menu)
         menu.findItem(R.id.menu_manage).isVisible = selectedBook != null &&
             type != NoteType.REVIEW && archive?.notes?.isNotEmpty() == true
+        menu.findItem(R.id.menu_reading_note_tasks).isVisible = selectedBook == null
         menu.findItem(R.id.menu_export_notes).isVisible = type != NoteType.REVIEW
         menu.findItem(R.id.menu_manage).setTitle(if (managing) R.string.book_notes_done else R.string.book_notes_manage)
         return super.onCompatCreateOptionsMenu(menu)
@@ -243,6 +248,8 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
                 else { search.setQuery("", false); search.clearFocus() }
             }
             R.id.menu_manage -> { managing = !managing; selected.clear(); render() }
+            R.id.menu_reading_note_tasks ->
+                startActivity(Intent(this, ReadingNoteTaskActivity::class.java))
             R.id.menu_export -> { exportRequest = 1; exportDir.launch { requestCode = 1 } }
             R.id.menu_export_md -> { exportRequest = 2; exportDir.launch { requestCode = 2 } }
             R.id.menu_export_notes -> requestNotesExport()
@@ -271,6 +278,7 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
         val details = selectedBook != null
         binding.bookHeading.isVisible = details
         binding.noteTabs.isVisible = details
+        binding.tvTaskCenter.isVisible = !details
         val reviewing = details && type == NoteType.REVIEW
         binding.tvTagFilter.isVisible = details && type != NoteType.REVIEW
         binding.tvSort.isVisible = !reviewing

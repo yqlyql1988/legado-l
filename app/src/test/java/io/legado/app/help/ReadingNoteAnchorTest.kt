@@ -37,6 +37,24 @@ class ReadingNoteAnchorTest {
         assertNull(ReadingNoteAnchor.find("abcdefghi!", "abcdefghi?", 0))
     }
 
+    @Test fun `context matches find a unique changed passage`() {
+        val prefix = "前文中唯一的定位上下文，"
+        val suffix = "，后文中唯一的定位上下文。"
+        val text = "其他内容。${prefix}当前正文已经改写。${suffix}其他内容。"
+        val start = text.indexOf("当前正文")
+        val end = start + "当前正文已经改写。".length
+        assertEquals(listOf(ReadingNoteAnchor.Match(start, end)),
+            ReadingNoteAnchor.contextMatches(text, prefix, suffix))
+    }
+
+    @Test fun `context matches preserve ambiguity and reject incomplete context`() {
+        val prefix = "相同的前文定位片段，"
+        val suffix = "，相同的后文定位片段。"
+        val text = "${prefix}第一处修改。${suffix} 中间内容 ${prefix}第二处修改。${suffix}"
+        assertEquals(2, ReadingNoteAnchor.contextMatches(text, prefix, suffix).size)
+        assertTrue(ReadingNoteAnchor.contextMatches(text, prefix, "不存在的后文。").isEmpty())
+    }
+
     @Test fun `the same quote in another book cannot move an existing note`() {
         val location = ReadingNoteLocation(bookUrl = "book-a", quote = "shared quote")
         val chapter = BookChapter(bookUrl = "book-b", url = "chapter")
