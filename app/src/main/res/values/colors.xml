@@ -12,6 +12,8 @@
 
     <color name="error">#eb4333</color>
     <color name="success">#439b53</color>
+    <color name="reading_note_diff_delete">#26c85a5a</color>
+    <color name="reading_note_diff_insert">#2665a86b</color>
 
     <color name="night_mask">#00000000</color>
 

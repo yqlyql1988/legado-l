@@ -60,8 +60,7 @@ internal object ReadingNoteTaskScanner {
         val chaptersByBook = archives.mapNotNull { it.book }
             .distinctBy { it.bookUrl }
             .associate { book ->
-                book.bookUrl to appDb.bookChapterDao.getChapterList(book.bookUrl)
-                    .filterNot { it.isVolume }
+                book.bookUrl to ReadingNoteChapter.available(book)
             }
         val candidates = rows.map { (archive, note) ->
             val legacy = note.highlight?.let(ReadingNotes::legacy)
