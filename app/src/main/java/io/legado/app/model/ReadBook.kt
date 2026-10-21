@@ -2206,7 +2206,10 @@ object ReadBook : CoroutineScope by MainScope() {
         } ?: return false
         val exists = when (kind) {
             "bookmark" -> appDb.bookmarkDao.getByBook(current.name, current.author).any { it.time == time }
-            "highlight" -> appDb.bookHighlightDao.getByBook(current.bookUrl).any { it.time == time }
+            "highlight" -> appDb.bookHighlightDao.getByBook(current.bookUrl).any { it.time == time } ||
+                appDb.bookHighlightDao.all.any {
+                    it.time == time && it.bookName == current.name && it.bookAuthor == current.author
+                }
             else -> false
         }
         if (!exists) return false

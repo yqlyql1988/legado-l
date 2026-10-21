@@ -53,16 +53,22 @@ object ReadingNotes {
         quote = bookmark.bookText, verified = false, updatedAt = 0
     )
 
-    fun location(legacy: ReadingNoteLocation): ReadingNoteLocation =
-        appDb.readingNoteDao.locationsForNote(legacy.kind, legacy.noteTime)
-            .firstOrNull { it.bookUrl == legacy.bookUrl } ?: legacy
+    fun location(
+        legacy: ReadingNoteLocation,
+        preferredBookUrl: String? = null,
+    ): ReadingNoteLocation {
+        val locations = appDb.readingNoteDao.locationsForNote(legacy.kind, legacy.noteTime)
+        return preferredBookUrl?.let { url ->
+            locations.firstOrNull { it.bookUrl == url }
+        } ?: locations.firstOrNull { it.bookUrl == legacy.bookUrl } ?: legacy
+    }
 
     fun target(legacy: ReadingNoteLocation, chapters: List<BookChapter>): ReadingNoteLocation? {
-        val saved = location(legacy)
+        val saved = location(legacy, chapters.firstOrNull()?.bookUrl)
         val chapter = ReadingNoteChapter.candidate(saved, chapters) ?: return null
         val trusted = saved.verified && ReadingNoteChapter.sameUrl(saved.chapterUrl, chapter.url)
         if (saved.quote.isBlank() && !trusted) return null
-        return saved.copy(chapterUrl = chapter.url, chapterIndex = chapter.index,
+        return saved.copy(bookUrl = chapter.bookUrl, chapterUrl = chapter.url, chapterIndex = chapter.index,
             verified = trusted)
     }
 
@@ -90,9 +96,26 @@ object ReadingNotes {
     /** A late layout job cannot recreate a deleted note or replace a newer manual position. */
     fun saveLocation(location: ReadingNoteLocation, bookName: String, author: String): Boolean =
         appDb.runInTransaction(Callable {
+            val highlight = if (location.kind == HIGHLIGHT) {
+                appDb.bookHighlightDao.getByBook(location.bookUrl)
+                    .firstOrNull { it.time == location.noteTime }
+                    ?: appDb.bookHighlightDao.all.firstOrNull {
+                        it.time == location.noteTime &&
+                            it.bookName == bookName && it.bookAuthor == author
+                    }
+            } else {
+                null
+            }
+            val bookmark = if (location.kind == BOOKMARK) {
+                appDb.bookmarkDao.getByBook(bookName, author)
+                    .firstOrNull { it.time == location.noteTime }
+                    ?: appDb.bookmarkDao.all.firstOrNull { it.time == location.noteTime }
+            } else {
+                null
+            }
             val exists = when (location.kind) {
-                HIGHLIGHT -> appDb.bookHighlightDao.getByBook(location.bookUrl).any { it.time == location.noteTime }
-                BOOKMARK -> appDb.bookmarkDao.getByBook(bookName, author).any { it.time == location.noteTime }
+                HIGHLIGHT -> highlight != null
+                BOOKMARK -> bookmark != null
                 else -> false
             }
             if (!exists) return@Callable false
@@ -100,19 +123,54 @@ object ReadingNotes {
             val previous = dao.locationsForNote(location.kind, location.noteTime)
                 .firstOrNull { it.bookUrl == location.bookUrl }
             if (previous != null && previous.updatedAt >= location.updatedAt) return@Callable false
-            val active = dao.sources().firstOrNull { it.bookUrl == location.bookUrl }?.activeBookUrl
+            val originalBookUrl = highlight?.bookUrl
+                ?: location.bookUrl.takeIf { bookmark == null }
+            val active = originalBookUrl?.let { sourceUrl ->
+                dao.sources().firstOrNull { it.bookUrl == sourceUrl }?.activeBookUrl
+            } ?: dao.sources().firstOrNull { it.bookUrl == location.bookUrl }?.activeBookUrl
             if (active != null && active != location.bookUrl) return@Callable false
             dao.saveLocations(listOf(location))
             if (location.kind == HIGHLIGHT) {
-                appDb.bookHighlightDao.updateLocation(location.noteTime, location.bookUrl,
-                    location.chapterUrl, location.chapterIndex, location.chapterName,
-                    location.chapterPos, location.chapterPosEnd, location.layoutTitleLength)
+                if (highlight == null) return@Callable false
+                if (highlight.bookUrl == location.bookUrl) {
+                    appDb.bookHighlightDao.updateLocation(location.noteTime, location.bookUrl,
+                        location.chapterUrl, location.chapterIndex, location.chapterName,
+                        location.chapterPos, location.chapterPosEnd, location.layoutTitleLength)
+                } else {
+                    appDb.bookHighlightDao.update(highlight.copy(
+                        bookUrl = location.bookUrl,
+                        bookName = bookName.ifBlank { highlight.bookName },
+                        bookAuthor = author.ifBlank { highlight.bookAuthor },
+                        chapterUrl = location.chapterUrl,
+                        chapterIndex = location.chapterIndex,
+                        chapterName = location.chapterName,
+                        chapterPos = location.chapterPos,
+                        chapterPosEnd = location.chapterPosEnd,
+                        layoutTitleLength = location.layoutTitleLength,
+                    ))
+                    moveHighlightTagOrders(highlight.bookUrl, location.bookUrl, location.noteTime)
+                }
             } else {
-                appDb.bookmarkDao.updateLocation(location.noteTime, bookName, author,
+                appDb.bookmarkDao.updateLocation(location.noteTime,
+                    bookmark?.bookName ?: bookName, bookmark?.bookAuthor ?: author,
                     location.chapterIndex, location.chapterPos, location.chapterName)
             }
             true
         })
+
+    private fun moveHighlightTagOrders(oldBookUrl: String, newBookUrl: String, time: Long) {
+        if (oldBookUrl.isBlank() || oldBookUrl == newBookUrl) return
+        val tagDao = appDb.highlightTagDao
+        val existing = tagDao.ordersForBook(newBookUrl).mapTo(hashSetOf()) { it.tagId }
+        val oldOrders = tagDao.ordersForBook(oldBookUrl).associateBy { it.tagId }
+        val retained = (tagDao.forBook(oldBookUrl, includeHidden = true).map { it.id } +
+            tagDao.idsForHighlight(time)).distinct().filter { it !in existing }
+        tagDao.upsertOrders(retained.mapIndexed { index, id ->
+            io.legado.app.data.entities.HighlightTagOrder(
+                newBookUrl, id, existing.size + index, oldOrders[id]?.hidden ?: false
+            )
+        })
+    }
 
     /** Called in the same transaction as the explicit source change, before old chapters are removed. */
     fun changeSource(oldBook: Book, newBook: Book, chapters: List<BookChapter>) {

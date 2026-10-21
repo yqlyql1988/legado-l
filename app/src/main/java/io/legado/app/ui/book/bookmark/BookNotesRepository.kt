@@ -3,6 +3,10 @@ package io.legado.app.ui.book.bookmark
 import android.net.Uri
 import io.legado.app.constant.AppLog
 import io.legado.app.data.appDb
+import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.BookHighlight
+import io.legado.app.data.entities.BookReview
+import io.legado.app.data.entities.Bookmark
 import io.legado.app.data.entities.HighlightTag
 import io.legado.app.data.entities.HighlightTagLink
 import io.legado.app.data.entities.HighlightTagOrder
@@ -27,13 +31,24 @@ internal object BookNotesRepository {
         val orders: List<HighlightTagOrder>,
         val bookmarkLinks: List<BookmarkTagLink>, val bookmarkOrders: List<BookmarkTagOrder>
     )
+    private data class ArchiveData(
+        val bookmarks: List<Bookmark>,
+        val highlights: List<BookHighlight>,
+        val books: List<Book>,
+        val tags: TagData,
+        val reviews: List<BookReview>,
+    )
     private val tagData = combine(appDb.highlightTagDao.flowAll(),
         appDb.highlightTagDao.flowLinks(), appDb.highlightTagDao.flowOrders(),
         appDb.bookmarkTagDao.flowLinks(), appDb.bookmarkTagDao.flowOrders(), ::TagData)
-    val archives = combine(appDb.bookmarkDao.flowAll(), appDb.bookHighlightDao.flowAll(),
-        appDb.bookDao.flowAll(), tagData, appDb.bookReviewDao.flowAll()) { bookmarks, highlights, books, tagData, reviews ->
-        archiveBookNotes(bookmarks, highlights, books, tagData.tags, tagData.links, tagData.orders, reviews,
-            tagData.bookmarkLinks, tagData.bookmarkOrders)
+    private val archiveData = combine(appDb.bookmarkDao.flowAll(), appDb.bookHighlightDao.flowAll(),
+        appDb.bookDao.flowAll(), tagData, appDb.bookReviewDao.flowAll()) { bookmarks, highlights, books, tags, reviews ->
+        ArchiveData(bookmarks, highlights, books, tags, reviews)
+    }
+    val archives = combine(archiveData, appDb.readingNoteDao.flowSources()) { data, sources ->
+        archiveBookNotes(data.bookmarks, data.highlights, data.books, data.tags.tags,
+            data.tags.links, data.tags.orders, data.reviews, data.tags.bookmarkLinks,
+            data.tags.bookmarkOrders, sources)
     }.flowOn(IO)
 
     suspend fun delete(notes: List<BookNote>) {

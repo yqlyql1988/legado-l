@@ -15,6 +15,8 @@ import java.net.URLDecoder
 import java.util.Base64
 
 object ReadingNoteChapter {
+    enum class CandidateState { FOUND, AMBIGUOUS, NOT_FOUND }
+
     /**
      * Reading notes may be restored before the local book's chapter table has been rebuilt.
      * Reuse the normal local-book parser only when the cached directory is missing or stale.
@@ -74,27 +76,47 @@ object ReadingNoteChapter {
 
     /** Titles and numbers are candidates only; the quote must be verified against actual text. */
     fun candidate(location: ReadingNoteLocation, chapters: List<BookChapter>): BookChapter? {
+        return candidateResult(location, chapters).first
+    }
+
+    fun candidateState(
+        location: ReadingNoteLocation,
+        chapters: List<BookChapter>,
+    ): CandidateState = candidateResult(location, chapters).second
+
+    private fun candidateResult(
+        location: ReadingNoteLocation,
+        chapters: List<BookChapter>,
+    ): Pair<BookChapter?, CandidateState> {
         val available = chapters.filterNot { it.isVolume }
         if (location.chapterUrl.isNotBlank()) {
             val exact = available.filter { it.url == location.chapterUrl }
-            if (exact.isNotEmpty()) return exact.singleOrNull()
+            if (exact.isNotEmpty()) {
+                return if (exact.size == 1) exact.single() to CandidateState.FOUND
+                else null to CandidateState.AMBIGUOUS
+            }
             val stable = available.filter { sameUrl(location.chapterUrl, it.url) }
-            if (stable.isNotEmpty()) return stable.singleOrNull()
+            if (stable.isNotEmpty()) {
+                return if (stable.size == 1) stable.single() to CandidateState.FOUND
+                else null to CandidateState.AMBIGUOUS
+            }
         }
         var ambiguous = false
         val name = getPureChapterName(location.chapterName)
         if (name.isNotBlank()) {
             val titles = available.filter { getPureChapterName(it.title) == name }
-            if (titles.size == 1) return titles.single()
+            if (titles.size == 1) return titles.single() to CandidateState.FOUND
             ambiguous = titles.size > 1
         }
         val number = getChapterNum(location.chapterName)
         if (number > 0) {
             val numbers = available.filter { getChapterNum(it.title) == number }
-            if (numbers.size == 1) return numbers.single()
+            if (numbers.size == 1) return numbers.single() to CandidateState.FOUND
             ambiguous = ambiguous || numbers.size > 1
         }
-        if (ambiguous) return null
-        return available.singleOrNull { it.index == location.chapterIndex }
+        if (ambiguous) return null to CandidateState.AMBIGUOUS
+        val indexed = available.singleOrNull { it.index == location.chapterIndex }
+        return if (indexed != null) indexed to CandidateState.FOUND
+        else null to CandidateState.NOT_FOUND
     }
 }

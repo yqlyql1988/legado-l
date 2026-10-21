@@ -5,6 +5,7 @@ import androidx.room.Query
 import androidx.room.Upsert
 import io.legado.app.data.entities.ReadingNoteLocation
 import io.legado.app.data.entities.ReadingNoteSource
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ReadingNoteDao {
@@ -19,6 +20,9 @@ interface ReadingNoteDao {
 
     @Query("SELECT * FROM reading_note_sources")
     fun sources(): List<ReadingNoteSource>
+
+    @Query("SELECT * FROM reading_note_sources")
+    fun flowSources(): Flow<List<ReadingNoteSource>>
 
     @Upsert
     fun saveLocations(locations: List<ReadingNoteLocation>)
