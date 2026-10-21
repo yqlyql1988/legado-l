@@ -5,6 +5,8 @@
         android:title="@string/search" app:showAsAction="always" />
     <item android:id="@+id/menu_manage" android:title="@string/book_notes_manage"
         app:showAsAction="ifRoom" />
+    <item android:id="@+id/menu_reading_note_tasks"
+        android:title="@string/reading_note_task_entry" />
 
     <item
         android:id="@+id/menu_export"

@@ -430,6 +430,7 @@ class ReadBookActivity : BaseReadBookActivity(),
             if (getPrefBoolean("disableReturnKey") && !menuLayoutIsVisible) {
                 return@addCallback
             }
+            if (relocatingNoteKind != null) clearNoteRelocation()
             finish()
         }
     }
@@ -1397,8 +1398,13 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     private fun clearNoteRelocation() {
+        clearNoteRelocation(clearQueue = true)
+    }
+
+    private fun clearNoteRelocation(clearQueue: Boolean) {
         relocatingNoteKind = null
         relocatingNoteTime = -1
+        if (clearQueue) ReadingNoteNavigation.clearQueue()
         intent.removeExtra(ReadingNoteNavigation.EXTRA_KIND)
         intent.removeExtra(ReadingNoteNavigation.EXTRA_TIME)
         relocationHint?.dismiss()
@@ -1417,10 +1423,17 @@ class ReadBookActivity : BaseReadBookActivity(),
             if (ReadBook.book?.bookUrl != sourceUrl ||
                 relocatingNoteKind != kind || relocatingNoteTime != time) return@launch
             if (saved) {
-                clearNoteRelocation()
+                val hasNextRelocation = sourceUrl?.let {
+                    ReadingNoteNavigation.completeQueueItem(it, kind, time)
+                } == true
+                clearNoteRelocation(clearQueue = false)
                 cancelSelect()
                 ReadBook.upHighlightTags()
-                toastOnUi(R.string.reading_note_relocated)
+                if (hasNextRelocation) {
+                    ReadingNoteNavigation.openNext(this@ReadBookActivity)
+                } else {
+                    toastOnUi(R.string.reading_note_relocated)
+                }
             } else toastOnUi(R.string.reading_note_unresolved)
         }
         return true
