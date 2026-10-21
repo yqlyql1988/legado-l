@@ -6,6 +6,7 @@ import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
+import io.legado.app.help.ReadingNoteChapter
 import io.legado.app.utils.startActivityForBook
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.launch
@@ -52,7 +53,7 @@ object ReadingNoteNavigation {
                 return@launch
             }
             val chapters = withContext(IO) {
-                appDb.bookChapterDao.getChapterList(book.bookUrl).filterNot { it.isVolume }
+                ReadingNoteChapter.available(book)
             }
             if (activity.isFinishing || activity.isDestroyed) {
                 clearQueue()
@@ -82,7 +83,7 @@ object ReadingNoteNavigation {
 
     fun relocate(activity: FragmentActivity, book: Book, kind: String, time: Long) {
         activity.lifecycleScope.launch {
-            val chapters = withContext(IO) { appDb.bookChapterDao.getChapterList(book.bookUrl).filterNot { it.isVolume } }
+            val chapters = withContext(IO) { ReadingNoteChapter.available(book) }
             if (activity.isFinishing || activity.isDestroyed) return@launch
             if (chapters.isEmpty()) {
                 activity.startActivityForBook(book) {

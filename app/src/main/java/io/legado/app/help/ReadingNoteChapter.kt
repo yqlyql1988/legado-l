@@ -1,14 +1,45 @@
 package io.legado.app.help
 
 import io.legado.app.data.entities.BookChapter
+import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.ReadingNoteLocation
+import io.legado.app.data.appDb
 import io.legado.app.help.book.getChapterNum
 import io.legado.app.help.book.getPureChapterName
+import io.legado.app.help.book.isLocal
+import io.legado.app.help.book.isLocalModified
+import io.legado.app.help.book.update
+import io.legado.app.model.localBook.LocalBook
 import java.net.URI
 import java.net.URLDecoder
 import java.util.Base64
 
 object ReadingNoteChapter {
+    /**
+     * Reading notes may be restored before the local book's chapter table has been rebuilt.
+     * Reuse the normal local-book parser only when the cached directory is missing or stale.
+     */
+    fun available(book: Book): List<BookChapter> {
+        val stored = appDb.bookChapterDao.getChapterList(book.bookUrl)
+        val chapters = stored.filterNot { it.isVolume }
+        if (!shouldRefreshLocalChapters(book.isLocal, chapters, book.isLocalModified())) {
+            return chapters
+        }
+        return runCatching {
+            val loaded = LocalBook.getChapterList(book)
+            appDb.bookChapterDao.delByBook(book.bookUrl)
+            appDb.bookChapterDao.insert(*loaded.toTypedArray())
+            book.update()
+            loaded.filterNot { it.isVolume }
+        }.getOrElse { chapters }
+    }
+
+    internal fun shouldRefreshLocalChapters(
+        isLocal: Boolean,
+        chapters: List<BookChapter>,
+        modified: Boolean,
+    ): Boolean = isLocal && (chapters.isEmpty() || modified)
+
     /** Never drop arbitrary query parameters: they may identify a different chapter or book. */
     fun stableIdentity(url: String): String? = runCatching {
         val query = if (url.startsWith("data:vipContent;base64,")) {

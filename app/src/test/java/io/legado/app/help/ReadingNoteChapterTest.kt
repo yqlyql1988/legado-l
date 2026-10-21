@@ -10,6 +10,19 @@ class ReadingNoteChapterTest {
     private fun vip(query: String) =
         "data:vipContent;base64," + Base64.getEncoder().encodeToString(query.toByteArray()) + ",{\"js\":\"changed\"}"
 
+    @Test fun `local chapter table is rebuilt when it is empty or stale`() {
+        assertTrue(ReadingNoteChapter.shouldRefreshLocalChapters(true, emptyList(), false))
+        assertTrue(ReadingNoteChapter.shouldRefreshLocalChapters(
+            true, listOf(BookChapter(title = "第五章")), true
+        ))
+        assertFalse(ReadingNoteChapter.shouldRefreshLocalChapters(
+            false, emptyList(), true
+        ))
+        assertFalse(ReadingNoteChapter.shouldRefreshLocalChapters(
+            true, listOf(BookChapter(title = "第五章")), false
+        ))
+    }
+
     @Test fun `old and new requests identify the same platform chapter`() {
         val old = vip("token=expired-fixture&novelId=42&chapterId=28")
         val current = vip("novelId=42&chapterId=28")

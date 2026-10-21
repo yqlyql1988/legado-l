@@ -174,9 +174,6 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
             render()
             binding.recyclerView.scrollToPosition(0)
         }
-        binding.tvTaskCenter.setOnClickListener {
-            startActivity(Intent(this, ReadingNoteTaskActivity::class.java))
-        }
         binding.tvTagFilter.setOnClickListener { showTagFilter() }
         binding.btnSelectAll.setOnClickListener {
             if (visibleNotes.all { it.id in selected }) selected.clear()
@@ -278,7 +275,6 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
         val details = selectedBook != null
         binding.bookHeading.isVisible = details
         binding.noteTabs.isVisible = details
-        binding.tvTaskCenter.isVisible = !details
         val reviewing = details && type == NoteType.REVIEW
         binding.tvTagFilter.isVisible = details && type != NoteType.REVIEW
         binding.tvSort.isVisible = !reviewing

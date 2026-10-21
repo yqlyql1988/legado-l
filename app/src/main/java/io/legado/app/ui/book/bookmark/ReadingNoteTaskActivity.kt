@@ -2,14 +2,13 @@ package io.legado.app.ui.book.bookmark
 
 import android.os.Bundle
 import android.text.SpannableStringBuilder
-import android.text.style.ForegroundColorSpan
+import android.text.style.BackgroundColorSpan
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.activity.addCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.SearchView
-import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -214,15 +213,20 @@ class ReadingNoteTaskActivity : BaseActivity<ActivityReadingNoteTaskBinding>() {
         marked: ReadingNoteDiff.Type
     ): CharSequence {
         val builder = SpannableStringBuilder()
-        val color = ContextCompat.getColor(this,
-            if (marked == ReadingNoteDiff.Type.DELETE) R.color.error else R.color.success)
+        val color = getCompatColor(
+            if (marked == ReadingNoteDiff.Type.DELETE) {
+                R.color.reading_note_diff_delete
+            } else {
+                R.color.reading_note_diff_insert
+            }
+        )
         parts.forEach { part ->
             if (part.type == ReadingNoteDiff.Type.INSERT && marked == ReadingNoteDiff.Type.DELETE) return@forEach
             if (part.type == ReadingNoteDiff.Type.DELETE && marked == ReadingNoteDiff.Type.INSERT) return@forEach
             val start = builder.length
             builder.append(part.text)
             if (part.type == marked) {
-                builder.setSpan(ForegroundColorSpan(color), start, builder.length, 0)
+                builder.setSpan(BackgroundColorSpan(color), start, builder.length, 0)
             }
         }
         return builder
