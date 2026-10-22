@@ -109,6 +109,60 @@ class ReadingNotesDatabaseTest {
         assertTrue(appDb.readingNoteDao.locationsForNote("highlight", highlight.time).isEmpty())
     }
 
+    @Test fun manualRelocationCanAdoptCurrentQuoteWithoutDroppingMetadata() =
+        withNotes { a, _, highlight, bookmark ->
+            val highlightLocation = ReadingNotes.legacy(highlight).copy(
+                chapterPos = 99, chapterPosEnd = 107, quote = "Current highlight",
+                updatedAt = 30
+            )
+            assertTrue(ReadingNotes.saveLocation(
+                highlightLocation, a.name, a.author, adoptQuote = true
+            ))
+            val savedHighlight = appDb.bookHighlightDao.getByBook(a.bookUrl).single()
+            assertEquals("Current highlight", savedHighlight.bookText)
+            assertEquals(highlight.note, savedHighlight.note)
+            assertEquals(highlight.style, savedHighlight.style)
+
+            val bookmarkLocation = ReadingNotes.legacy(bookmark, a.bookUrl).copy(
+                chapterPos = 101, chapterPosEnd = 112, quote = "Current bookmark",
+                updatedAt = 31
+            )
+            assertTrue(ReadingNotes.saveLocation(
+                bookmarkLocation, a.name, a.author, adoptQuote = true
+            ))
+            val savedBookmark = appDb.bookmarkDao.getByBook(a.name, a.author)
+                .single { it.time == bookmark.time }
+            assertEquals("Current bookmark", savedBookmark.bookText)
+            assertEquals(bookmark.content, savedBookmark.content)
+        }
+
+    @Test fun staleHighlightCanFollowUniqueSameNameAndAuthorSource() = withNotes { a, b, highlight, _ ->
+        appDb.bookDao.insert(b)
+        try {
+            val relocated = ReadingNotes.legacy(highlight).copy(
+                bookUrl = b.bookUrl,
+                chapterUrl = "new/chapter",
+                chapterIndex = 1,
+                chapterName = "新章节",
+                chapterPos = 44,
+                chapterPosEnd = 49,
+                quote = "New text",
+                verified = true,
+                updatedAt = 20,
+            )
+            assertTrue(ReadingNotes.saveLocation(relocated, b.name, b.author))
+            val saved = appDb.bookHighlightDao.all.single()
+            assertEquals(b.bookUrl, saved.bookUrl)
+            assertEquals(44, saved.chapterPos)
+            assertEquals(relocated, appDb.readingNoteDao.locationsForNote(
+                "highlight", highlight.time
+            ).single { it.bookUrl == b.bookUrl })
+        } finally {
+            appDb.readingNoteDao.deleteLocations("highlight", listOf(highlight.time))
+            appDb.bookDao.delete(b)
+        }
+    }
+
     @Test fun oldBackupPreservesNewerContextAndRehomesExplicitlyLinkedSources() = withNotes { a, b, highlight, bookmark ->
         val chapters = listOf(BookChapter(bookUrl = b.bookUrl, url = "b/chapter", index = 0,
             title = "第一章 原章名"))

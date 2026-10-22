@@ -7,6 +7,7 @@ import io.legado.app.data.entities.BookReview
 import io.legado.app.data.entities.HighlightTag
 import io.legado.app.data.entities.HighlightTagLink
 import io.legado.app.data.entities.HighlightTagOrder
+import io.legado.app.data.entities.ReadingNoteSource
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -90,6 +91,27 @@ class BookNotesTest {
         assertEquals(1, result.bookmarkCount)
         assertEquals(1, result.highlightCount)
         assertEquals(2, result.notes.size)
+    }
+
+    @Test fun legacyHighlightFollowsUniqueSameNameAndAuthorBook() {
+        val current = book.copy(bookUrl = "source-new")
+        val result = archiveBookNotes(
+            emptyList(), listOf(highlight(url = "source-old")), listOf(current),
+            emptyList(), emptyList()
+        ).single()
+        assertEquals(current.bookUrl, result.bookUrl)
+        assertEquals(current, result.book)
+    }
+
+    @Test fun explicitSourceMappingWinsWhenBookMetadataChanged() {
+        val current = book.copy(bookUrl = "source-new", name = "改名后的书")
+        val old = highlight(url = "source-old")
+        val result = archiveBookNotes(
+            emptyList(), listOf(old), listOf(current), emptyList(), emptyList(),
+            sources = listOf(ReadingNoteSource("source-old", "work", current.bookUrl))
+        ).single()
+        assertEquals(current.bookUrl, result.bookUrl)
+        assertEquals(current, result.book)
     }
     @Test fun sameTimestampAcrossTablesRemainsTwoSelectableRecords() {
         val notes = archive(highlights = listOf(highlight(time = 1))).single().notes

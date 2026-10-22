@@ -21,9 +21,12 @@ import io.legado.app.databinding.ActivityReadingNoteTaskBinding
 import io.legado.app.databinding.DialogReadingNoteDiffBinding
 import io.legado.app.databinding.ItemReadingNoteTaskBinding
 import io.legado.app.help.ReadingNoteDiff
+import io.legado.app.help.ReadingNoteChapter
+import io.legado.app.help.ReadingNotes
 import io.legado.app.ui.widget.popupActionMenu
 import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.applyTint
+import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getCompatColor
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
@@ -74,6 +77,7 @@ class ReadingNoteTaskActivity : BaseActivity<ActivityReadingNoteTaskBinding>() {
         }
         binding.btnRetry.setOnClickListener { retrySelected() }
         binding.btnManual.setOnClickListener { startManualSelected() }
+        binding.btnDelete.setOnClickListener { deleteSelected() }
         onBackPressedDispatcher.addCallback(this) {
             if (managing) {
                 managing = false
@@ -88,8 +92,11 @@ class ReadingNoteTaskActivity : BaseActivity<ActivityReadingNoteTaskBinding>() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 try {
                     BookNotesRepository.archives.collect {
-                        archives = it
-                        if (!scanStarted) scan()
+                        val changed = archives != it
+                        if (changed) archives = it
+                        if ((!scanStarted || changed) && scanJob?.isActive != true) {
+                            loadPending()
+                        }
                     }
                 } catch (e: CancellationException) {
                     throw e
@@ -104,7 +111,7 @@ class ReadingNoteTaskActivity : BaseActivity<ActivityReadingNoteTaskBinding>() {
 
     override fun onResume() {
         super.onResume()
-        if (scanStarted && scanJob?.isActive != true) scan()
+        if (scanStarted && scanJob?.isActive != true) loadPending()
     }
 
     override fun onDestroy() {
@@ -113,7 +120,8 @@ class ReadingNoteTaskActivity : BaseActivity<ActivityReadingNoteTaskBinding>() {
     }
 
     private fun scan(onlyIds: Set<String>? = null) {
-        if (archives.isEmpty() && onlyIds == null) return
+        if (archives.isEmpty() || onlyIds == null) return
+        val scanArchives = archives
         scanStarted = true
         scanJob?.cancel()
         binding.tvEmpty.isVisible = false
@@ -121,26 +129,50 @@ class ReadingNoteTaskActivity : BaseActivity<ActivityReadingNoteTaskBinding>() {
         scanJob = lifecycleScope.launch {
             try {
                 val result = withContext(IO) {
-                    ReadingNoteTaskScanner.scan(archives, onlyIds)
+                    ReadingNoteTaskScanner.scan(scanArchives, onlyIds)
                 }
-                if (onlyIds == null) {
-                    tasks = orderedTasks(result)
-                } else {
-                    val previous = tasks.filter { it.id in onlyIds }
-                    tasks = orderedTasks(tasks.filterNot { it.id in onlyIds } + result)
-                    val resultById = result.associateBy { it.id }
-                    val recovered = previous.count { it.id !in resultById }
-                    val changed = result.count { it.reason == ReadingNoteTaskReason.CHANGED }
-                    val manual = result.size - changed
-                    toastOnUi(getString(R.string.reading_note_task_retry_result,
-                        recovered, changed, manual))
+                if (archives != scanArchives) {
+                    scanJob = null
+                    loadPending()
+                    return@launch
                 }
+                val previous = tasks.filter { it.id in onlyIds }
+                tasks = orderedTasks(tasks.filterNot { it.id in onlyIds } + result)
+                val resultById = result.associateBy { it.id }
+                val recovered = previous.count { it.id !in resultById }
+                val changed = result.count { it.reason == ReadingNoteTaskReason.CHANGED }
+                val manual = result.size - changed
+                toastOnUi(getString(R.string.reading_note_task_retry_result,
+                    recovered, changed, manual))
                 selected.retainAll(tasks.map { it.id }.toSet())
                 render()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 AppLog.put("标注定位检查失败\n${e.localizedMessage}", e)
+                binding.tvSummary.setText(R.string.book_notes_load_failed)
+            }
+        }
+    }
+
+    private fun loadPending() {
+        if (archives.isEmpty()) return
+        scanStarted = true
+        scanJob?.cancel()
+        binding.tvEmpty.isVisible = false
+        binding.tvSummary.setText(R.string.reading_note_task_scanning)
+        scanJob = lifecycleScope.launch {
+            try {
+                val result = withContext(IO) {
+                    ReadingNoteTaskScanner.scan(archives, verify = false)
+                }
+                tasks = orderedTasks(result)
+                selected.retainAll(tasks.map { it.id }.toSet())
+                render()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.put("标注定位任务加载失败\n${e.localizedMessage}", e)
                 binding.tvSummary.setText(R.string.book_notes_load_failed)
             }
         }
@@ -158,21 +190,59 @@ class ReadingNoteTaskActivity : BaseActivity<ActivityReadingNoteTaskBinding>() {
 
     private fun startManualSelected() {
         val target = if (selected.isEmpty()) visibleTasks else tasks.filter { it.id in selected }
-        val queue = target.mapNotNull { task ->
-            val book = task.archive.book ?: return@mapNotNull null
-            ReadingNoteNavigation.QueueItem(
-                bookUrl = book.bookUrl,
-                kind = if (task.note.highlight != null) "highlight" else "bookmark",
-                time = task.note.time,
-                chapterIndex = task.chapter?.index ?: task.resolved?.chapterIndex
-                    ?: task.source.chapterIndex
-            )
-        }
+        val queue = target.mapNotNull(::queueItem)
         if (queue.isEmpty()) {
             toastOnUi(R.string.book_notes_unavailable)
             return
         }
         ReadingNoteNavigation.startQueue(this, queue)
+    }
+
+    private fun deleteSelected() {
+        val target = if (selected.isEmpty()) visibleTasks else tasks.filter { it.id in selected }
+        if (target.isEmpty()) {
+            toastOnUi(R.string.book_notes_select_first)
+            return
+        }
+        confirmDelete(target)
+    }
+
+    private fun confirmDelete(target: List<ReadingNoteTask>) {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.delete)
+            .setMessage(getString(R.string.reading_note_task_delete_confirm, target.size))
+            .setPositiveButton(R.string.delete) { _, _ ->
+                lifecycleScope.launch {
+                    BookNotesRepository.delete(target.map { it.note })
+                    val ids = target.mapTo(hashSetOf()) { it.id }
+                    tasks = tasks.filterNot { it.id in ids }
+                    selected.removeAll(ids)
+                    render()
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun acceptCurrentQuote(task: ReadingNoteTask) {
+        val resolved = task.resolved ?: return
+        lifecycleScope.launch {
+            val accepted = withContext(IO) {
+                ReadingNotes.adoptCurrentQuote(
+                    resolved,
+                    task.archive.book?.name ?: task.note.bookName,
+                    task.archive.book?.author ?: task.note.author,
+                )
+            }
+            if (accepted) {
+                tasks = tasks.filterNot { it.id == task.id }
+                selected.remove(task.id)
+                render()
+                toastOnUi(R.string.reading_note_task_accepted)
+            } else {
+                toastOnUi(R.string.reading_note_task_accept_failed)
+            }
+        }
     }
 
     private fun showDiff(task: ReadingNoteTask) {
@@ -237,7 +307,13 @@ class ReadingNoteTaskActivity : BaseActivity<ActivityReadingNoteTaskBinding>() {
 
     private fun reasonText(task: ReadingNoteTask): String = getString(
         when (task.reason) {
-            ReadingNoteTaskReason.CHAPTER_UNAVAILABLE -> R.string.reading_note_task_chapter_unavailable
+            ReadingNoteTaskReason.PENDING -> R.string.reading_note_task_pending
+            ReadingNoteTaskReason.BOOK_UNAVAILABLE -> R.string.reading_note_task_book_unavailable
+            ReadingNoteTaskReason.LOCAL_FILE_UNAVAILABLE -> R.string.reading_note_task_local_file_unavailable
+            ReadingNoteTaskReason.TOC_UNAVAILABLE -> R.string.reading_note_task_toc_unavailable
+            ReadingNoteTaskReason.CHAPTER_NOT_FOUND -> R.string.reading_note_task_chapter_not_found
+            ReadingNoteTaskReason.CHAPTER_AMBIGUOUS -> R.string.reading_note_task_chapter_ambiguous
+            ReadingNoteTaskReason.SOURCE_UNAVAILABLE -> R.string.reading_note_task_source_unavailable
             ReadingNoteTaskReason.CONTENT_UNAVAILABLE -> R.string.reading_note_task_content_unavailable
             ReadingNoteTaskReason.MULTIPLE_MATCHES -> R.string.reading_note_task_multiple
             ReadingNoteTaskReason.NOT_FOUND -> R.string.reading_note_task_not_found
@@ -252,9 +328,13 @@ class ReadingNoteTaskActivity : BaseActivity<ActivityReadingNoteTaskBinding>() {
         binding.tvSummary.text = if (scanJob?.isActive == true) {
             getString(R.string.reading_note_task_scanning)
         } else {
+            val bookmarks = visibleTasks.count { it.note.bookmark != null }
+            val highlights = visibleTasks.size - bookmarks
             getString(
                 R.string.reading_note_task_summary,
                 visibleTasks.size,
+                bookmarks,
+                highlights,
                 visibleTasks.count { it.reason != ReadingNoteTaskReason.CHANGED },
                 visibleTasks.count { it.reason == ReadingNoteTaskReason.CHANGED }
             )
@@ -270,27 +350,39 @@ class ReadingNoteTaskActivity : BaseActivity<ActivityReadingNoteTaskBinding>() {
     }
 
     private fun orderedTasks(items: List<ReadingNoteTask>): List<ReadingNoteTask> =
-        items.sortedWith(compareBy<ReadingNoteTask> { reasonOrder(it.reason) }
-            .thenBy { it.archive.name }
+        items.sortedWith(compareBy<ReadingNoteTask> { it.archive.id }
+            .thenBy { reasonOrder(it.reason) }
             .thenBy { it.note.chapterIndex }
             .thenBy { it.note.time })
 
     private fun reasonOrder(reason: ReadingNoteTaskReason): Int = when (reason) {
-        ReadingNoteTaskReason.CHAPTER_UNAVAILABLE -> 0
-        ReadingNoteTaskReason.CONTENT_UNAVAILABLE -> 1
-        ReadingNoteTaskReason.MULTIPLE_MATCHES -> 2
-        ReadingNoteTaskReason.NOT_FOUND -> 3
-        ReadingNoteTaskReason.CHANGED -> 4
+        ReadingNoteTaskReason.PENDING -> 0
+        ReadingNoteTaskReason.BOOK_UNAVAILABLE -> 1
+        ReadingNoteTaskReason.LOCAL_FILE_UNAVAILABLE -> 2
+        ReadingNoteTaskReason.TOC_UNAVAILABLE -> 3
+        ReadingNoteTaskReason.CHAPTER_NOT_FOUND -> 4
+        ReadingNoteTaskReason.CHAPTER_AMBIGUOUS -> 5
+        ReadingNoteTaskReason.SOURCE_UNAVAILABLE -> 6
+        ReadingNoteTaskReason.CONTENT_UNAVAILABLE -> 7
+        ReadingNoteTaskReason.MULTIPLE_MATCHES -> 8
+        ReadingNoteTaskReason.NOT_FOUND -> 9
+        ReadingNoteTaskReason.CHANGED -> 10
     }
 
     private fun showActions(task: ReadingNoteTask, anchor: View) {
         popupActionMenu(this) {
             item(getString(R.string.reading_note_diff_title), "diff")
+            if (task.reason == ReadingNoteTaskReason.CHANGED && task.resolved != null) {
+                item(getString(R.string.reading_note_task_accept), "accept")
+            }
             item(getString(R.string.reading_note_relocate), "manual")
             item(getString(R.string.reading_note_task_skip), "skip")
+            item(getString(R.string.delete), "delete")
+            danger("delete")
         }.show(anchor) { action ->
             when (action) {
                 "diff" -> showDiff(task)
+                "accept" -> acceptCurrentQuote(task)
                 "manual" -> {
                     selected.clear()
                     startManual(listOf(task))
@@ -299,22 +391,33 @@ class ReadingNoteTaskActivity : BaseActivity<ActivityReadingNoteTaskBinding>() {
                     tasks = tasks.filterNot { it.id == task.id }
                     render()
                 }
+                "delete" -> confirmDelete(listOf(task))
             }
         }
     }
 
     private fun startManual(items: List<ReadingNoteTask>) {
-        val queue = items.mapNotNull { task ->
-            val book = task.archive.book ?: return@mapNotNull null
-            ReadingNoteNavigation.QueueItem(
-                book.bookUrl,
-                if (task.note.highlight != null) "highlight" else "bookmark",
-                task.note.time,
-                task.chapter?.index ?: task.resolved?.chapterIndex ?: task.source.chapterIndex
-            )
-        }
+        val queue = items.mapNotNull(::queueItem)
         if (queue.isNotEmpty()) ReadingNoteNavigation.startQueue(this, queue)
         else toastOnUi(R.string.book_notes_unavailable)
+    }
+
+    private fun queueItem(task: ReadingNoteTask): ReadingNoteNavigation.QueueItem? {
+        val book = task.archive.book ?: return null
+        val chapter = task.chapter
+        val resolved = task.resolved
+        val sameChapter = chapter != null && task.source.chapterUrl.isNotBlank() &&
+            ReadingNoteChapter.sameUrl(task.source.chapterUrl, chapter.url)
+        val location = resolved ?: task.source
+        return ReadingNoteNavigation.QueueItem(
+            bookUrl = book.bookUrl,
+            kind = if (task.note.highlight != null) "highlight" else "bookmark",
+            time = task.note.time,
+            chapterIndex = chapter?.index ?: location.chapterIndex,
+            chapterUrl = resolved?.chapterUrl ?: chapter?.url.orEmpty(),
+            chapterName = chapter?.title ?: location.chapterName,
+            chapterPos = resolved?.chapterPos ?: location.chapterPos.takeIf { sameChapter } ?: 0,
+        )
     }
 
     private inner class TaskAdapter : RecyclerView.Adapter<TaskHolder>() {
@@ -328,8 +431,13 @@ class ReadingNoteTaskActivity : BaseActivity<ActivityReadingNoteTaskBinding>() {
         override fun onBindViewHolder(holder: TaskHolder, position: Int) {
             val task = visibleTasks[position]
             holder.row.run {
-                tvBook.text = listOfNotNull(task.archive.name.takeIf { it.isNotBlank() },
-                    task.archive.author.takeIf { it.isNotBlank() }).joinToString(" · ")
+                tvBook.text = buildString {
+                    if (task.archive.name.isNotBlank()) append("《").append(task.archive.name).append("》")
+                    task.archive.author.takeIf { it.isNotBlank() }?.let {
+                        if (isNotEmpty()) append(" · ")
+                        append(it)
+                    }
+                }
                 tvChapter.text = task.chapter?.title ?: task.note.chapterName
                 tvStatus.text = reasonText(task)
                 tvBefore.text = getString(R.string.reading_note_task_before,
@@ -345,6 +453,12 @@ class ReadingNoteTaskActivity : BaseActivity<ActivityReadingNoteTaskBinding>() {
                     task.candidateCount.takeIf { it > 1 }?.toString()
                         ?: getString(R.string.reading_note_task_manual)
                 )
+                (root.layoutParams as? ViewGroup.MarginLayoutParams)?.let { params ->
+                    params.topMargin = if (position > 0 &&
+                        visibleTasks[position - 1].archive.id != task.archive.id
+                    ) 8.dpToPx() else 0
+                    root.layoutParams = params
+                }
                 check.isVisible = managing
                 check.setOnCheckedChangeListener(null)
                 check.isChecked = task.id in selected

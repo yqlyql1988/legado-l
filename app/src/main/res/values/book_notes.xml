@@ -38,14 +38,23 @@
     <string name="book_notes_load_failed">阅读笔记加载失败，请返回后重试</string>
     <string name="reading_note_task_center">标注定位</string>
     <string name="reading_note_task_entry">未定位</string>
-    <string name="reading_note_task_summary">共 %1$d 条定位任务：%2$d 条待处理，%3$d 条原文有变化</string>
+    <string name="reading_note_task_summary">共 %1$d 条定位任务 · 书签 %2$d · 标注 %3$d · 待处理 %4$d · 原文变化 %5$d</string>
     <string name="reading_note_task_scanning">正在检查笔记定位…</string>
     <string name="reading_note_task_empty">没有需要处理的定位任务</string>
     <string name="reading_note_task_retry">批量重试</string>
     <string name="reading_note_task_manual">连续手动定位</string>
     <string name="reading_note_task_skip">跳过本次</string>
+    <string name="reading_note_task_pending">待检查</string>
     <string name="reading_note_task_changed">原文有变化，但已找到唯一位置</string>
-    <string name="reading_note_task_chapter_unavailable">章节不存在或无法确定章节</string>
+    <string name="reading_note_task_accept">采用当前正文</string>
+    <string name="reading_note_task_accepted">已采用当前正文，备注、标签和样式已保留</string>
+    <string name="reading_note_task_accept_failed">保存当前正文失败，请重试</string>
+    <string name="reading_note_task_book_unavailable">原书记录不可用</string>
+    <string name="reading_note_task_local_file_unavailable">本地文件不可用</string>
+    <string name="reading_note_task_toc_unavailable">目录无法获取</string>
+    <string name="reading_note_task_chapter_not_found">章节不存在</string>
+    <string name="reading_note_task_chapter_ambiguous">无法确定章节</string>
+    <string name="reading_note_task_source_unavailable">书源不可用</string>
     <string name="reading_note_task_content_unavailable">正文暂时无法获取</string>
     <string name="reading_note_task_multiple">原文存在多个候选位置</string>
     <string name="reading_note_task_not_found">没有找到对应原文</string>
@@ -57,4 +66,5 @@
     <string name="reading_note_diff_after">当前正文</string>
     <string name="reading_note_diff_title">原文变化</string>
     <string name="reading_note_diff_chapter">章节：%1$s → %2$s</string>
+    <string name="reading_note_task_delete_confirm">删除这 %1$d 条原书签或标注？备注、标签关联和定位记录也会一起删除。</string>
 </resources>
