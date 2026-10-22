@@ -20,6 +20,26 @@ import java.time.temporal.ChronoUnit
 data class ReadDayDuration(val date: String, val duration: Long)
 data class ReadHourDuration(val date: String, val hour: Int, val duration: Long)
 
+/** Distribute a forward-reading word delta over dated intervals without losing its total. */
+internal fun allocateReadWords(words: Long, durations: List<Long>): List<Long> {
+    if (words <= 0 || durations.isEmpty()) return durations.map { 0L }
+    val totalDuration = durations.sumOf { it.coerceAtLeast(0L) }
+    if (totalDuration <= 0) return durations.map { 0L }
+    var allocated = 0L
+    return durations.mapIndexed { index, duration ->
+        if (index == durations.lastIndex) {
+            (words - allocated).coerceAtLeast(0L)
+        } else {
+            val safeDuration = duration.coerceAtLeast(0L)
+            val whole = words / totalDuration
+            val remainder = words % totalDuration
+            val share = whole * safeDuration + remainder * safeDuration / totalDuration
+            allocated = Math.addExact(allocated, share)
+            share
+        }
+    }
+}
+
 /** Freeze local clock labels at recording time; account for timezone transitions too. */
 internal fun splitReadHourlyInterval(
     end: Long,
@@ -119,35 +139,61 @@ internal fun mergeReadStatistics(
         .values.mapNotNull { rows ->
             val active = rows.filter { it.resetTime == hourResets[it.date] }
             if (active.isEmpty()) return@mapNotNull null
-            val deleted = active.maxOf { it.deletedTime }
-            val gross = active.maxOf { Math.addExact(it.readTime, it.deletedTime) }
-            active.first().copy(readTime = (gross - deleted).coerceAtLeast(0), deletedTime = deleted)
+            val deletedTime = active.maxOf { it.deletedTime }
+            val grossTime = active.maxOf { Math.addExact(it.readTime, it.deletedTime) }
+            val deletedWords = active.maxOf { it.deletedWords }
+            val grossWords = active.maxOf { Math.addExact(it.readWords, it.deletedWords) }
+            active.first().copy(
+                readTime = (grossTime - deletedTime).coerceAtLeast(0),
+                deletedTime = deletedTime,
+                readWords = (grossWords - deletedWords).coerceAtLeast(0),
+                deletedWords = deletedWords,
+            )
         }
     val hourlyDays = mergedHourly.groupBy { it.date }.values.map { rows ->
         val first = rows.first()
         ReadRecordDaily(first.deviceId, first.bookName, first.author, first.date,
             rows.fold(0L) { total, row -> Math.addExact(total, row.readTime) },
-            Math.addExact(first.resetTime, rows.sumOf { it.deletedTime }), first.resetTime)
+            Math.addExact(first.resetTime, rows.sumOf { it.deletedTime }), first.resetTime,
+            rows.fold(0L) { total, row -> Math.addExact(total, row.readWords) },
+            rows.fold(0L) { total, row -> Math.addExact(total, row.deletedWords) })
     }
     val mergedDaily = (currentDaily + incomingDaily.orEmpty() + hourlyDays)
         .groupBy { it.date }
         .values.map { rows ->
-            val deleted = rows.maxOf { it.deletedTime }
-            val gross = rows.maxOf { Math.addExact(it.readTime, it.deletedTime) }
-            rows.first().copy(readTime = (gross - deleted).coerceAtLeast(0),
-                deletedTime = deleted, resetTime = rows.maxOf { it.resetTime })
+            val deletedTime = rows.maxOf { it.deletedTime }
+            val grossTime = rows.maxOf { Math.addExact(it.readTime, it.deletedTime) }
+            val deletedWords = rows.maxOf { it.deletedWords }
+            val grossWords = rows.maxOf { Math.addExact(it.readWords, it.deletedWords) }
+            rows.first().copy(
+                readTime = (grossTime - deletedTime).coerceAtLeast(0),
+                deletedTime = deletedTime,
+                resetTime = rows.maxOf { it.resetTime },
+                readWords = (grossWords - deletedWords).coerceAtLeast(0),
+                deletedWords = deletedWords,
+            )
         }
     val dailyTotal = mergedDaily.sumOf { it.readTime }
+    val dailyWords = mergedDaily.sumOf { it.readWords }
     val record = mergeRestoredReadRecord(current, incoming, localDevice)
     val history = listOfNotNull(currentHistory, incomingHistory).maxOrNull()
     val knownTotal = Math.addExact(history ?: 0L, dailyTotal)
+    val knownWords = dailyWords
     val removed = mergedDaily.sumOf { it.deletedTime }
+    val removedWords = mergedDaily.sumOf { it.deletedWords }
     val currentGross = Math.addExact(current?.readTime ?: 0, currentDaily.sumOf { it.deletedTime })
     val incomingGross = Math.addExact(incoming.readTime, incomingDaily.orEmpty().sumOf { it.deletedTime })
     val gross = if (incomingDaily == null && !localDevice && removed == 0L) incomingGross
         else maxOf(currentGross, incomingGross)
     val total = maxOf((gross - removed).coerceAtLeast(0), knownTotal)
-    return RestoredReadStatistics(record.copy(readTime = total), mergedDaily, history, mergedHourly)
+    val currentGrossWords = Math.addExact(current?.readWords ?: 0L, currentDaily.sumOf { it.deletedWords })
+    val incomingGrossWords = Math.addExact(incoming.readWords, incomingDaily.orEmpty().sumOf { it.deletedWords })
+    // Legacy backups have no word counters. Keep any newer local value when
+    // restoring one of those backups, while still accepting newer word data.
+    val grossWords = maxOf(currentGrossWords, incomingGrossWords)
+    val totalWords = maxOf((grossWords - removedWords).coerceAtLeast(0L), knownWords)
+    return RestoredReadStatistics(record.copy(readTime = total, readWords = totalWords),
+        mergedDaily, history, mergedHourly)
 }
 
 enum class ReadStatisticsPeriod { ALL, YEAR, MONTH, DAY }
@@ -184,8 +230,18 @@ data class ReadStatisticsSummary(
     val historyDuration: Long,
     val days: Map<String, Long>,
     val books: List<ReadRecordShow>,
+    val words: Long = 0L,
+    val datedWords: Long = 0L,
 ) {
     val average: Long get() = if (days.isEmpty()) 0L else datedDuration / days.size
+    val historyWords: Long get() = (words - datedWords).coerceAtLeast(0L)
+    /** Old records may have time without word details; speed uses the dated portion. */
+    val speed: Long get() = readWordsSpeed(datedWords, datedDuration)
+}
+
+internal fun readWordsSpeed(words: Long, duration: Long): Long {
+    if (words <= 0 || duration <= 0) return 0L
+    return (words.toDouble() * 60_000.0 / duration).toLong().coerceAtLeast(0L)
 }
 
 /** A single immutable database snapshot supplies totals, charts, calendar and rankings. */
@@ -210,11 +266,13 @@ data class ReadStatisticsSnapshot(
 
     /** Daily rankings use the day's complete records, independently of the month threshold. */
     fun booksForDay(date: String): List<ReadRecordShow> {
-        val times = daily.filter { it.date == date }
+        val metrics = daily.filter { it.date == date }
             .groupBy { it.bookName to it.author }
-            .mapValues { (_, rows) -> rows.sumOf { it.readTime } }
+            .mapValues { (_, rows) -> rows.sumOf { it.readTime } to rows.sumOf { it.readWords } }
         return records.mapNotNull { record ->
-            times[record.bookName to record.author]?.takeIf { it > 0 }?.let { record.copy(readTime = it) }
+            metrics[record.bookName to record.author]?.takeIf { it.first > 0 }?.let {
+                record.copy(readTime = it.first, readWords = it.second)
+            }
         }.sortedWith(compareByDescending<ReadRecordShow> { it.readTime }
             .thenBy { it.bookName }.thenBy { it.author })
     }
@@ -228,10 +286,12 @@ data class ReadStatisticsSnapshot(
     ): ReadStatisticsSummary {
         val prefix = readStatisticsPrefix(period, year, month, day)
         val selected = daily.filter { it.date.startsWith(prefix) }
-        val bookTimes = selected.groupBy { it.bookName to it.author }
-            .mapValues { (_, rows) -> rows.sumOf { it.readTime } }
+        val bookMetrics = selected.groupBy { it.bookName to it.author }
+            .mapValues { (_, rows) -> rows.sumOf { it.readTime } to rows.sumOf { it.readWords } }
         val ranked = if (period == ReadStatisticsPeriod.ALL) records else records.mapNotNull { record ->
-            bookTimes[record.bookName to record.author]?.let { record.copy(readTime = it) }
+            bookMetrics[record.bookName to record.author]?.let {
+                record.copy(readTime = it.first, readWords = it.second)
+            }
         }
         // Qualify books using their aggregate for this period, then keep all of
         // those books' daily time. A threshold never trims individual sessions.
@@ -242,11 +302,13 @@ data class ReadStatisticsSnapshot(
         val details = if (minimum > 0) selected.filter { (it.bookName to it.author) in identities }
             else selected
         val dated = details.sumOf { it.readTime }
+        val datedWords = details.sumOf { it.readWords }
         val duration = if (period == ReadStatisticsPeriod.ALL) books.sumOf { it.readTime } else dated
+        val words = if (period == ReadStatisticsPeriod.ALL) books.sumOf { it.readWords } else datedWords
         return ReadStatisticsSummary(
             duration, dated, (duration - dated).coerceAtLeast(0),
             details.groupBy { it.date }.mapValues { (_, rows) -> rows.sumOf { it.readTime } },
-            books,
+            books, words, datedWords,
         )
     }
 

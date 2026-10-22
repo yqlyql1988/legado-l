@@ -23,6 +23,12 @@ data class ReadRecordDaily(
     /** Lifetime removal counter at the last whole-day deletion, also used by its hours. */
     @ColumnInfo(defaultValue = "0")
     val resetTime: Long = 0L,
+    /** Effective text characters counted for this device, book and day. */
+    @ColumnInfo(defaultValue = "0")
+    val readWords: Long = 0L,
+    /** Removed portion of the cumulative word counter. */
+    @ColumnInfo(defaultValue = "0")
+    val deletedWords: Long = 0L,
 )
 
 @Entity(tableName = "readStatisticsState", primaryKeys = ["deviceId"])
@@ -45,4 +51,5 @@ data class ReadRecordDailyShow(
     val author: String,
     val date: String,
     val readTime: Long,
+    val readWords: Long = 0L,
 )

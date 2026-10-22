@@ -66,6 +66,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
+import java.util.Locale
 import java.util.concurrent.Callable
 
 class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
@@ -455,6 +456,18 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         value, AppConfig.readRecordUseDays, AppConfig.readRecordShowSeconds,
     )
 
+    private fun wordCount(value: Long): String = when {
+        value <= 0L -> getString(R.string.read_statistics_no_words)
+        value >= 10_000L -> String.format(Locale.getDefault(), "%.1f万字", value / 10_000.0)
+        else -> getString(R.string.read_statistics_word_value, value)
+    }
+
+    private fun speed(value: Long): String = if (value > 0L) {
+        getString(R.string.read_statistics_speed_value, value)
+    } else {
+        getString(R.string.read_statistics_no_speed)
+    }
+
     private fun summaryValue(value: String, numberScale: Float, unitScale: Float = 1f) =
         SpannableStringBuilder(value).apply {
             Regex("\\d+|\\D+").findAll(value).forEach { match ->
@@ -567,6 +580,12 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
                 value.contentDescription = "$text\n${label.text}"
                 label.setTextColor(contentSecondary)
             }
+            tvWords.text = summaryValue(wordCount(summary.words), 22f / 13)
+            tvWords.contentDescription = "${wordCount(summary.words)}\n${tvWordsLabel.text}"
+            tvSpeed.text = summaryValue(speed(summary.speed), 22f / 13)
+            tvSpeed.contentDescription = "${speed(summary.speed)}\n${tvSpeedLabel.text}"
+            tvWordsLabel.setTextColor(contentSecondary)
+            tvSpeedLabel.setTextColor(contentSecondary)
             tvHistory.isVisible = period == ReadStatisticsPeriod.ALL && summary.historyDuration > 0
             tvHistory.text = getString(R.string.read_statistics_history, duration(summary.historyDuration))
             tvRankTitle.setText(when (period) {
@@ -820,7 +839,9 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         row.tvRank.text = (index + 1).toString()
         row.tvBookName.text = item.bookName
         row.tvAuthor.text = item.displayAuthor.ifBlank { getString(R.string.read_record_no_author) }
-        row.tvReadingTime.text = duration(item.readTime)
+        val metrics = getString(R.string.read_statistics_book_metrics, duration(item.readTime), wordCount(item.readWords))
+        row.tvReadingTime.text = metrics
+        row.tvReadingTime.contentDescription = metrics
         row.progress.progress = (1000.0 * item.readTime / maximum.coerceAtLeast(1)).toInt()
         row.progress.progressTintList = ColorStateList.valueOf(accentColor)
         loadReadRecordCover(row.ivCover, item, bookshelf[item.bookName to item.author])

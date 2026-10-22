@@ -10,6 +10,7 @@ data class ReadRecordShow(
     var lastChapterIndex: Int = -1,
     var lastChapterPos: Int = 0,
     var coverUrl: String? = null,
+    var readWords: Long = 0L,
 ) {
     val displayAuthor: String
         get() = ReadRecordAuthors.display(author)

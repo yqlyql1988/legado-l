@@ -12,6 +12,7 @@ internal fun mergeRestoredReadRecord(
     val chapter = if (latest.lastChapterIndex >= 0 || !latest.lastChapterTitle.isNullOrBlank()) latest else previous
     return incoming.copy(
         readTime = if (localDevice) maxOf(current.readTime, incoming.readTime) else incoming.readTime,
+        readWords = if (localDevice) maxOf(current.readWords, incoming.readWords) else incoming.readWords,
         lastRead = maxOf(current.lastRead, incoming.lastRead),
         lastChapterTitle = chapter.lastChapterTitle,
         lastChapterIndex = chapter.lastChapterIndex,

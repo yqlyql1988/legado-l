@@ -195,6 +195,50 @@
                 android:layout_weight="1.2"
                 android:text="@string/read_statistics_average" />
         </LinearLayout>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:baselineAligned="false"
+            android:orientation="horizontal">
+            <TextView
+                android:id="@+id/tv_words"
+                style="@style/ReadStatisticsMetricValue"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp" />
+            <TextView
+                android:id="@+id/tv_speed"
+                style="@style/ReadStatisticsMetricValue"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp" />
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:baselineAligned="false"
+            android:orientation="horizontal">
+            <TextView
+                android:id="@+id/tv_words_label"
+                style="@style/ReadStatisticsMetricLabel"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:text="@string/read_statistics_words" />
+            <TextView
+                android:id="@+id/tv_speed_label"
+                style="@style/ReadStatisticsMetricLabel"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:text="@string/read_statistics_speed" />
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+        </LinearLayout>
     </LinearLayout>
     <TextView
         android:id="@+id/tv_history"

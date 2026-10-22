@@ -45,6 +45,9 @@ data class ReadRecord(
     var coverUrl: String? = null,
     /** Keep the original blank-author account stable when restoring older backups. */
     var resolvedAuthor: String? = null,
+    /** Effective text characters counted while moving forward through the reader. */
+    @ColumnInfo(defaultValue = "0")
+    var readWords: Long = 0L,
 )
 
 fun ReadRecord.updateSnapshot(
@@ -59,24 +62,26 @@ fun ReadRecord.updateSnapshot(
     book.getDisplayCover()?.takeIf { it.isNotBlank() }?.let { coverUrl = it }
 }
 
-fun ReadRecord.saveWithCover(book: Book?, elapsed: Long? = null) {
+fun ReadRecord.saveWithCover(book: Book?, elapsed: Long? = null, readWords: Long = 0L) {
     val zone = TimeZone.getDefault()
-    saveWithCover(book, elapsed, null, elapsed?.let { splitReadInterval(lastRead, it, zone) }.orEmpty(),
+    saveWithCover(book, elapsed, readWords, null,
+        elapsed?.let { splitReadInterval(lastRead, it, zone) }.orEmpty(),
         elapsed?.let { splitReadHourlyInterval(lastRead, it, zone) }.orEmpty())
 }
 
 /** Capture routing while the reader still holds its record lock, before submitting the write. */
-fun ReadRecord.prepareSaveWithCover(book: Book?, elapsed: Long): () -> Unit {
+fun ReadRecord.prepareSaveWithCover(book: Book?, elapsed: Long, readWords: Long = 0L): () -> Unit {
     val ticket = book?.let { readRecordMetadataRoutes.capture(it.bookUrl, bookName, author) }
     val zone = TimeZone.getDefault()
     val intervals = splitReadInterval(lastRead, elapsed, zone)
     val hours = splitReadHourlyInterval(lastRead, elapsed, zone)
-    return { saveWithCover(book, elapsed, ticket, intervals, hours) }
+    return { saveWithCover(book, elapsed, readWords, ticket, intervals, hours) }
 }
 
 private fun ReadRecord.saveWithCover(
     book: Book?,
     elapsed: Long?,
+    readWords: Long,
     ticket: ReadRecordMetadataRoutes.Ticket?,
     intervals: List<ReadDayDuration>,
     hours: List<ReadHourDuration>,
@@ -105,12 +110,13 @@ private fun ReadRecord.saveWithCover(
             val snapshot = current?.takeIf { it.lastRead > lastRead } ?: this
             saved = snapshot.copy(
                 readTime = (current?.readTime ?: 0L) + elapsed.coerceAtLeast(0L),
+                readWords = Math.addExact(current?.readWords ?: 0L, readWords.coerceAtLeast(0L)),
             )
         }
         saved = saved.copy(resolvedAuthor = current?.resolvedAuthor ?: saved.resolvedAuthor)
         appDb.readRecordDao.insert(saved)
-        appDb.readRecordDao.addDaily(saved, intervals, lastRead)
-        appDb.readRecordDao.addHourly(saved, hours)
+        appDb.readRecordDao.addDaily(saved, intervals, lastRead, readWords)
+        appDb.readRecordDao.addHourly(saved, hours, readWords)
     }
     ReadRecordCoverCache.request(saved.copy(), snapshotBook?.getCoverSourceOrigin())
 }

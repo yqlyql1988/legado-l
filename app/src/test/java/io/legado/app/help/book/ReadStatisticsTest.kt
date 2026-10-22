@@ -57,8 +57,15 @@ class ReadStatisticsTest {
         }
     }
 
-    private fun daily(date: String, duration: Long) = ReadRecordDaily("phone", "Book", "A", date, duration)
+    private fun daily(date: String, duration: Long, words: Long = 0L) =
+        ReadRecordDaily("phone", "Book", "A", date, duration, readWords = words)
     private val parent = ReadRecord("phone", "Book", "A", 1000, 100, lastChapterTitle = "Saved chapter", lastChapterIndex = 7)
+
+    @Test fun allocateWordsKeepsTheWholeDeltaAcrossDateBoundaries() {
+        val shares = allocateReadWords(10, listOf(1L, 2L, 3L))
+        assertEquals(10L, shares.sum())
+        assertEquals(listOf(1L, 3L, 6L), shares)
+    }
 
     @Test fun restoringNewBackupTwiceKeepsHistoryAndDatesOnce() {
         val rows = listOf(daily("2026-10-16", 200), daily("2026-10-17", 300))
@@ -67,6 +74,19 @@ class ReadStatisticsTest {
         assertEquals(parent, first.record)
         assertEquals(first, second)
         assertEquals(500L, first.record.readTime - first.daily.sumOf { it.readTime })
+    }
+
+    @Test fun restoringLegacyBackupDoesNotEraseNewWordCount() {
+        val current = parent.copy(readWords = 600)
+        val restored = mergeReadStatistics(
+            current = current,
+            incoming = parent.copy(readWords = 0),
+            currentDaily = emptyList(),
+            incomingDaily = null,
+            localDevice = false,
+        )
+
+        assertEquals(600L, restored.record.readWords)
     }
 
     @Test fun differentDaysFromDivergentBackupsMergeWithoutDuplicatingOldTotal() {
@@ -144,6 +164,23 @@ class ReadStatisticsTest {
         assertEquals(300L, month.duration)
         assertEquals(listOf("2026-10-17"), month.days.keys.toList())
         assertTrue(snapshot.summary(ReadStatisticsPeriod.YEAR, 2024, 10).books.isEmpty())
+    }
+
+    @Test fun summaryAggregatesWordsAndCalculatesDatedSpeed() {
+        val snapshot = ReadStatisticsSnapshot(
+            listOf(ReadRecordShow("Book", 600_000, 100, "A", readWords = 600)),
+            listOf(
+                ReadRecordDailyShow("Book", "A", "2026-10-17", 600_000, 600),
+            ),
+            1,
+        )
+
+        val summary = snapshot.summary(ReadStatisticsPeriod.DAY, 2026, 10, day = 17)
+
+        assertEquals(600L, summary.words)
+        assertEquals(600L, summary.datedWords)
+        assertEquals(60L, summary.speed)
+        assertEquals(600L, snapshot.booksForDay("2026-10-17").single().readWords)
     }
 
     @Test fun sameTitleDifferentAuthorsRemainSeparateInPeriodRanking() {
