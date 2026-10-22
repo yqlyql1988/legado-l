@@ -212,6 +212,8 @@ object ReadBook : CoroutineScope by MainScope() {
     private data class PendingPdfJump(val bookUrl: String, val chapterIndex: Int, val pageIndex: Int)
     private var pendingPdfJump: PendingPdfJump? = null
     var readStartTime: Long = System.currentTimeMillis()
+    private val readWordTracker = TextReadProgressTracker()
+    private val readWordChapterCache = TextReadChapterSnapshotCache()
 
     /* 跳转进度前进度记录 */
     var lastBookProgress: BookProgress? = null
@@ -245,6 +247,7 @@ object ReadBook : CoroutineScope by MainScope() {
         contentProcessor = ContentProcessor.get(book)
         durChapterIndex = book.durChapterIndex
         durChapterPos = book.durChapterPos
+        readWordTracker.reset()
         isLocalBook = book.isLocal
         upWebBook(book)
         clearTextChapter()
@@ -720,6 +723,7 @@ object ReadBook : CoroutineScope by MainScope() {
             if (readRecord.bookName != book.name || readRecord.author != book.author) {
                 upReadTime()
                 resetReadRecord(book)
+                readWordTracker.reset()
             }
             ReadBook.book = book
         }
@@ -798,6 +802,7 @@ object ReadBook : CoroutineScope by MainScope() {
             (durChapterIndex != progress.durChapterIndex
                     || durChapterPos != progress.durChapterPos)
         ) {
+            readWordTracker.markSeek()
             durChapterIndex = progress.durChapterIndex
             durChapterPos = progress.durChapterPos
             saveRead()
@@ -924,6 +929,17 @@ object ReadBook : CoroutineScope by MainScope() {
             ?: ReadRecord(deviceId = AppConst.androidId, bookName = book.name, author = book.author)
     }
 
+    fun startReadSession() {
+        synchronized(readRecordLock) {
+            readStartTime = System.currentTimeMillis()
+            readWordTracker.start(
+                durChapterIndex,
+                durChapterPos,
+                readWordChapterCache.snapshot(curTextChapter),
+            )
+        }
+    }
+
     fun updateEditedMetadata(edited: Book) {
         val current = synchronized(readRecordLock) {
             val current = book?.takeIf { it.bookUrl == edited.bookUrl } ?: return
@@ -948,11 +964,17 @@ object ReadBook : CoroutineScope by MainScope() {
             }
             val now = System.currentTimeMillis()
             val elapsed = (now - readStartTime).coerceAtLeast(0)
+            val readWords = readWordTracker.update(
+                durChapterIndex,
+                durChapterPos,
+                readWordChapterCache.snapshot(curTextChapter),
+            )
             readRecord.readTime += elapsed
+            readRecord.readWords += readWords
             readStartTime = now
             readRecord.lastRead = now
             readRecord.updateSnapshot(currentBook, durChapterIndex, durChapterPos)
-            readRecord.copy().prepareSaveWithCover(currentBook, elapsed)
+            readRecord.copy().prepareSaveWithCover(currentBook, elapsed, readWords)
         }
         executor.execute {
             saveRecord()
@@ -1141,6 +1163,7 @@ object ReadBook : CoroutineScope by MainScope() {
         if (BaseReadAloudService.isRun) {
             ReadAloud.detachReadAloudFollow()
         }
+        readWordTracker.markSeek()
         durChapterPos = curTextChapter?.getReadLength(index) ?: index
         callBack?.upContent {
             success?.invoke()
@@ -1193,6 +1216,7 @@ object ReadBook : CoroutineScope by MainScope() {
             ReadAloud.detachReadAloudFollow()
         }
         if (index < chapterSize) {
+            readWordTracker.markSeek()
             clearTextChapter()
             if (upContent) callBack?.upContent()
             durChapterIndex = index

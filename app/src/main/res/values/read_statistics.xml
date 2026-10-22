@@ -31,6 +31,13 @@
     <string name="read_statistics_days">已记录天数</string>
     <string name="read_statistics_books">读过的书</string>
     <string name="read_statistics_average">明细日均</string>
+    <string name="read_statistics_words">阅读字数</string>
+    <string name="read_statistics_speed">平均速度</string>
+    <string name="read_statistics_word_value">%1$d字</string>
+    <string name="read_statistics_speed_value">%1$d字/分</string>
+    <string name="read_statistics_no_words">暂无字数数据</string>
+    <string name="read_statistics_no_speed">暂无速度数据</string>
+    <string name="read_statistics_book_metrics">%1$s · %2$s</string>
     <string name="read_statistics_book_days">本书阅读日</string>
     <string name="read_statistics_day_count">%1$d天</string>
     <string name="read_statistics_book_count">%1$d本</string>

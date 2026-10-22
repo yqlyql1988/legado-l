@@ -14,6 +14,7 @@ import io.legado.app.data.entities.ReadStatisticsState
 import io.legado.app.data.entities.mergeRestoredReadRecord
 import io.legado.app.help.book.ReadDayDuration
 import io.legado.app.help.book.ReadHourDuration
+import io.legado.app.help.book.allocateReadWords
 import io.legado.app.help.book.isReadStatisticsDate
 import io.legado.app.help.book.mergeReadStatistics
 import io.legado.app.help.book.ReadRecordDeleteScope
@@ -39,7 +40,8 @@ interface ReadRecordDao {
             max(history.lastRead) as lastRead,
             case when history.author = '' then coalesce(history.resolvedAuthor, '') else history.author end as author,
             snapshot.lastChapterTitle, snapshot.lastChapterIndex,
-            snapshot.lastChapterPos, snapshot.coverUrl
+            snapshot.lastChapterPos, snapshot.coverUrl,
+            sum(history.readWords) as readWords
         from readRecord history
         join readRecord snapshot on snapshot.rowid = (select rowid from readRecord
                 where bookName = history.bookName and
@@ -62,7 +64,8 @@ interface ReadRecordDao {
             max(history.lastRead) as lastRead,
             case when history.author = '' then coalesce(history.resolvedAuthor, '') else history.author end as author,
             snapshot.lastChapterTitle, snapshot.lastChapterIndex,
-            snapshot.lastChapterPos, snapshot.coverUrl
+            snapshot.lastChapterPos, snapshot.coverUrl,
+            sum(history.readWords) as readWords
         from readRecord history
         join readRecord snapshot on snapshot.rowid = (select rowid from readRecord
                 where bookName = history.bookName and
@@ -186,6 +189,7 @@ interface ReadRecordDao {
             val merged = renamed.reduce { current, incoming ->
                 mergeRestoredReadRecord(current, incoming, localDevice = true).copy(
                     readTime = Math.addExact(current.readTime, incoming.readTime),
+                    readWords = Math.addExact(current.readWords, incoming.readWords),
                 )
             }
             insert(merged)
@@ -196,6 +200,8 @@ interface ReadRecordDao {
                 readTime = rows.fold(0L) { total, row -> Math.addExact(total, row.readTime) },
                 deletedTime = rows.fold(0L) { total, row -> Math.addExact(total, row.deletedTime) },
                 resetTime = rows.fold(0L) { total, row -> Math.addExact(total, row.resetTime) },
+                readWords = rows.fold(0L) { total, row -> Math.addExact(total, row.readWords) },
+                deletedWords = rows.fold(0L) { total, row -> Math.addExact(total, row.deletedWords) },
             ))
         }
         val resets = daily.groupBy { it.deviceId to it.date }
@@ -206,6 +212,8 @@ interface ReadRecordDao {
                 readTime = rows.fold(0L) { total, row -> Math.addExact(total, row.readTime) },
                 deletedTime = rows.fold(0L) { total, row -> Math.addExact(total, row.deletedTime) },
                 resetTime = resets[rows.first().deviceId to rows.first().date] ?: 0L,
+                readWords = rows.fold(0L) { total, row -> Math.addExact(total, row.readWords) },
+                deletedWords = rows.fold(0L) { total, row -> Math.addExact(total, row.deletedWords) },
             ))
         }
         histories.groupBy { it.deviceId }.values.forEach { rows ->
@@ -255,7 +263,7 @@ interface ReadRecordDao {
     @Query(
         """select daily.bookName,
             case when history.author = '' then coalesce(history.resolvedAuthor, '') else history.author end as author,
-            daily.date, sum(daily.readTime) as readTime
+            daily.date, sum(daily.readTime) as readTime, sum(daily.readWords) as readWords
         from readRecordDaily daily join readRecord history
             on daily.deviceId = history.deviceId and daily.bookName = history.bookName and daily.author = history.author
         where daily.readTime > 0
@@ -287,7 +295,7 @@ interface ReadRecordDao {
 
     @Query("""select hourly.bookName,
         case when history.author = '' then coalesce(history.resolvedAuthor, '') else history.author end as author,
-        hourly.date, hourly.hour, sum(hourly.readTime) as readTime
+        hourly.date, hourly.hour, sum(hourly.readTime) as readTime, sum(hourly.readWords) as readWords
         from readRecordHourly hourly join readRecord history
         on hourly.deviceId = history.deviceId and hourly.bookName = history.bookName and hourly.author = history.author
         where hourly.readTime > 0
@@ -317,14 +325,18 @@ interface ReadRecordDao {
     fun deleteHourly(deviceId: String, bookName: String, author: String)
 
     @Transaction
-    fun addHourly(record: ReadRecord, intervals: List<ReadHourDuration>) {
-        intervals.forEach { interval ->
+    fun addHourly(record: ReadRecord, intervals: List<ReadHourDuration>, readWords: Long = 0L) {
+        val wordShares = allocateReadWords(readWords, intervals.map { it.duration })
+        intervals.forEachIndexed { index, interval ->
             val reset = getDailyCounter(record.deviceId, record.bookName, record.author, interval.date)?.resetTime ?: 0L
             val existing = getHourlyCounter(record.deviceId, record.bookName, record.author, interval.date, interval.hour)
                 ?.takeIf { it.resetTime == reset }
                 ?: ReadRecordHourly(record.deviceId, record.bookName, record.author, interval.date,
                     interval.hour, resetTime = reset)
-            insertHourly(existing.copy(readTime = Math.addExact(existing.readTime, interval.duration)))
+            insertHourly(existing.copy(
+                readTime = Math.addExact(existing.readTime, interval.duration),
+                readWords = Math.addExact(existing.readWords, wordShares[index]),
+            ))
         }
     }
 
@@ -341,12 +353,21 @@ interface ReadRecordDao {
     fun insertStatisticsState(state: ReadStatisticsState)
 
     @Transaction
-    fun addDaily(record: ReadRecord, intervals: List<ReadDayDuration>, intervalEnd: Long = record.lastRead) {
+    fun addDaily(
+        record: ReadRecord,
+        intervals: List<ReadDayDuration>,
+        intervalEnd: Long = record.lastRead,
+        readWords: Long = 0L,
+    ) {
         if (intervals.isEmpty()) return
-        intervals.forEach { interval ->
+        val wordShares = allocateReadWords(readWords, intervals.map { it.duration })
+        intervals.forEachIndexed { index, interval ->
             val existing = getDailyCounter(record.deviceId, record.bookName, record.author, interval.date)
                 ?: ReadRecordDaily(record.deviceId, record.bookName, record.author, interval.date)
-            insertDaily(existing.copy(readTime = Math.addExact(existing.readTime, interval.duration)))
+            insertDaily(existing.copy(
+                readTime = Math.addExact(existing.readTime, interval.duration),
+                readWords = Math.addExact(existing.readWords, wordShares[index]),
+            ))
         }
         ensureStatisticsState(ReadStatisticsState(
             record.deviceId, (intervalEnd - intervals.sumOf { it.duration }).coerceAtLeast(0),
@@ -365,7 +386,9 @@ interface ReadRecordDao {
         val incomingHourly = hourly.orEmpty().map {
             if (it.deviceId.isBlank()) it.copy(deviceId = localDeviceId) else it
         }.filter { it.readTime >= 0 && it.deletedTime >= 0 && it.resetTime >= 0 &&
-            (it.readTime > 0 || it.deletedTime > 0 || it.resetTime > 0) &&
+            it.readWords >= 0 && it.deletedWords >= 0 &&
+            (it.readTime > 0 || it.deletedTime > 0 || it.resetTime > 0 ||
+                it.readWords > 0 || it.deletedWords > 0) &&
             it.hour in 0..23 && isReadStatisticsDate(it.date) }
             .groupBy { Triple(it.deviceId, it.bookName, it.author) }
         val incomingHistory = history.orEmpty().map {
@@ -374,7 +397,9 @@ interface ReadRecordDao {
         val incomingDaily = daily?.map {
             if (it.deviceId.isBlank()) it.copy(deviceId = localDeviceId) else it
         }?.filter { it.readTime >= 0 && it.deletedTime >= it.resetTime && it.resetTime >= 0 &&
-            (it.readTime > 0 || it.deletedTime > 0) && isReadStatisticsDate(it.date) }
+            it.readWords >= 0 && it.deletedWords >= 0 &&
+            (it.readTime > 0 || it.deletedTime > 0 || it.readWords > 0 || it.deletedWords > 0) &&
+            isReadStatisticsDate(it.date) }
             ?.groupBy { Triple(it.deviceId, it.bookName, it.author) }
         records.forEach { incoming ->
             val current = getRecord(incoming.deviceId, incoming.bookName, incoming.author)

@@ -26,6 +26,7 @@ internal data class ReadRecordDeletion(
     val daily: List<ReadRecordDaily>,
     val hourly: List<ReadRecordHourly>,
     val removed: Long,
+    val removedWords: Long,
 )
 
 /** Only net dated time is removed. Undated history and reading-position snapshots stay intact. */
@@ -37,6 +38,7 @@ internal fun deleteReadRecordPeriod(
 ): ReadRecordDeletion {
     require(scope.range != ReadRecordTimeRange.ALL)
     var removed = 0L
+    var removedWords = 0L
     val changedHours = hourly.associateBy { it.date to it.hour }.toMutableMap()
     val hoursByDay = hourly.groupBy { it.date }
     val days = daily.map { day ->
@@ -47,21 +49,48 @@ internal fun deleteReadRecordPeriod(
             check(target.readTime in 0..day.readTime)
             if (target.readTime == 0L) return@map day
             changedHours[day.date to target.hour] = target.copy(
-                readTime = 0, deletedTime = Math.addExact(target.deletedTime, target.readTime))
+                readTime = 0,
+                deletedTime = Math.addExact(target.deletedTime, target.readTime),
+                readWords = 0,
+                deletedWords = Math.addExact(target.deletedWords, target.readWords),
+            )
             removed = Math.addExact(removed, target.readTime)
+            removedWords = Math.addExact(removedWords, target.readWords)
             day.copy(readTime = day.readTime - target.readTime,
-                deletedTime = Math.addExact(day.deletedTime, target.readTime))
+                deletedTime = Math.addExact(day.deletedTime, target.readTime),
+                readWords = (day.readWords - target.readWords).coerceAtLeast(0L),
+                deletedWords = Math.addExact(day.deletedWords, target.readWords))
         } else {
-            if (day.readTime == 0L) return@map day
+            if (day.readTime == 0L && day.readWords == 0L) return@map day
             val reset = Math.addExact(day.deletedTime, day.readTime)
+            val resetWords = Math.addExact(day.deletedWords, day.readWords)
             hours.forEach { old ->
-                changedHours[old.date to old.hour] = old.copy(readTime = 0, deletedTime = 0, resetTime = reset)
+                changedHours[old.date to old.hour] = old.copy(
+                    readTime = 0,
+                    deletedTime = 0,
+                    resetTime = reset,
+                    readWords = 0,
+                    deletedWords = 0,
+                )
             }
             removed = Math.addExact(removed, day.readTime)
-            day.copy(readTime = 0, deletedTime = reset, resetTime = reset)
+            removedWords = Math.addExact(removedWords, day.readWords)
+            day.copy(
+                readTime = 0,
+                deletedTime = reset,
+                resetTime = reset,
+                readWords = 0,
+                deletedWords = resetWords,
+            )
         }
     }
     check(removed in 0..record.readTime)
-    return ReadRecordDeletion(record.copy(readTime = record.readTime - removed),
-        days, changedHours.values.toList(), removed)
+    check(removedWords in 0..record.readWords)
+    return ReadRecordDeletion(
+        record.copy(
+            readTime = record.readTime - removed,
+            readWords = record.readWords - removedWords,
+        ),
+        days, changedHours.values.toList(), removed, removedWords,
+    )
 }

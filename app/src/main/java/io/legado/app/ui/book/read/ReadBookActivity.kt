@@ -486,7 +486,6 @@ class ReadBookActivity : BaseReadBookActivity(),
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
     override fun onResume() {
         super.onResume()
-        ReadBook.readStartTime = System.currentTimeMillis()
         if (bookChanged) {
             bookChanged = false
             ReadBook.callBack = this
@@ -512,6 +511,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                 ReadBook.syncProgress({ progress -> sureNewProgress(progress) })
             }
         }
+        ReadBook.startReadSession()
     }
 
     override fun onPostResume() {
@@ -536,6 +536,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         autoPageStop()
         backupJob?.cancel()
         binding.readView.updateScrollReadPosition()
+        ReadBook.upReadTime()
         ReadBook.saveRead()
         ReadBook.cancelPreDownloadTask()
         unregisterReceiver(timeBatteryReceiver)
