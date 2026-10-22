@@ -38,7 +38,8 @@
 
     <style name="ReadStatisticsMetricValue">
         <item name="android:layout_width">0dp</item>
-        <item name="android:layout_height">match_parent</item>
+        <!-- wrap_content: a match_parent row collapses to the 1dp spacer in the word/speed row. -->
+        <item name="android:layout_height">wrap_content</item>
         <item name="android:gravity">top|start</item>
         <item name="android:textColor">@color/secondaryText</item>
         <item name="android:textSize">13sp</item>

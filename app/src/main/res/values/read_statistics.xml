@@ -38,6 +38,7 @@
     <string name="read_statistics_no_words">暂无字数数据</string>
     <string name="read_statistics_no_speed">暂无速度数据</string>
     <string name="read_statistics_book_metrics">%1$s · %2$s</string>
+    <string name="read_statistics_book_metrics_speed">%1$s · %2$s · %3$s</string>
     <string name="read_statistics_book_days">本书阅读日</string>
     <string name="read_statistics_day_count">%1$d天</string>
     <string name="read_statistics_book_count">%1$d本</string>

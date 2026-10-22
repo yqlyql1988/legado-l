@@ -22,7 +22,7 @@ static def releaseTime() {
 
 def name = "legado"
 def version = "3." + releaseTime()
-def versionCodeValue = 30000
+def versionCodeValue = 30002
 // Preserve the published code at this point, then ignore GitHub wrapper merge commits.
 def versionCodeBaseCommit = '9639f027fbc8cfdf57ce136a9e0c98829a235aef'
 def versionCodeAtBase = 37540

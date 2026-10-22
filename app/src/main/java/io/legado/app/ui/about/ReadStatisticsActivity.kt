@@ -46,6 +46,7 @@ import io.legado.app.help.book.ReadStatisticsPeriod
 import io.legado.app.help.book.ReadStatisticsSnapshot
 import io.legado.app.help.book.ReadStatisticsSummary
 import io.legado.app.help.book.ReadHourlySummary
+import io.legado.app.help.book.readWordsSpeed
 import io.legado.app.help.book.visibleReadStatisticsBooks
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
@@ -92,6 +93,7 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
     private var hourBooksExpanded = false
     private var selectedHour = -1
     private var hourly = ReadHourlySummary(emptyList(), 0, 0)
+    private var bookSpeeds: Map<Pair<String, String>, Long> = emptyMap()
     private var selectedDay: String? = null
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
@@ -508,6 +510,7 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         val qualifiedOnly = qualifiedOnly()
         val summary = if (qualifiedOnly) snapshot.summary(period, year, month, minimum, day) else all
         val visibleBooks = summary.books
+        bookSpeeds = summary.bookSpeeds
         header.statisticsScope.background = rounded(
             ColorUtils.blendColors(backgroundColor, accentColor, .04f),
         ).apply { cornerRadius = 10.dpToPx().toFloat() }
@@ -698,7 +701,8 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
                 })
             } else selected.books.forEachIndexed { rank, record ->
                 val row = ItemReadStatisticsBinding.inflate(layoutInflater, hourBooks, false)
-                bindBook(row, record, rank, selected.books.first().readTime)
+                bindBook(row, record, rank, selected.books.first().readTime,
+                    readWordsSpeed(record.readWords, record.readTime))
                 row.root.setOnClickListener { openRecordedBook(record) }
                 hourBooks.addView(row.root)
             }
@@ -823,7 +827,8 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
             })
         } else books.forEachIndexed { index, record ->
             val row = ItemReadStatisticsBinding.inflate(layoutInflater, header.dayBooks, false)
-            bindBook(row, record, index, books.first().readTime)
+            bindBook(row, record, index, books.first().readTime,
+                readWordsSpeed(record.readWords, record.readTime))
             row.root.setOnClickListener { openRecordedBook(record) }
             header.dayBooks.addView(row.root)
         }
@@ -835,11 +840,22 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         if (selected) setStroke(2.dpToPx(), accentColor) else setStroke(2.dpToPx(), Color.TRANSPARENT)
     }
 
-    private fun bindBook(row: ItemReadStatisticsBinding, item: ReadRecordShow, index: Int, maximum: Long) {
+    private fun bindBook(
+        row: ItemReadStatisticsBinding,
+        item: ReadRecordShow,
+        index: Int,
+        maximum: Long,
+        bookSpeed: Long = 0L,
+    ) {
         row.tvRank.text = (index + 1).toString()
         row.tvBookName.text = item.bookName
         row.tvAuthor.text = item.displayAuthor.ifBlank { getString(R.string.read_record_no_author) }
-        val metrics = getString(R.string.read_statistics_book_metrics, duration(item.readTime), wordCount(item.readWords))
+        val metrics = if (bookSpeed > 0L) {
+            getString(R.string.read_statistics_book_metrics_speed,
+                duration(item.readTime), wordCount(item.readWords), speed(bookSpeed))
+        } else {
+            getString(R.string.read_statistics_book_metrics, duration(item.readTime), wordCount(item.readWords))
+        }
         row.tvReadingTime.text = metrics
         row.tvReadingTime.contentDescription = metrics
         row.progress.progress = (1000.0 * item.readTime / maximum.coerceAtLeast(1)).toInt()
@@ -852,7 +868,8 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         override fun getViewBinding(parent: ViewGroup) = ItemReadStatisticsBinding.inflate(inflater, parent, false)
 
         override fun convert(holder: ItemViewHolder, binding: ItemReadStatisticsBinding, item: ReadRecordShow, payloads: MutableList<Any>) {
-            bindBook(binding, item, holder.layoutPosition - getHeaderCount(), getItem(0)?.readTime ?: 1)
+            bindBook(binding, item, holder.layoutPosition - getHeaderCount(),
+                getItem(0)?.readTime ?: 1, bookSpeeds[item.bookName to item.author] ?: 0L)
         }
 
         override fun registerListener(holder: ItemViewHolder, binding: ItemReadStatisticsBinding) {
