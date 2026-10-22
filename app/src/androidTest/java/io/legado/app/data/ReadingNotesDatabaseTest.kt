@@ -109,6 +109,33 @@ class ReadingNotesDatabaseTest {
         assertTrue(appDb.readingNoteDao.locationsForNote("highlight", highlight.time).isEmpty())
     }
 
+    @Test fun manualRelocationCanAdoptCurrentQuoteWithoutDroppingMetadata() =
+        withNotes { a, _, highlight, bookmark ->
+            val highlightLocation = ReadingNotes.legacy(highlight).copy(
+                chapterPos = 99, chapterPosEnd = 107, quote = "Current highlight",
+                updatedAt = 30
+            )
+            assertTrue(ReadingNotes.saveLocation(
+                highlightLocation, a.name, a.author, adoptQuote = true
+            ))
+            val savedHighlight = appDb.bookHighlightDao.getByBook(a.bookUrl).single()
+            assertEquals("Current highlight", savedHighlight.bookText)
+            assertEquals(highlight.note, savedHighlight.note)
+            assertEquals(highlight.style, savedHighlight.style)
+
+            val bookmarkLocation = ReadingNotes.legacy(bookmark, a.bookUrl).copy(
+                chapterPos = 101, chapterPosEnd = 112, quote = "Current bookmark",
+                updatedAt = 31
+            )
+            assertTrue(ReadingNotes.saveLocation(
+                bookmarkLocation, a.name, a.author, adoptQuote = true
+            ))
+            val savedBookmark = appDb.bookmarkDao.getByBook(a.name, a.author)
+                .single { it.time == bookmark.time }
+            assertEquals("Current bookmark", savedBookmark.bookText)
+            assertEquals(bookmark.content, savedBookmark.content)
+        }
+
     @Test fun staleHighlightCanFollowUniqueSameNameAndAuthorSource() = withNotes { a, b, highlight, _ ->
         appDb.bookDao.insert(b)
         try {

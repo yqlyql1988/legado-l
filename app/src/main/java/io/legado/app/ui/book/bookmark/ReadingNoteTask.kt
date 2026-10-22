@@ -24,6 +24,7 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 internal enum class ReadingNoteTaskReason {
+    PENDING,
     BOOK_UNAVAILABLE,
     LOCAL_FILE_UNAVAILABLE,
     TOC_UNAVAILABLE,
@@ -58,6 +59,7 @@ internal object ReadingNoteTaskScanner {
     suspend fun scan(
         archives: List<NoteBook>,
         onlyIds: Set<String>? = null,
+        verify: Boolean = true,
     ): List<ReadingNoteTask> = withContext(IO) {
         val rows = archives.flatMap { archive ->
             archive.notes.filter { onlyIds == null || "${archive.bookUrl}:${it.id}" in onlyIds }
@@ -83,6 +85,14 @@ internal object ReadingNoteTaskScanner {
             val chapters = archive.book?.let { chaptersByBook[it.bookUrl] }.orEmpty()
             val chapter = ReadingNoteChapter.candidate(source, chapters)
             CandidateRow(archive, note, legacy, source, chapter)
+        }
+
+        if (!verify) {
+            return@withContext candidates.mapNotNull { row ->
+                pendingTask(row, row.archive.book?.let {
+                    chaptersByBook[it.bookUrl]
+                }.orEmpty())
+            }
         }
 
         val chapterKeys = candidates.mapNotNull { row ->
@@ -199,6 +209,45 @@ internal object ReadingNoteTaskScanner {
                 reason = reason, candidateCount = contextMatches.size
             )
         }
+    }
+
+    private fun pendingTask(row: CandidateRow, chapters: List<BookChapter>): ReadingNoteTask? {
+        val book = row.archive.book
+        if (book == null) {
+            return ReadingNoteTask(row.archive, row.note, row.source,
+                reason = ReadingNoteTaskReason.BOOK_UNAVAILABLE)
+        }
+        if (book.isLocal && !localFileAvailable(book)) {
+            return ReadingNoteTask(row.archive, row.note, row.source,
+                reason = ReadingNoteTaskReason.LOCAL_FILE_UNAVAILABLE)
+        }
+        if (chapters.isEmpty()) {
+            return ReadingNoteTask(row.archive, row.note, row.source,
+                reason = ReadingNoteTaskReason.TOC_UNAVAILABLE)
+        }
+        val chapter = row.chapter ?: return ReadingNoteTask(
+            row.archive, row.note, row.source,
+            reason = if (ReadingNoteChapter.candidateState(row.source, chapters) ==
+                ReadingNoteChapter.CandidateState.AMBIGUOUS
+            ) ReadingNoteTaskReason.CHAPTER_AMBIGUOUS
+            else ReadingNoteTaskReason.CHAPTER_NOT_FOUND
+        )
+        if (row.source.updatedAt > 0 && row.source.verified) {
+            if (!row.source.quote.isBlank() && ReadingNoteDiff.meaningfulChange(
+                    ReadingNotes.anchorQuote(row.legacy), row.source.quote
+                )
+            ) {
+                return ReadingNoteTask(
+                    row.archive, row.note, row.source, chapter, row.source,
+                    ReadingNoteTaskReason.CHANGED
+                )
+            }
+            return null
+        }
+        return ReadingNoteTask(
+            row.archive, row.note, row.source, chapter = chapter,
+            reason = ReadingNoteTaskReason.PENDING
+        )
     }
 
     private suspend fun chapterBody(book: Book, chapter: BookChapter): String? {

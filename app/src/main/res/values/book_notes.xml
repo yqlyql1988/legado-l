@@ -44,7 +44,11 @@
     <string name="reading_note_task_retry">批量重试</string>
     <string name="reading_note_task_manual">连续手动定位</string>
     <string name="reading_note_task_skip">跳过本次</string>
+    <string name="reading_note_task_pending">待检查</string>
     <string name="reading_note_task_changed">原文有变化，但已找到唯一位置</string>
+    <string name="reading_note_task_accept">采用当前正文</string>
+    <string name="reading_note_task_accepted">已采用当前正文，备注、标签和样式已保留</string>
+    <string name="reading_note_task_accept_failed">保存当前正文失败，请重试</string>
     <string name="reading_note_task_book_unavailable">原书记录不可用</string>
     <string name="reading_note_task_local_file_unavailable">本地文件不可用</string>
     <string name="reading_note_task_toc_unavailable">目录无法获取</string>

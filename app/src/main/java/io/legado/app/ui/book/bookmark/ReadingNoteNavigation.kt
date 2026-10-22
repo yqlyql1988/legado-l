@@ -6,6 +6,7 @@ import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.ReadingNoteLocation
 import io.legado.app.help.ReadingNoteChapter
 import io.legado.app.utils.startActivityForBook
 import kotlinx.coroutines.Dispatchers.IO
@@ -20,6 +21,9 @@ object ReadingNoteNavigation {
         val kind: String,
         val time: Long,
         val chapterIndex: Int = -1,
+        val chapterUrl: String = "",
+        val chapterName: String = "",
+        val chapterPos: Int = 0,
     )
 
     private val relocationQueue = ArrayList<QueueItem>()
@@ -59,15 +63,24 @@ object ReadingNoteNavigation {
                 clearQueue()
                 return@launch
             }
-            val chapter = chapters.firstOrNull { it.index == item.chapterIndex }
+            val location = ReadingNoteLocation(
+                kind = item.kind,
+                noteTime = item.time,
+                bookUrl = book.bookUrl,
+                chapterUrl = item.chapterUrl,
+                chapterIndex = item.chapterIndex,
+                chapterName = item.chapterName,
+                chapterPos = item.chapterPos,
+            )
+            val chapter = ReadingNoteChapter.candidate(location, chapters)
             if (chapter != null) {
-                launchReader(activity, book, chapter.index, item)
+                launchReader(activity, book, chapter, item)
             } else if (chapters.isEmpty()) {
-                launchReader(activity, book, 0, item)
+                launchReader(activity, book, null, item)
             } else {
                 AlertDialog.Builder(activity).setTitle(R.string.reading_note_choose_chapter)
                     .setItems(chapters.map { it.title }.toTypedArray()) { _, position ->
-                        launchReader(activity, book, chapters[position].index, item)
+                        launchReader(activity, book, chapters[position], item)
                     }.setNegativeButton(R.string.cancel) { _, _ -> clearQueue() }
                     .setOnCancelListener { clearQueue() }
                     .show()
@@ -107,12 +120,16 @@ object ReadingNoteNavigation {
     private fun launchReader(
         activity: FragmentActivity,
         book: Book,
-        chapterIndex: Int,
+        chapter: io.legado.app.data.entities.BookChapter?,
         item: QueueItem,
     ) {
         activity.startActivityForBook(book) {
-            putExtra("index", chapterIndex)
-            putExtra("chapterPos", 0)
+            putExtra("index", chapter?.index ?: item.chapterIndex.coerceAtLeast(0))
+            val sameChapter = chapter != null && (
+                item.chapterUrl.isBlank() ||
+                    ReadingNoteChapter.sameUrl(item.chapterUrl, chapter.url)
+                )
+            putExtra("chapterPos", if (sameChapter) item.chapterPos.coerceAtLeast(0) else 0)
             putExtra(EXTRA_KIND, item.kind)
             putExtra(EXTRA_TIME, item.time)
         }

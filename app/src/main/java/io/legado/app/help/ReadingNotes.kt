@@ -94,7 +94,12 @@ object ReadingNotes {
     }
 
     /** A late layout job cannot recreate a deleted note or replace a newer manual position. */
-    fun saveLocation(location: ReadingNoteLocation, bookName: String, author: String): Boolean =
+    fun saveLocation(
+        location: ReadingNoteLocation,
+        bookName: String,
+        author: String,
+        adoptQuote: Boolean = false,
+    ): Boolean =
         appDb.runInTransaction(Callable {
             val highlight = if (location.kind == HIGHLIGHT) {
                 appDb.bookHighlightDao.getByBook(location.bookUrl)
@@ -133,9 +138,21 @@ object ReadingNotes {
             if (location.kind == HIGHLIGHT) {
                 if (highlight == null) return@Callable false
                 if (highlight.bookUrl == location.bookUrl) {
-                    appDb.bookHighlightDao.updateLocation(location.noteTime, location.bookUrl,
-                        location.chapterUrl, location.chapterIndex, location.chapterName,
-                        location.chapterPos, location.chapterPosEnd, location.layoutTitleLength)
+                    if (adoptQuote) {
+                        appDb.bookHighlightDao.update(highlight.copy(
+                            chapterUrl = location.chapterUrl,
+                            chapterIndex = location.chapterIndex,
+                            chapterName = location.chapterName,
+                            chapterPos = location.chapterPos,
+                            chapterPosEnd = location.chapterPosEnd,
+                            layoutTitleLength = location.layoutTitleLength,
+                            bookText = location.quote,
+                        ))
+                    } else {
+                        appDb.bookHighlightDao.updateLocation(location.noteTime, location.bookUrl,
+                            location.chapterUrl, location.chapterIndex, location.chapterName,
+                            location.chapterPos, location.chapterPosEnd, location.layoutTitleLength)
+                    }
                 } else {
                     appDb.bookHighlightDao.update(highlight.copy(
                         bookUrl = location.bookUrl,
@@ -147,13 +164,52 @@ object ReadingNotes {
                         chapterPos = location.chapterPos,
                         chapterPosEnd = location.chapterPosEnd,
                         layoutTitleLength = location.layoutTitleLength,
+                        bookText = if (adoptQuote) location.quote else highlight.bookText,
                     ))
                     moveHighlightTagOrders(highlight.bookUrl, location.bookUrl, location.noteTime)
                 }
             } else {
-                appDb.bookmarkDao.updateLocation(location.noteTime,
-                    bookmark?.bookName ?: bookName, bookmark?.bookAuthor ?: author,
-                    location.chapterIndex, location.chapterPos, location.chapterName)
+                if (bookmark == null) return@Callable false
+                if (adoptQuote) {
+                    appDb.bookmarkDao.update(bookmark.copy(
+                        chapterIndex = location.chapterIndex,
+                        chapterPos = location.chapterPos,
+                        chapterName = location.chapterName,
+                        bookText = location.quote,
+                    ))
+                } else {
+                    appDb.bookmarkDao.updateLocation(location.noteTime,
+                        bookmark.bookName.ifBlank { bookName },
+                        bookmark.bookAuthor.ifBlank { author },
+                        location.chapterIndex, location.chapterPos, location.chapterName)
+                }
+            }
+            true
+        })
+
+    /** Accept a uniquely resolved current excerpt while keeping note metadata unchanged. */
+    fun adoptCurrentQuote(location: ReadingNoteLocation, bookName: String, author: String): Boolean =
+        appDb.runInTransaction(Callable {
+            if (location.quote.isBlank()) return@Callable false
+            when (location.kind) {
+                HIGHLIGHT -> {
+                    val highlight = appDb.bookHighlightDao.getByBook(location.bookUrl)
+                        .firstOrNull { it.time == location.noteTime }
+                        ?: appDb.bookHighlightDao.all.firstOrNull {
+                            it.time == location.noteTime &&
+                                it.bookName == bookName && it.bookAuthor == author
+                        }
+                    if (highlight == null) return@Callable false
+                    appDb.bookHighlightDao.update(highlight.copy(bookText = location.quote))
+                }
+                BOOKMARK -> {
+                    val bookmark = appDb.bookmarkDao.getByBook(bookName, author)
+                        .firstOrNull { it.time == location.noteTime }
+                        ?: appDb.bookmarkDao.all.firstOrNull { it.time == location.noteTime }
+                    if (bookmark == null) return@Callable false
+                    appDb.bookmarkDao.update(bookmark.copy(bookText = location.quote))
+                }
+                else -> return@Callable false
             }
             true
         })
