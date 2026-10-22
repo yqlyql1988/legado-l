@@ -179,8 +179,28 @@ class ReadStatisticsTest {
 
         assertEquals(600L, summary.words)
         assertEquals(600L, summary.datedWords)
+        assertEquals(600_000L, summary.wordDuration)
         assertEquals(60L, summary.speed)
         assertEquals(600L, snapshot.booksForDay("2026-10-17").single().readWords)
+    }
+
+    @Test fun wordlessLegacyDaysDoNotDiluteSpeed() {
+        val snapshot = ReadStatisticsSnapshot(
+            listOf(ReadRecordShow("Book", 7_200_000, 100, "A", readWords = 600)),
+            listOf(
+                ReadRecordDailyShow("Book", "A", "2025-01-01", 6_600_000, 0),
+                ReadRecordDailyShow("Book", "A", "2026-10-17", 600_000, 600),
+            ),
+            1,
+        )
+
+        val summary = snapshot.summary(ReadStatisticsPeriod.ALL, 2026, 10)
+
+        assertEquals(7_200_000L, summary.datedDuration)
+        assertEquals(600L, summary.datedWords)
+        assertEquals(600_000L, summary.wordDuration)
+        assertEquals(60L, summary.speed)
+        assertEquals(60L, summary.bookSpeeds["Book" to "A"])
     }
 
     @Test fun sameTitleDifferentAuthorsRemainSeparateInPeriodRanking() {

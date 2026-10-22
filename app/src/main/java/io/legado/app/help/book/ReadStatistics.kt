@@ -232,11 +232,15 @@ data class ReadStatisticsSummary(
     val books: List<ReadRecordShow>,
     val words: Long = 0L,
     val datedWords: Long = 0L,
+    /** Time on days that carry word counters; legacy wordless days must not dilute speed. */
+    val wordDuration: Long = 0L,
+    /** Per-book speed for the selected period, keyed by book identity. */
+    val bookSpeeds: Map<Pair<String, String>, Long> = emptyMap(),
 ) {
     val average: Long get() = if (days.isEmpty()) 0L else datedDuration / days.size
     val historyWords: Long get() = (words - datedWords).coerceAtLeast(0L)
-    /** Old records may have time without word details; speed uses the dated portion. */
-    val speed: Long get() = readWordsSpeed(datedWords, datedDuration)
+    /** Speed divides by word-bearing time only; pre-update days carry time but no words. */
+    val speed: Long get() = readWordsSpeed(datedWords, wordDuration)
 }
 
 internal fun readWordsSpeed(words: Long, duration: Long): Long {
@@ -303,12 +307,21 @@ data class ReadStatisticsSnapshot(
             else selected
         val dated = details.sumOf { it.readTime }
         val datedWords = details.sumOf { it.readWords }
+        // Days recorded before word counters existed carry time only; exclude them
+        // from the speed denominator instead of letting them drag the average down.
+        val wordDuration = details.filter { it.readWords > 0 }.sumOf { it.readTime }
+        val bookSpeeds = details.groupBy { it.bookName to it.author }.mapValues { (_, rows) ->
+            readWordsSpeed(
+                rows.sumOf { it.readWords },
+                rows.filter { it.readWords > 0 }.sumOf { it.readTime },
+            )
+        }
         val duration = if (period == ReadStatisticsPeriod.ALL) books.sumOf { it.readTime } else dated
         val words = if (period == ReadStatisticsPeriod.ALL) books.sumOf { it.readWords } else datedWords
         return ReadStatisticsSummary(
             duration, dated, (duration - dated).coerceAtLeast(0),
             details.groupBy { it.date }.mapValues { (_, rows) -> rows.sumOf { it.readTime } },
-            books, words, datedWords,
+            books, words, datedWords, wordDuration, bookSpeeds,
         )
     }
 
