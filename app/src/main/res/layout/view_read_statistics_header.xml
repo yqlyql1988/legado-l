@@ -6,34 +6,48 @@
     android:orientation="vertical"
     android:padding="16dp">
 
-    <com.google.android.material.tabs.TabLayout
+    <LinearLayout
         android:id="@+id/period_tabs"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:background="@android:color/transparent"
-        app:tabBackground="@android:color/transparent"
-        app:tabGravity="fill"
-        app:tabIndicatorColor="?attr/colorAccent"
-        app:tabIndicatorFullWidth="false"
-        app:tabIndicatorHeight="2dp"
-        app:tabMode="fixed"
-        app:tabRippleColor="@android:color/transparent"
-        app:tabSelectedTextColor="?attr/colorAccent"
-        app:tabTextAppearance="@style/ReadStatisticsTabText"
-        app:tabTextColor="@color/secondaryText">
+        android:layout_height="44dp"
+        android:layout_marginTop="4dp"
+        android:orientation="horizontal">
 
-        <com.google.android.material.tabs.TabItem
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/tab_all"
+            style="@style/ReadStatisticsTabButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="4dp"
+            android:layout_weight="1"
             android:text="@string/read_statistics_all" />
 
-        <com.google.android.material.tabs.TabItem
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/tab_year"
+            style="@style/ReadStatisticsTabButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="4dp"
+            android:layout_weight="1"
             android:text="@string/read_statistics_year" />
 
-        <com.google.android.material.tabs.TabItem
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/tab_month"
+            style="@style/ReadStatisticsTabButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="4dp"
+            android:layout_weight="1"
             android:text="@string/read_statistics_month" />
 
-        <com.google.android.material.tabs.TabItem
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/tab_day"
+            style="@style/ReadStatisticsTabButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
             android:text="@string/read_statistics_day" />
-    </com.google.android.material.tabs.TabLayout>
+    </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -141,9 +155,9 @@
                 android:layout_marginTop="10dp"
                 android:maxLines="2"
                 android:textColor="@color/primaryText"
-                android:textSize="32sp"
-                app:autoSizeMaxTextSize="32sp"
-                app:autoSizeMinTextSize="26sp"
+                android:textSize="38sp"
+                app:autoSizeMaxTextSize="38sp"
+                app:autoSizeMinTextSize="28sp"
                 app:autoSizeStepGranularity="1sp"
                 app:autoSizeTextType="uniform" />
 

@@ -11,7 +11,6 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.google.android.material.tabs.TabLayout
 import io.legado.app.R
 import io.legado.app.constant.BookType
 import io.legado.app.data.appDb
@@ -124,14 +123,13 @@ class ReadStatisticsUiTest {
         ActivityScenario.launch<ReadStatisticsActivity>(Intent(context, ReadStatisticsActivity::class.java)).use { scenario ->
             await(scenario) { it.findViewById<TextView>(R.id.tv_duration)?.text?.isNotEmpty() == true }
             scenario.onActivity { activity ->
-                val tabs = activity.findViewById<TabLayout>(R.id.period_tabs)
-                assertEquals(ReadStatisticsPeriod.DAY.ordinal, tabs.selectedTabPosition)
+                assertTrue(activity.findViewById<View>(R.id.tab_day).isSelected)
                 assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.hour_details).visibility)
-                tabs.getTabAt(ReadStatisticsPeriod.ALL.ordinal)?.select()
+                activity.findViewById<View>(R.id.tab_all).performClick()
                 assertTrue(activity.findViewById<TextView>(R.id.tv_history).visibility == View.VISIBLE)
-                tabs.getTabAt(ReadStatisticsPeriod.YEAR.ordinal)?.select()
+                activity.findViewById<View>(R.id.tab_year).performClick()
                 assertTrue(activity.findViewById<TextView>(R.id.tv_period).text.contains(today.year.toString()))
-                tabs.getTabAt(ReadStatisticsPeriod.MONTH.ordinal)?.select()
+                activity.findViewById<View>(R.id.tab_month).performClick()
                 activity.findViewById<View>(R.id.graph_trend).performClick()
                 val grid = activity.findViewById<GridLayout>(R.id.calendar_grid)
                 val day = (0 until grid.childCount).map { grid.getChildAt(it) }.first {
