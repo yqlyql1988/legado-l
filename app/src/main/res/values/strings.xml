@@ -1854,6 +1854,9 @@
     <string name="my_more_items">Move selected items to More</string>
     <string name="reading_note_task_scanning_progress">正在检查 %1$d/%2$d 章</string>
     <string name="reading_note_manual_hint_quote">请选中当前正文，再点击“书签”或“标注”采用新位置。待定位原文：%1$s</string>
+    <string name="reading_note_manual_bar_quote">待定位原文：%1$s</string>
+    <string name="reading_note_find_in_book">在本书查找</string>
+    <string name="reading_note_find_empty">没有可搜索的原文，请直接选中正文</string>
     <string name="reading_note_position_missing">原文已修改或有多处匹配，已打开章节。可长按书签或标注，选择“手动定位”。</string>
     <string name="reading_note_relocate">手动定位</string>
     <string name="reading_note_choose_chapter">选择原文所在章节</string>

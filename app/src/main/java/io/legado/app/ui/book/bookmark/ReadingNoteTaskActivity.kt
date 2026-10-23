@@ -425,7 +425,8 @@ class ReadingNoteTaskActivity : BaseActivity<ActivityReadingNoteTaskBinding>() {
             chapterUrl = resolved?.chapterUrl ?: chapter?.url.orEmpty(),
             chapterName = chapter?.title ?: location.chapterName,
             chapterPos = resolved?.chapterPos ?: location.chapterPos.takeIf { sameChapter } ?: 0,
-            quote = task.beforeQuote,
+            layoutTitleLength = location.layoutTitleLength,
+            quote = ReadingNotes.anchorQuote(location),
         )
     }
 

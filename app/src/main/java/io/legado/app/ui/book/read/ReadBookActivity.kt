@@ -18,7 +18,6 @@ import android.view.View
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
-import com.google.android.material.snackbar.Snackbar
 import androidx.appcompat.view.menu.MenuItemImpl
 import androidx.core.view.doOnLayout
 import androidx.core.view.get
@@ -135,6 +134,7 @@ import io.legado.app.ui.replace.edit.ReplaceEditActivity
 import io.legado.app.ui.widget.PopupAction
 import io.legado.app.ui.widget.dialog.PhotoDialog
 import io.legado.app.ui.widget.popupActionMenu
+import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.ACache
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.Debounce
@@ -356,7 +356,6 @@ class ReadBookActivity : BaseReadBookActivity(),
     private var relocatingNoteKind: String? = null
     private var relocatingNoteTime: Long = -1
     private var relocatingNoteText: String = ""
-    private var relocationHint: Snackbar? = null
     private var syncDialog: AlertDialog? = null
 
     @Suppress("DEPRECATION")
@@ -384,6 +383,13 @@ class ReadBookActivity : BaseReadBookActivity(),
             ?: intent.getLongExtra(ReadingNoteNavigation.EXTRA_TIME, -1)
         relocatingNoteText = savedInstanceState?.getString("relocatingNoteText")
             ?: intent.getStringExtra(ReadingNoteNavigation.EXTRA_TEXT).orEmpty()
+        binding.relocationBar.root.applyNavigationBarPadding()
+        binding.relocationBar.btnRelocationFind.setOnClickListener {
+            val word = relocationSearchWord()
+            if (word.isBlank()) toastOnUi(R.string.reading_note_find_empty)
+            else openSearchActivity(word)
+        }
+        binding.relocationBar.btnRelocationCancel.setOnClickListener { clearNoteRelocation() }
         showRelocationHint()
         viewModel.pendingSourceReimport.observe(this) { showPendingSourceReimport() }
         viewModel.resourceRefreshing.observe(this) { loading ->
@@ -517,9 +523,6 @@ class ReadBookActivity : BaseReadBookActivity(),
             }
         }
         ReadBook.startReadSession()
-        if (relocatingNoteKind != null && relocationHint?.isShown != true) {
-            showRelocationHint()
-        }
     }
 
     override fun onPostResume() {
@@ -1400,16 +1403,33 @@ class ReadBookActivity : BaseReadBookActivity(),
      * 文本选择菜单操作
      */
     private fun showRelocationHint() {
-        relocationHint?.dismiss()
-        if (relocatingNoteKind == null || relocatingNoteTime < 0) return
+        if (relocatingNoteKind == null || relocatingNoteTime < 0) {
+            binding.relocationBar.root.isVisible = false
+            return
+        }
         val quote = relocatingNoteText.trim()
-        val message = if (quote.isBlank()) {
+        binding.relocationBar.tvRelocationQuote.text = if (quote.isBlank()) {
             getString(R.string.reading_note_manual_hint)
         } else {
-            getString(R.string.reading_note_manual_hint_quote, quotePreview(quote))
+            getString(R.string.reading_note_manual_bar_quote, quotePreview(quote))
         }
-        relocationHint = Snackbar.make(binding.root, message, Snackbar.LENGTH_INDEFINITE)
-            .setAction(R.string.cancel) { clearNoteRelocation() }.also { it.show() }
+        val background = bottomBackground
+        val textColor = getPrimaryTextColor(ColorUtils.isColorLight(background))
+        binding.relocationBar.root.setBackgroundColor(background)
+        binding.relocationBar.tvRelocationQuote.setTextColor(textColor)
+        binding.relocationBar.btnRelocationFind.setTextColor(accentColor)
+        binding.relocationBar.btnRelocationCancel.setTextColor(textColor)
+        binding.relocationBar.btnRelocationFind.isVisible = quote.isNotBlank()
+        binding.relocationBar.root.isVisible = true
+    }
+
+    private fun relocationSearchWord(): String {
+        val text = relocatingNoteText.trim()
+        if (text.isBlank()) return ""
+        val longest = text.split(Regex("[^\\p{L}\\p{N}]+"))
+            .maxByOrNull { it.length }.orEmpty()
+        return if (longest.length >= 4) longest.take(20)
+        else text.filterNot(Char::isWhitespace).take(20)
     }
 
     private fun quotePreview(text: String, limit: Int = 60): String {
@@ -1431,8 +1451,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         intent.removeExtra(ReadingNoteNavigation.EXTRA_KIND)
         intent.removeExtra(ReadingNoteNavigation.EXTRA_TIME)
         intent.removeExtra(ReadingNoteNavigation.EXTRA_TEXT)
-        relocationHint?.dismiss()
-        relocationHint = null
+        binding.relocationBar.root.isVisible = false
     }
 
     private fun completeNoteRelocation(chapterIndex: Int, start: Int, end: Int, quote: String): Boolean {
@@ -3074,7 +3093,6 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     override fun onDestroy() {
-        relocationHint?.dismiss()
         super.onDestroy()
         aloudControls.dispose()
         tts?.clearTts()
