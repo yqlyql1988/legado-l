@@ -30,7 +30,6 @@ import androidx.core.widget.doAfterTextChanged
 import androidx.core.view.ViewCompat
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.tabs.TabLayout
 import io.legado.app.R
 import io.legado.app.base.BaseActivity
 import io.legado.app.base.adapter.ItemViewHolder
@@ -120,17 +119,10 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         adapter.addHeaderView { header }
         binding.recyclerView.adapter = adapter
         binding.recyclerView.applyNavigationBarPadding()
-        header.periodTabs.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
-            override fun onTabSelected(tab: TabLayout.Tab) {
-                ReadStatisticsPeriod.entries.getOrNull(tab.position)
-                    ?.takeIf { it != period }
-                    ?.let { selectPeriod(it) }
-            }
-
-            override fun onTabUnselected(tab: TabLayout.Tab) = Unit
-
-            override fun onTabReselected(tab: TabLayout.Tab) = Unit
-        })
+        header.tabAll.setOnClickListener { selectPeriod(ReadStatisticsPeriod.ALL) }
+        header.tabYear.setOnClickListener { selectPeriod(ReadStatisticsPeriod.YEAR) }
+        header.tabMonth.setOnClickListener { selectPeriod(ReadStatisticsPeriod.MONTH) }
+        header.tabDay.setOnClickListener { selectPeriod(ReadStatisticsPeriod.DAY) }
         header.graphTrend.setOnClickListener { showHours = false; render() }
         header.graphHours.setOnClickListener { showHours = true; render() }
         header.hourInterval.setOnClickListener { showIntervalPicker() }
@@ -146,6 +138,10 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         header.scopeAll.setOnClickListener { selectScope(false) }
         header.scopeQualified.setOnClickListener { selectScope(true) }
         header.summaryDivider.setBackgroundColor(ColorUtils.blendColors(backgroundColor, contentSecondary, .16f))
+        // 卡片表面与强调色全部由主题背景色混合得到，切换主题、背景图和日夜时自动跟随
+        val cardSurface = ColorUtils.blendColors(backgroundColor, contentPrimary, .045f)
+        header.summaryCard.setCardBackgroundColor(cardSurface)
+        header.trendCard.setCardBackgroundColor(cardSurface)
     }
 
     override fun onResume() {
@@ -535,9 +531,18 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
             )
             button.setTextColor(if (selected) accentColor else contentSecondary)
         }
-        if (header.periodTabs.selectedTabPosition != period.ordinal) {
-            header.periodTabs.getTabAt(period.ordinal)?.select()
-        }
+        listOf(header.tabAll, header.tabYear, header.tabMonth, header.tabDay)
+            .forEachIndexed { index, button ->
+                val selected = index == period.ordinal
+                button.isSelected = selected
+                button.backgroundTintList = null
+                button.background = rounded(
+                    if (selected) ColorUtils.blendColors(backgroundColor, accentColor, .12f)
+                    else Color.TRANSPARENT,
+                    radius = 10,
+                )
+                button.setTextColor(if (selected) accentColor else contentSecondary)
+            }
         val today = LocalDate.now()
         val first = earliestDate()
         with(header) {
