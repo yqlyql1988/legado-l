@@ -137,11 +137,13 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         header.tvPeriod.setOnClickListener { showPeriodPicker() }
         header.scopeAll.setOnClickListener { selectScope(false) }
         header.scopeQualified.setOnClickListener { selectScope(true) }
-        header.summaryDivider.setBackgroundColor(ColorUtils.blendColors(backgroundColor, contentSecondary, .16f))
         // 卡片表面与强调色全部由主题背景色混合得到，切换主题、背景图和日夜时自动跟随
         val cardSurface = ColorUtils.blendColors(backgroundColor, contentPrimary, .045f)
         header.summaryCard.setCardBackgroundColor(cardSurface)
         header.trendCard.setCardBackgroundColor(cardSurface)
+        val groupSurface = ColorUtils.blendColors(backgroundColor, contentPrimary, .035f)
+        header.summaryGroupPrimary.background = rounded(groupSurface, radius = 14)
+        header.summaryGroupSecondary.background = rounded(groupSurface, radius = 14)
         val controlSurface = ColorUtils.blendColors(backgroundColor, contentPrimary, .05f)
         header.periodTabs.background = rounded(controlSurface, radius = 13)
         header.dateNav.background = rounded(controlSurface, radius = 13)
