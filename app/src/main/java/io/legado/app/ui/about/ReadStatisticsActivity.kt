@@ -142,6 +142,9 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         val cardSurface = ColorUtils.blendColors(backgroundColor, contentPrimary, .045f)
         header.summaryCard.setCardBackgroundColor(cardSurface)
         header.trendCard.setCardBackgroundColor(cardSurface)
+        val controlSurface = ColorUtils.blendColors(backgroundColor, contentPrimary, .05f)
+        header.periodTabs.background = rounded(controlSurface, radius = 13)
+        header.dateNav.background = rounded(controlSurface, radius = 13)
     }
 
     override fun onResume() {
@@ -537,9 +540,9 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
                 button.isSelected = selected
                 button.backgroundTintList = null
                 button.background = rounded(
-                    if (selected) ColorUtils.blendColors(backgroundColor, accentColor, .12f)
+                    if (selected) ColorUtils.blendColors(backgroundColor, accentColor, .22f)
                     else Color.TRANSPARENT,
-                    radius = 10,
+                    radius = 11,
                 )
                 button.setTextColor(if (selected) accentColor else contentSecondary)
             }
