@@ -10,6 +10,7 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.ReadingNoteLocation
 import io.legado.app.help.ReadingNoteChapter
 import io.legado.app.help.ReadingNotes
+import io.legado.app.ui.book.toc.TocActivityResult
 import io.legado.app.utils.startActivityForBook
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.launch
@@ -28,6 +29,7 @@ object ReadingNoteNavigation {
         val chapterUrl: String = "",
         val chapterName: String = "",
         val chapterPos: Int = 0,
+        val layoutTitleLength: Int = -1,
         val quote: String = "",
     )
 
@@ -147,7 +149,8 @@ object ReadingNoteNavigation {
         chapterUrl = chapter?.url ?: location.chapterUrl,
         chapterName = chapter?.title ?: location.chapterName,
         chapterPos = chapter?.let { location.chapterPos.coerceAtLeast(0) } ?: 0,
-        quote = location.quote,
+        layoutTitleLength = location.layoutTitleLength,
+        quote = ReadingNotes.anchorQuote(location),
     )
 
     private fun launchReader(
@@ -165,7 +168,15 @@ object ReadingNoteNavigation {
             putExtra("chapterPos", if (sameChapter) item.chapterPos.coerceAtLeast(0) else 0)
             putExtra(EXTRA_KIND, item.kind)
             putExtra(EXTRA_TIME, item.time)
-            if (item.quote.isNotBlank()) putExtra(EXTRA_TEXT, item.quote)
+            if (item.quote.isNotBlank()) {
+                putExtra(EXTRA_TEXT, item.quote)
+                putExtra(
+                    TocActivityResult.EXTRA_HIGHLIGHT_LAYOUT_TITLE_LENGTH,
+                    item.layoutTitleLength,
+                )
+                putExtra(TocActivityResult.EXTRA_HIGHLIGHT_ANCHOR_TEXT, item.quote)
+                putExtra(TocActivityResult.EXTRA_READING_NOTE_KEY, "${item.kind}:${item.time}")
+            }
         }
     }
 }

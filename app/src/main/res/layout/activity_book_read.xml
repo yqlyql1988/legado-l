@@ -37,6 +37,13 @@
         android:src="@drawable/ic_cursor_right"
         android:visibility="invisible" />
 
+    <include
+        android:id="@+id/relocation_bar"
+        layout="@layout/view_reading_note_relocation"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom" />
+
     <io.legado.app.ui.book.read.ReadMenu
         android:id="@+id/read_menu"
         android:layout_width="match_parent"
