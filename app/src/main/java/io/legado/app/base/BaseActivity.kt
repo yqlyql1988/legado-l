@@ -256,6 +256,9 @@ abstract class BaseActivity<VB : ViewBinding>(
             setLightStatusBar(false)
         } else if (toolBarTheme == Theme.Light) {
             setLightStatusBar(true)
+        } else if (isTransparentStatusBar) {
+            // 透明状态栏盖在标题栏上，图标深浅应按标题栏主色判断
+            setLightStatusBar(ColorUtils.isColorLight(ThemeStore.primaryColor(this)))
         }
         upNavigationBarColor()
     }

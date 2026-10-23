@@ -17,13 +17,13 @@
     </style>
 
     <style name="ReadStatisticsScopeButton" parent="Widget.AppCompat.Button.Borderless">
-        <item name="android:minWidth">48dp</item>
-        <item name="android:minHeight">40dp</item>
+        <item name="android:minWidth">40dp</item>
+        <item name="android:minHeight">36dp</item>
         <item name="android:paddingStart">8dp</item>
         <item name="android:paddingEnd">8dp</item>
-        <item name="android:paddingTop">6dp</item>
-        <item name="android:paddingBottom">6dp</item>
-        <item name="android:textSize">13sp</item>
+        <item name="android:paddingTop">4dp</item>
+        <item name="android:paddingBottom">4dp</item>
+        <item name="android:textSize">12sp</item>
         <item name="android:textAllCaps">false</item>
         <item name="android:singleLine">true</item>
         <item name="android:gravity">center</item>
@@ -38,14 +38,30 @@
 
     <style name="ReadStatisticsMetricValue">
         <item name="android:layout_width">0dp</item>
-        <!-- wrap_content: a match_parent row collapses to the 1dp spacer in the word/speed row. -->
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:gravity">top|start</item>
+        <item name="android:textColor">@color/primaryText</item>
+        <item name="android:textSize">18sp</item>
+    </style>
+
+    <style name="ReadStatisticsMetricLabel">
+        <item name="android:layout_width">0dp</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:gravity">top|start</item>
         <item name="android:textColor">@color/secondaryText</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:importantForAccessibility">no</item>
+    </style>
+
+    <style name="ReadStatisticsDetailValue">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">@color/primaryText</item>
         <item name="android:textSize">13sp</item>
     </style>
 
-    <style name="ReadStatisticsMetricLabel" parent="ReadStatisticsMetricValue">
-        <item name="android:importantForAccessibility">no</item>
+    <style name="ReadStatisticsTabText" parent="TextAppearance.AppCompat.Body1">
+        <item name="android:textSize">14sp</item>
+        <item name="android:textAllCaps">false</item>
     </style>
 </resources>

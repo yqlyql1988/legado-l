@@ -5,422 +5,555 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:padding="16dp">
+
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/period_tabs"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@android:color/transparent"
+        app:tabBackground="@android:color/transparent"
+        app:tabGravity="fill"
+        app:tabIndicatorColor="?attr/colorAccent"
+        app:tabIndicatorFullWidth="false"
+        app:tabIndicatorHeight="2dp"
+        app:tabMode="fixed"
+        app:tabRippleColor="@android:color/transparent"
+        app:tabSelectedTextColor="?attr/colorAccent"
+        app:tabTextAppearance="@style/ReadStatisticsTabText"
+        app:tabTextColor="@color/secondaryText">
+
+        <com.google.android.material.tabs.TabItem
+            android:text="@string/read_statistics_all" />
+
+        <com.google.android.material.tabs.TabItem
+            android:text="@string/read_statistics_year" />
+
+        <com.google.android.material.tabs.TabItem
+            android:text="@string/read_statistics_month" />
+
+        <com.google.android.material.tabs.TabItem
+            android:text="@string/read_statistics_day" />
+    </com.google.android.material.tabs.TabLayout>
+
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/tab_all"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:minWidth="0dp"
-            android:text="@string/read_statistics_all"
-            android:textAllCaps="false" />
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/tab_year"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:minWidth="0dp"
-            android:text="@string/read_statistics_year"
-            android:textAllCaps="false" />
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/tab_month"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:minWidth="0dp"
-            android:text="@string/read_statistics_month"
-            android:textAllCaps="false" />
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/tab_day"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:minWidth="0dp"
-            android:text="@string/read_statistics_day"
-            android:textAllCaps="false" />
-    </LinearLayout>
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_height="48dp"
         android:gravity="center"
         android:orientation="horizontal">
-        <androidx.appcompat.widget.AppCompatButton
+
+        <androidx.appcompat.widget.AppCompatImageButton
             android:id="@+id/previous_period"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:minWidth="0dp"
-            android:padding="0dp"
-            android:text="‹"
-            android:textSize="26sp"
-            android:contentDescription="@string/read_statistics_previous_year" />
-        <FrameLayout
-            android:layout_width="0dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/read_statistics_previous_year"
+            android:rotation="180"
+            android:scaleType="centerInside"
+            app:srcCompat="@drawable/ic_arrow_right"
+            app:tint="@color/read_statistics_nav_tint" />
+
+        <TextView
+            android:id="@+id/tv_period"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1">
-            <TextView
-                android:id="@+id/tv_period"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:minHeight="48dp"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:background="?attr/selectableItemBackground"
-                android:drawablePadding="4dp"
-                android:gravity="center"
-                android:textColor="@color/primaryText"
-                android:textSize="17sp" />
-        </FrameLayout>
-        <androidx.appcompat.widget.AppCompatButton
+            android:background="?attr/selectableItemBackground"
+            android:drawablePadding="4dp"
+            android:gravity="center"
+            android:minHeight="44dp"
+            android:minWidth="120dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:textColor="@color/primaryText"
+            android:textSize="16sp" />
+
+        <androidx.appcompat.widget.AppCompatImageButton
             android:id="@+id/next_period"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:minWidth="0dp"
-            android:padding="0dp"
-            android:text="›"
-            android:textSize="26sp"
-            android:contentDescription="@string/read_statistics_next_year" />
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/read_statistics_next_year"
+            android:scaleType="centerInside"
+            app:srcCompat="@drawable/ic_arrow_right"
+            app:tint="@color/read_statistics_nav_tint" />
     </LinearLayout>
-    <LinearLayout
-        android:id="@+id/summary"
+
+    <androidx.cardview.widget.CardView
+        android:id="@+id/summary_card"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:orientation="vertical"
-        android:paddingStart="18dp"
-        android:paddingEnd="18dp"
-        android:paddingTop="12dp"
-        android:paddingBottom="20dp">
+        app:cardBackgroundColor="@color/background_card"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="2dp">
+
         <LinearLayout
-            android:id="@+id/summary_title"
+            android:id="@+id/summary"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-            <TextView
-                android:id="@+id/tv_duration_label"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="8dp"
-                android:text="@string/read_statistics_duration"
-                android:textColor="@color/secondaryText"
-                android:textSize="13sp" />
+            android:orientation="vertical"
+            android:padding="16dp">
+
             <LinearLayout
-                android:id="@+id/statistics_scope"
-                android:layout_width="wrap_content"
+                android:id="@+id/summary_title"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:padding="2dp"
+                android:gravity="center_vertical"
                 android:orientation="horizontal">
-                <androidx.appcompat.widget.AppCompatButton
-                    android:id="@+id/scope_all"
-                    style="@style/ReadStatisticsScopeButton"
+
+                <TextView
+                    android:id="@+id/tv_duration_label"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/read_statistics_duration"
+                    android:textColor="@color/primaryText"
+                    android:textSize="16sp" />
+
+                <LinearLayout
+                    android:id="@+id/statistics_scope"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/read_statistics_scope_all"
-                    android:contentDescription="@string/read_statistics_scope_all_description" />
-                <androidx.appcompat.widget.AppCompatButton
-                    android:id="@+id/scope_qualified"
-                    style="@style/ReadStatisticsScopeButton"
+                    android:orientation="horizontal"
+                    android:padding="2dp">
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/scope_all"
+                        style="@style/ReadStatisticsScopeButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:contentDescription="@string/read_statistics_scope_all_description"
+                        android:text="@string/read_statistics_scope_all" />
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/scope_qualified"
+                        style="@style/ReadStatisticsScopeButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:contentDescription="@string/read_statistics_scope_qualified_description"
+                        android:text="@string/read_statistics_scope_qualified" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tv_duration"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:maxLines="2"
+                android:textColor="@color/primaryText"
+                android:textSize="32sp"
+                app:autoSizeMaxTextSize="32sp"
+                app:autoSizeMinTextSize="26sp"
+                app:autoSizeStepGranularity="1sp"
+                app:autoSizeTextType="uniform" />
+
+            <TextView
+                android:id="@+id/tv_duration_hint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:textColor="@color/secondaryText"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <View
+                android:id="@+id/summary_divider"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="14dp"
+                android:importantForAccessibility="no" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:baselineAligned="false"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/tv_days_label"
+                        style="@style/ReadStatisticsMetricLabel"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/read_statistics_days" />
+
+                    <TextView
+                        android:id="@+id/tv_days"
+                        style="@style/ReadStatisticsMetricValue"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="34dp"
+                    android:layout_gravity="center_vertical"
+                    android:layout_marginStart="12dp"
+                    android:layout_marginEnd="12dp"
+                    android:alpha="0.18"
+                    android:background="@color/secondaryText"
+                    android:importantForAccessibility="no" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/tv_books_label"
+                        style="@style/ReadStatisticsMetricLabel"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/read_statistics_books" />
+
+                    <TextView
+                        android:id="@+id/tv_books"
+                        style="@style/ReadStatisticsMetricValue"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="34dp"
+                    android:layout_gravity="center_vertical"
+                    android:layout_marginStart="12dp"
+                    android:layout_marginEnd="12dp"
+                    android:alpha="0.18"
+                    android:background="@color/secondaryText"
+                    android:importantForAccessibility="no" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/tv_average_label"
+                        style="@style/ReadStatisticsMetricLabel"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/read_statistics_average" />
+
+                    <TextView
+                        android:id="@+id/tv_average"
+                        style="@style/ReadStatisticsMetricValue"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/detail_row"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/tv_words_label"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/read_statistics_scope_qualified"
-                    android:contentDescription="@string/read_statistics_scope_qualified_description" />
+                    android:text="@string/read_statistics_words"
+                    android:textColor="@color/secondaryText"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/tv_words"
+                    style="@style/ReadStatisticsDetailValue"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_marginEnd="8dp"
+                    android:text="·"
+                    android:textColor="@color/secondaryText"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/tv_speed_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/read_statistics_speed"
+                    android:textColor="@color/secondaryText"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/tv_speed"
+                    style="@style/ReadStatisticsDetailValue"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp" />
             </LinearLayout>
         </LinearLayout>
-        <TextView
-            android:id="@+id/tv_duration"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:layout_marginBottom="20dp"
-            android:textColor="@color/primaryText"
-            android:maxLines="2"
-            android:textSize="32sp"
-            app:autoSizeTextType="uniform"
-            app:autoSizeMinTextSize="26sp"
-            app:autoSizeMaxTextSize="32sp"
-            app:autoSizeStepGranularity="1sp" />
-        <View
-            android:id="@+id/summary_divider"
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:importantForAccessibility="no" />
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:baselineAligned="false"
-            android:orientation="horizontal">
-            <TextView
-                android:id="@+id/tv_days"
-                style="@style/ReadStatisticsMetricValue"
-                android:layout_weight="1.2"
-                android:layout_marginEnd="4dp" />
-            <TextView
-                android:id="@+id/tv_books"
-                style="@style/ReadStatisticsMetricValue"
-                android:layout_weight="1"
-                android:layout_marginEnd="4dp" />
-            <TextView
-                android:id="@+id/tv_average"
-                style="@style/ReadStatisticsMetricValue"
-                android:layout_weight="1.2" />
-        </LinearLayout>
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:baselineAligned="false"
-            android:orientation="horizontal">
-            <TextView
-                android:id="@+id/tv_days_label"
-                style="@style/ReadStatisticsMetricLabel"
-                android:layout_weight="1.2"
-                android:layout_marginEnd="4dp"
-                android:text="@string/read_statistics_days" />
-            <TextView
-                android:id="@+id/tv_books_label"
-                style="@style/ReadStatisticsMetricLabel"
-                android:layout_weight="1"
-                android:layout_marginEnd="4dp"
-                android:text="@string/read_statistics_books" />
-            <TextView
-                android:id="@+id/tv_average_label"
-                style="@style/ReadStatisticsMetricLabel"
-                android:layout_weight="1.2"
-                android:text="@string/read_statistics_average" />
-        </LinearLayout>
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:baselineAligned="false"
-            android:orientation="horizontal">
-            <TextView
-                android:id="@+id/tv_words"
-                style="@style/ReadStatisticsMetricValue"
-                android:layout_weight="1"
-                android:layout_marginEnd="4dp" />
-            <TextView
-                android:id="@+id/tv_speed"
-                style="@style/ReadStatisticsMetricValue"
-                android:layout_weight="1"
-                android:layout_marginEnd="4dp" />
-            <View
-                android:layout_width="0dp"
-                android:layout_height="1dp"
-                android:layout_weight="1" />
-        </LinearLayout>
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:baselineAligned="false"
-            android:orientation="horizontal">
-            <TextView
-                android:id="@+id/tv_words_label"
-                style="@style/ReadStatisticsMetricLabel"
-                android:layout_weight="1"
-                android:layout_marginEnd="4dp"
-                android:text="@string/read_statistics_words" />
-            <TextView
-                android:id="@+id/tv_speed_label"
-                style="@style/ReadStatisticsMetricLabel"
-                android:layout_weight="1"
-                android:layout_marginEnd="4dp"
-                android:text="@string/read_statistics_speed" />
-            <View
-                android:layout_width="0dp"
-                android:layout_height="1dp"
-                android:layout_weight="1" />
-        </LinearLayout>
-    </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
     <TextView
         android:id="@+id/tv_history"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="8dp"
         android:textColor="@color/secondaryText"
         android:textSize="13sp" />
-    <LinearLayout
-        android:id="@+id/trend_panel"
+
+    <androidx.cardview.widget.CardView
+        android:id="@+id/trend_card"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
-        android:orientation="vertical"
-        android:padding="16dp">
+        android:layout_marginTop="12dp"
+        app:cardBackgroundColor="@color/background_card"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="2dp">
+
         <LinearLayout
-            android:id="@+id/graph_tabs"
+            android:id="@+id/trend_panel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            android:orientation="horizontal">
-            <androidx.appcompat.widget.AppCompatButton
-                android:id="@+id/graph_trend"
-                style="@style/ReadStatisticsScopeButton"
-                android:layout_width="0dp"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <LinearLayout
+                android:id="@+id/graph_tabs"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/read_statistics_calendar" />
-            <androidx.appcompat.widget.AppCompatButton
-                android:id="@+id/graph_hours"
-                style="@style/ReadStatisticsScopeButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/read_statistics_hourly" />
-        </LinearLayout>
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-            <TextView
-                android:id="@+id/tv_trend_title"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:textColor="@color/primaryText"
-                android:textSize="16sp" />
-            <androidx.appcompat.widget.AppCompatButton
-                android:id="@+id/hour_interval"
-                style="@style/ReadStatisticsScopeButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/read_statistics_one_hour" />
-        </LinearLayout>
-        <io.legado.app.ui.about.ReadStatisticsChartView
-            android:id="@+id/chart"
-            android:layout_width="match_parent"
-            android:layout_height="210dp"
-            android:layout_marginTop="16dp" />
-        <TextView
-            android:id="@+id/tv_peak"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="@color/secondaryText"
-            android:textSize="12sp" />
-        <LinearLayout
-            android:id="@+id/hour_details"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:orientation="vertical">
+                android:layout_marginBottom="8dp"
+                android:orientation="horizontal">
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/graph_trend"
+                    style="@style/ReadStatisticsScopeButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/read_statistics_calendar" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/graph_hours"
+                    style="@style/ReadStatisticsScopeButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/read_statistics_hourly" />
+            </LinearLayout>
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
-                <androidx.appcompat.widget.AppCompatButton
-                    android:id="@+id/previous_hour"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:minWidth="0dp"
-                    android:padding="0dp"
-                    android:text="‹"
-                    android:textSize="24sp"
-                    android:contentDescription="@string/read_statistics_previous_hour" />
+
                 <TextView
-                    android:id="@+id/tv_selected_hour"
+                    android:id="@+id/tv_trend_title"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:gravity="center"
                     android:textColor="@color/primaryText"
-                    android:textSize="13sp"
-                    android:accessibilityLiveRegion="polite" />
+                    android:textSize="16sp" />
+
                 <androidx.appcompat.widget.AppCompatButton
-                    android:id="@+id/next_hour"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:minWidth="0dp"
-                    android:padding="0dp"
-                    android:text="›"
-                    android:textSize="24sp"
-                    android:contentDescription="@string/read_statistics_next_hour" />
+                    android:id="@+id/hour_interval"
+                    style="@style/ReadStatisticsScopeButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/read_statistics_one_hour" />
             </LinearLayout>
-            <androidx.appcompat.widget.AppCompatButton
-                android:id="@+id/toggle_hour_books"
-                style="@style/ReadStatisticsScopeButton"
+
+            <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="start|center_vertical"
-                android:minHeight="48dp"
-                android:text="@string/read_statistics_expand_hour_books" />
-            <LinearLayout
-                android:id="@+id/hour_books"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:visibility="gone" />
-        </LinearLayout>
-        <LinearLayout
-            android:id="@+id/calendar_panel"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:orientation="vertical"
-            android:visibility="gone">
-            <GridLayout
-                android:id="@+id/calendar_grid"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:columnCount="7" />
+                android:layout_height="wrap_content">
+
+                <io.legado.app.ui.about.ReadStatisticsChartView
+                    android:id="@+id/chart"
+                    android:layout_width="match_parent"
+                    android:layout_height="210dp"
+                    android:layout_marginTop="12dp" />
+
+                <LinearLayout
+                    android:id="@+id/chart_empty"
+                    android:layout_width="match_parent"
+                    android:layout_height="210dp"
+                    android:layout_marginTop="12dp"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/tv_chart_empty"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/read_statistics_chart_empty"
+                        android:textColor="@color/secondaryText"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/tv_chart_empty_hint"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:gravity="center"
+                        android:text="@string/read_statistics_chart_empty_hint"
+                        android:textColor="@color/secondaryText"
+                        android:textSize="11sp" />
+                </LinearLayout>
+            </FrameLayout>
+
             <TextView
+                android:id="@+id/tv_peak"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/secondaryText"
+                android:textSize="12sp" />
+
+            <LinearLayout
+                android:id="@+id/hour_details"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <androidx.appcompat.widget.AppCompatImageButton
+                        android:id="@+id/previous_hour"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/read_statistics_previous_hour"
+                        android:rotation="180"
+                        android:scaleType="centerInside"
+                        app:srcCompat="@drawable/ic_arrow_right"
+                        app:tint="@color/read_statistics_nav_tint" />
+
+                    <TextView
+                        android:id="@+id/tv_selected_hour"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:accessibilityLiveRegion="polite"
+                        android:gravity="center"
+                        android:textColor="@color/primaryText"
+                        android:textSize="13sp" />
+
+                    <androidx.appcompat.widget.AppCompatImageButton
+                        android:id="@+id/next_hour"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/read_statistics_next_hour"
+                        android:scaleType="centerInside"
+                        app:srcCompat="@drawable/ic_arrow_right"
+                        app:tint="@color/read_statistics_nav_tint" />
+                </LinearLayout>
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/toggle_hour_books"
+                    style="@style/ReadStatisticsScopeButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="start|center_vertical"
+                    android:minHeight="44dp"
+                    android:text="@string/read_statistics_expand_hour_books" />
+
+                <LinearLayout
+                    android:id="@+id/hour_books"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/calendar_panel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                android:text="@string/read_statistics_calendar_legend"
-                android:textColor="@color/secondaryText"
-                android:textSize="11sp" />
-            <LinearLayout
-                android:id="@+id/day_rank_header"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-                <TextView
-                    android:id="@+id/tv_selected_day"
-                    android:layout_width="0dp"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <GridLayout
+                    android:id="@+id/calendar_grid"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="8dp"
-                    android:textColor="@color/primaryText"
-                    android:textSize="14sp" />
+                    android:columnCount="7" />
+
                 <TextView
-                    android:id="@+id/tv_day_rank_scope"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/read_statistics_calendar_legend"
                     android:textColor="@color/secondaryText"
-                    android:textSize="12sp" />
+                    android:textSize="11sp" />
+
+                <LinearLayout
+                    android:id="@+id/day_rank_header"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tv_selected_day"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1"
+                        android:textColor="@color/primaryText"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/tv_day_rank_scope"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/secondaryText"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/day_books"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
             </LinearLayout>
-            <LinearLayout
-                android:id="@+id/day_books"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical" />
         </LinearLayout>
-    </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
+        android:layout_marginTop="20dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
+
         <TextView
             android:id="@+id/tv_rank_title"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
             android:layout_marginEnd="8dp"
+            android:layout_weight="1"
             android:textColor="@color/primaryText"
             android:textSize="16sp" />
+
         <TextView
             android:id="@+id/tv_rank_scope"
             android:layout_width="wrap_content"
@@ -428,18 +561,20 @@
             android:textColor="@color/secondaryText"
             android:textSize="12sp" />
     </LinearLayout>
+
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="5dp"
+        android:layout_marginTop="4dp"
         android:text="@string/read_statistics_rank_hint"
         android:textColor="@color/secondaryText"
         android:textSize="12sp" />
+
     <TextView
         android:id="@+id/tv_empty"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
+        android:layout_marginTop="16dp"
         android:text="@string/read_statistics_empty"
         android:textColor="@color/secondaryText"
         android:textSize="14sp"
