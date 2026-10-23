@@ -68,4 +68,69 @@ class ReadingNoteChapterTest {
         assertEquals(expected, ReadingNoteChapter.candidate(source, listOf(
             expected, BookChapter(url = "two", title = "第2章 番外", index = 2))))
     }
+
+    @Test fun `chapter index keeps stable platform identity`() {
+        val original = ReadingNoteLocation(
+            chapterUrl = vip("token=old&novelId=42&chapterId=28"),
+            chapterName = "旧章名", chapterIndex = 27,
+        )
+        val changed = BookChapter(
+            url = vip("novelId=42&chapterId=28"), title = "新章名", index = 32,
+        )
+        val index = ReadingNoteChapter.index(listOf(changed))
+        assertEquals(changed, index.candidate(original))
+        assertEquals(ReadingNoteChapter.CandidateState.FOUND, index.candidateState(original))
+    }
+
+    @Test fun `chapter index resolves the same candidates as the list lookup`() {
+        val chapters = listOf(
+            BookChapter(url = "u1", title = "第一章 开端", index = 0),
+            BookChapter(url = "u2", title = "第二章 发展", index = 1),
+            BookChapter(url = "u3", title = "番外", index = 2),
+            BookChapter(url = "u4", title = "番外", index = 3),
+            BookChapter(url = "u5", title = "第5章 结局", index = 4),
+            BookChapter(url = "u6", title = "第五章 另一个结局", index = 5),
+            BookChapter(url = "volume", title = "第一卷", index = 6, isVolume = true),
+        )
+        val index = ReadingNoteChapter.index(chapters)
+        val locations = listOf(
+            ReadingNoteLocation(chapterUrl = "u2"),
+            ReadingNoteLocation(chapterUrl = "u3"),
+            ReadingNoteLocation(chapterUrl = "missing"),
+            ReadingNoteLocation(chapterName = "番外"),
+            ReadingNoteLocation(chapterName = "第2章 任意"),
+            ReadingNoteLocation(chapterName = "第五章"),
+            ReadingNoteLocation(chapterName = "第一卷"),
+            ReadingNoteLocation(chapterName = "不存在", chapterIndex = 3),
+            ReadingNoteLocation(chapterName = "不存在", chapterIndex = 99),
+            ReadingNoteLocation(),
+        )
+        locations.forEach { location ->
+            assertEquals(
+                ReadingNoteChapter.candidate(location, chapters),
+                index.candidate(location),
+            )
+            assertEquals(
+                ReadingNoteChapter.candidateState(location, chapters),
+                index.candidateState(location),
+            )
+        }
+    }
+
+    @Test fun `chapter index keeps volumes and repeated urls out of candidates`() {
+        val repeated = BookChapter(url = "same", title = "重复地址", index = 0)
+        val chapters = listOf(
+            repeated,
+            BookChapter(url = "same", title = "重复地址续", index = 1),
+            BookChapter(url = "volume", title = "第二卷", index = 2, isVolume = true),
+        )
+        val index = ReadingNoteChapter.index(chapters)
+        val location = ReadingNoteLocation(chapterUrl = "same")
+        assertEquals(ReadingNoteChapter.CandidateState.AMBIGUOUS, index.candidateState(location))
+        assertNull(index.candidate(location))
+        assertEquals(
+            ReadingNoteChapter.CandidateState.NOT_FOUND,
+            index.candidateState(ReadingNoteLocation(chapterName = "第二卷", chapterIndex = 2)),
+        )
+    }
 }

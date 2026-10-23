@@ -229,7 +229,7 @@ class HighlightFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_highlig
             val chapterIndex = target?.chapterIndex
             if (chapterIndex == null || chapterIndex < 0) {
                 activity?.let {
-                    ReadingNoteNavigation.unavailable(it, book, "highlight", highlight.time)
+                    ReadingNoteNavigation.unavailable(it, book, ReadingNotes.legacy(highlight))
                 }
                 return@launch
             }
@@ -260,7 +260,7 @@ class HighlightFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_highlig
             if (position == 0) showDialogFragment(HighlightNoteDialog(highlight))
             else viewModel.bookData.value?.let { book ->
                 ReadingNoteNavigation.relocate(
-                    requireActivity(), book, "highlight", highlight.time)
+                    requireActivity(), book, ReadingNotes.legacy(highlight))
             }
         }.show()
     }
