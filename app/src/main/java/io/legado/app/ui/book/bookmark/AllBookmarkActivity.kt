@@ -377,15 +377,14 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
             // Let the reader restore its saved progress. Never pass a note's index/position here.
             startActivityForBook(book)
         } else {
+            val legacy = note.highlight?.let(ReadingNotes::legacy)
+                ?: ReadingNotes.legacy(note.bookmark!!, book.bookUrl)
             val target = withContext(IO) {
-                val legacy = note.highlight?.let(ReadingNotes::legacy)
-                    ?: ReadingNotes.legacy(note.bookmark!!, book.bookUrl)
                 ReadingNotes.target(legacy, appDb.bookChapterDao.getChapterList(url))
             }
             val index = target?.chapterIndex
             if (index == null || index < 0 || index >= book.totalChapterNum) {
-                ReadingNoteNavigation.unavailable(this, book,
-                    if (note.highlight != null) "highlight" else "bookmark", note.time)
+                ReadingNoteNavigation.unavailable(this, book, legacy)
                 return@runTask
             }
             startActivityForBook(book) {
@@ -428,7 +427,8 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
                 "view" -> showFullNote(note)
                 "relocate" -> archive?.book?.let { book ->
                     ReadingNoteNavigation.relocate(this, book,
-                        if (note.highlight != null) "highlight" else "bookmark", note.time)
+                        note.highlight?.let(ReadingNotes::legacy)
+                            ?: ReadingNotes.legacy(note.bookmark!!, book.bookUrl))
                 }
                 "edit" -> if (note.bookmark != null) showDialogFragment(BookmarkDialog(note.bookmark, 0))
                     else showDialogFragment(HighlightNoteDialog(note.highlight!!))

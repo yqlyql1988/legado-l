@@ -84,6 +84,89 @@ object ReadingNoteChapter {
         chapters: List<BookChapter>,
     ): CandidateState = candidateResult(location, chapters).second
 
+    /**
+     * Builds the chapter lookups once so each note no longer scans the whole directory
+     * (and re-parses every title) on its own. The result is identical to [candidate].
+     */
+    class ChapterIndex(chapters: List<BookChapter>) {
+        private val byUrl: Map<String, List<BookChapter>>
+        private val byStable: Map<String, List<BookChapter>>
+        private val byName: Map<String, List<BookChapter>>
+        private val byNumber: Map<Int, List<BookChapter>>
+        private val byIndex: Map<Int, List<BookChapter>>
+
+        init {
+            val available = chapters.filterNot { it.isVolume }
+            byUrl = available.groupBy { it.url }
+            byIndex = available.groupBy { it.index }
+            val stable = HashMap<String, MutableList<BookChapter>>()
+            val names = HashMap<String, MutableList<BookChapter>>()
+            val numbers = HashMap<Int, MutableList<BookChapter>>()
+            available.forEach { chapter ->
+                val url = chapter.url
+                if (url.contains("jjwxc", ignoreCase = true) ||
+                    url.startsWith("data:vipContent;base64,")
+                ) {
+                    stableIdentity(url)?.let { identity ->
+                        stable.getOrPut(identity) { ArrayList() }.add(chapter)
+                    }
+                }
+                getPureChapterName(chapter.title).takeIf { it.isNotBlank() }?.let { name ->
+                    names.getOrPut(name) { ArrayList() }.add(chapter)
+                }
+                getChapterNum(chapter.title).takeIf { it > 0 }?.let { number ->
+                    numbers.getOrPut(number) { ArrayList() }.add(chapter)
+                }
+            }
+            byStable = stable
+            byName = names
+            byNumber = numbers
+        }
+
+        fun candidate(location: ReadingNoteLocation): BookChapter? = resolve(location).first
+
+        fun candidateState(location: ReadingNoteLocation): CandidateState =
+            resolve(location).second
+
+        fun resolve(location: ReadingNoteLocation): Pair<BookChapter?, CandidateState> {
+            if (location.chapterUrl.isNotBlank()) {
+                byUrl[location.chapterUrl]?.takeIf { it.isNotEmpty() }?.let { exact ->
+                    return if (exact.size == 1) exact.single() to CandidateState.FOUND
+                    else null to CandidateState.AMBIGUOUS
+                }
+                if (location.chapterUrl.contains("jjwxc", ignoreCase = true) ||
+                    location.chapterUrl.startsWith("data:vipContent;base64,")
+                ) {
+                    stableIdentity(location.chapterUrl)?.let { identity ->
+                        byStable[identity]?.takeIf { it.isNotEmpty() }?.let { stable ->
+                            return if (stable.size == 1) stable.single() to CandidateState.FOUND
+                            else null to CandidateState.AMBIGUOUS
+                        }
+                    }
+                }
+            }
+            var ambiguous = false
+            val name = getPureChapterName(location.chapterName)
+            if (name.isNotBlank()) {
+                val titles = byName[name].orEmpty()
+                if (titles.size == 1) return titles.single() to CandidateState.FOUND
+                ambiguous = titles.size > 1
+            }
+            val number = getChapterNum(location.chapterName)
+            if (number > 0) {
+                val numbers = byNumber[number].orEmpty()
+                if (numbers.size == 1) return numbers.single() to CandidateState.FOUND
+                ambiguous = ambiguous || numbers.size > 1
+            }
+            if (ambiguous) return null to CandidateState.AMBIGUOUS
+            val indexed = byIndex[location.chapterIndex]?.singleOrNull()
+            return if (indexed != null) indexed to CandidateState.FOUND
+            else null to CandidateState.NOT_FOUND
+        }
+    }
+
+    fun index(chapters: List<BookChapter>) = ChapterIndex(chapters)
+
     private fun candidateResult(
         location: ReadingNoteLocation,
         chapters: List<BookChapter>,

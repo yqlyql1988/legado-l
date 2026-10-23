@@ -129,7 +129,15 @@ class ReadingNoteTaskActivity : BaseActivity<ActivityReadingNoteTaskBinding>() {
         scanJob = lifecycleScope.launch {
             try {
                 val result = withContext(IO) {
-                    ReadingNoteTaskScanner.scan(scanArchives, onlyIds)
+                    ReadingNoteTaskScanner.scan(scanArchives, onlyIds) { done, total ->
+                        runOnUiThread {
+                            if (!isFinishing && !isDestroyed) {
+                                binding.tvSummary.text = getString(
+                                    R.string.reading_note_task_scanning_progress, done, total
+                                )
+                            }
+                        }
+                    }
                 }
                 if (archives != scanArchives) {
                     scanJob = null
@@ -417,6 +425,7 @@ class ReadingNoteTaskActivity : BaseActivity<ActivityReadingNoteTaskBinding>() {
             chapterUrl = resolved?.chapterUrl ?: chapter?.url.orEmpty(),
             chapterName = chapter?.title ?: location.chapterName,
             chapterPos = resolved?.chapterPos ?: location.chapterPos.takeIf { sameChapter } ?: 0,
+            quote = task.beforeQuote,
         )
     }
 

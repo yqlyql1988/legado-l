@@ -14,6 +14,7 @@ import io.legado.app.help.book.isLocal
 import io.legado.app.model.CacheBook
 import io.legado.app.model.ReadBook
 import io.legado.app.model.localBook.LocalBook
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers.Default
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.async
@@ -22,6 +23,9 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 
 internal enum class ReadingNoteTaskReason {
     PENDING,
@@ -60,6 +64,7 @@ internal object ReadingNoteTaskScanner {
         archives: List<NoteBook>,
         onlyIds: Set<String>? = null,
         verify: Boolean = true,
+        onProgress: ((Int, Int) -> Unit)? = null,
     ): List<ReadingNoteTask> = withContext(IO) {
         val rows = archives.flatMap { archive ->
             archive.notes.filter { onlyIds == null || "${archive.bookUrl}:${it.id}" in onlyIds }
@@ -70,55 +75,38 @@ internal object ReadingNoteTaskScanner {
         val chaptersByBook = archives.mapNotNull { it.book }
             .distinctBy { it.bookUrl }
             .associate { book ->
-                book.bookUrl to if (book.isLocal && !localFileAvailable(book)) {
+                val chapters = if (book.isLocal && !localFileAvailable(book)) {
                     emptyList()
                 } else {
                     ReadingNoteChapter.available(book)
                 }
+                book.bookUrl to BookChapters(chapters, ReadingNoteChapter.index(chapters))
             }
+        val savedLocations = appDb.readingNoteDao.locations().groupBy { it.kind to it.noteTime }
         val candidates = rows.map { (archive, note) ->
             val legacy = note.highlight?.let(ReadingNotes::legacy)
                 ?: ReadingNotes.legacy(note.bookmark!!, archive.bookUrl)
-            val source = ReadingNotes.location(legacy, archive.book?.bookUrl).let { saved ->
+            val source = savedLocation(legacy, archive.book?.bookUrl, savedLocations).let { saved ->
                 archive.book?.let { saved.copy(bookUrl = it.bookUrl) } ?: saved
             }
-            val chapters = archive.book?.let { chaptersByBook[it.bookUrl] }.orEmpty()
-            val chapter = ReadingNoteChapter.candidate(source, chapters)
+            val chapter = archive.book?.let { chaptersByBook[it.bookUrl] }
+                ?.index?.candidate(source)
             CandidateRow(archive, note, legacy, source, chapter)
         }
 
         if (!verify) {
             return@withContext candidates.mapNotNull { row ->
-                pendingTask(row, row.archive.book?.let {
-                    chaptersByBook[it.bookUrl]
-                }.orEmpty())
+                pendingTask(row, row.archive.book?.let { chaptersByBook[it.bookUrl] })
             }
         }
 
-        val chapterKeys = candidates.mapNotNull { row ->
-            val book = row.archive.book ?: return@mapNotNull null
-            val chapter = row.chapter ?: return@mapNotNull null
-            ChapterKey(book.bookUrl, chapter.index)
-        }.distinct()
-        val bodies = HashMap<ChapterKey, String?>()
-        val semaphore = Semaphore(2)
-        coroutineScope {
-            chapterKeys.map { key ->
-                async(IO) {
-                    key to semaphore.withPermit {
-                        val book = appDb.bookDao.getBook(key.bookUrl)
-                        val chapter = book?.let {
-                            appDb.bookChapterDao.getChapter(it.bookUrl, key.chapterIndex)
-                        }
-                        if (book == null || chapter == null) {
-                            null
-                        } else {
-                            chapterBody(book, chapter)
-                        }
-                    }
-                }
-            }.awaitAll().forEach { (key, body) -> bodies[key] = body }
+        val targets = LinkedHashMap<ChapterKey, Pair<Book, BookChapter>>()
+        candidates.forEach { row ->
+            val book = row.archive.book ?: return@forEach
+            val chapter = row.chapter ?: return@forEach
+            targets.getOrPut(ChapterKey(book.bookUrl, chapter.index)) { book to chapter }
         }
+        val bodies = loadBodies(targets, onProgress)
 
         candidates.mapNotNull { row ->
             val book = row.archive.book
@@ -134,8 +122,8 @@ internal object ReadingNoteTaskScanner {
                     reason = ReadingNoteTaskReason.LOCAL_FILE_UNAVAILABLE
                 )
             }
-            val chapters = chaptersByBook[book.bookUrl].orEmpty()
-            if (chapters.isEmpty()) {
+            val chapters = chaptersByBook[book.bookUrl]
+            if (chapters == null || chapters.list.isEmpty()) {
                 return@mapNotNull ReadingNoteTask(
                     row.archive, row.note, row.source,
                     reason = ReadingNoteTaskReason.TOC_UNAVAILABLE
@@ -143,7 +131,7 @@ internal object ReadingNoteTaskScanner {
             }
             val chapter = row.chapter ?: return@mapNotNull ReadingNoteTask(
                 row.archive, row.note, row.source,
-                reason = if (ReadingNoteChapter.candidateState(row.source, chapters) ==
+                reason = if (chapters.index.candidateState(row.source) ==
                     ReadingNoteChapter.CandidateState.AMBIGUOUS
                 ) ReadingNoteTaskReason.CHAPTER_AMBIGUOUS
                 else ReadingNoteTaskReason.CHAPTER_NOT_FOUND
@@ -211,7 +199,7 @@ internal object ReadingNoteTaskScanner {
         }
     }
 
-    private fun pendingTask(row: CandidateRow, chapters: List<BookChapter>): ReadingNoteTask? {
+    private fun pendingTask(row: CandidateRow, chapters: BookChapters?): ReadingNoteTask? {
         val book = row.archive.book
         if (book == null) {
             return ReadingNoteTask(row.archive, row.note, row.source,
@@ -221,13 +209,13 @@ internal object ReadingNoteTaskScanner {
             return ReadingNoteTask(row.archive, row.note, row.source,
                 reason = ReadingNoteTaskReason.LOCAL_FILE_UNAVAILABLE)
         }
-        if (chapters.isEmpty()) {
+        if (chapters == null || chapters.list.isEmpty()) {
             return ReadingNoteTask(row.archive, row.note, row.source,
                 reason = ReadingNoteTaskReason.TOC_UNAVAILABLE)
         }
         val chapter = row.chapter ?: return ReadingNoteTask(
             row.archive, row.note, row.source,
-            reason = if (ReadingNoteChapter.candidateState(row.source, chapters) ==
+            reason = if (chapters.index.candidateState(row.source) ==
                 ReadingNoteChapter.CandidateState.AMBIGUOUS
             ) ReadingNoteTaskReason.CHAPTER_AMBIGUOUS
             else ReadingNoteTaskReason.CHAPTER_NOT_FOUND
@@ -250,13 +238,125 @@ internal object ReadingNoteTaskScanner {
         )
     }
 
-    private suspend fun chapterBody(book: Book, chapter: BookChapter): String? {
-        val raw = BookHelp.getContent(book, chapter)
-            ?: CacheBook.getOrCreate(book.bookUrl)?.downloadAwait(chapter)
-        if (raw.isNullOrBlank() || raw.startsWith("获取正文失败")) return null
-        return withContext(Default) {
-            ReadBook.processChapterContent(book, chapter, raw).second.textList.joinToString("\n")
+    private suspend fun loadBodies(
+        targets: Map<ChapterKey, Pair<Book, BookChapter>>,
+        onProgress: ((Int, Int) -> Unit)?,
+    ): Map<ChapterKey, String?> {
+        if (targets.isEmpty()) return emptyMap()
+        val raw = ConcurrentHashMap<ChapterKey, String>()
+        val missing = Collections.synchronizedList(
+            ArrayList<Pair<ChapterKey, Pair<Book, BookChapter>>>()
+        )
+        val readSemaphore = Semaphore(4)
+        coroutineScope {
+            targets.entries.map { (key, target) ->
+                async(IO) {
+                    readSemaphore.withPermit {
+                        val content = BookHelp.getContent(target.first, target.second)
+                        if (content == null) {
+                            missing.add(key to target)
+                        } else {
+                            raw[key] = content
+                        }
+                    }
+                }
+            }.awaitAll()
         }
+        downloadMissing(missing.toList(), raw)
+
+        val total = targets.size
+        val done = AtomicInteger()
+        val processSemaphore = Semaphore(4)
+        return coroutineScope {
+            targets.entries.map { (key, target) ->
+                async(IO) {
+                    processSemaphore.withPermit {
+                        val content = raw.remove(key)
+                        val body = if (content.isNullOrBlank() ||
+                            content.startsWith("获取正文失败")
+                        ) {
+                            null
+                        } else {
+                            withContext(Default) {
+                                ReadBook.processChapterContent(target.first, target.second, content)
+                                    .second.textList.joinToString("\n")
+                            }
+                        }
+                        onProgress?.invoke(done.incrementAndGet(), total)
+                        key to body
+                    }
+                }
+            }.awaitAll()
+        }.toMap()
+    }
+
+    private suspend fun downloadMissing(
+        missing: List<Pair<ChapterKey, Pair<Book, BookChapter>>>,
+        raw: MutableMap<ChapterKey, String>,
+    ) {
+        if (missing.isEmpty()) return
+        val bookSemaphore = Semaphore(2)
+        coroutineScope {
+            missing.groupBy { it.second.first.bookUrl }.values.map { items ->
+                async(IO) {
+                    bookSemaphore.withPermit {
+                        val book = items.first().second.first
+                        val cacheBook = CacheBook.getOrCreate(book.bookUrl) ?: return@withPermit
+                        val chapters = items.map { it.second.second }
+                        if (chapters.size >= 2) {
+                            val remaining = try {
+                                cacheBook.downloadBatchAwait(chapters)
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                chapters
+                            }
+                            for (chapter in remaining) {
+                                val content = BookHelp.getContent(book, chapter)
+                                    ?: downloadOne(cacheBook, chapter)
+                                if (!content.isNullOrBlank() &&
+                                    !content.startsWith("获取正文失败")
+                                ) {
+                                    raw[ChapterKey(book.bookUrl, chapter.index)] = content
+                                }
+                            }
+                        } else {
+                            for (chapter in chapters) {
+                                val content = downloadOne(cacheBook, chapter)
+                                if (!content.isNullOrBlank() &&
+                                    !content.startsWith("获取正文失败")
+                                ) {
+                                    raw[ChapterKey(book.bookUrl, chapter.index)] = content
+                                }
+                            }
+                        }
+                    }
+                }
+            }.awaitAll()
+        }
+    }
+
+    private suspend fun downloadOne(
+        cacheBook: CacheBook.CacheBookModel,
+        chapter: BookChapter,
+    ): String? =
+        try {
+            cacheBook.downloadAwait(chapter)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+
+    private fun savedLocation(
+        legacy: ReadingNoteLocation,
+        preferredBookUrl: String?,
+        saved: Map<Pair<String, Long>, List<ReadingNoteLocation>>,
+    ): ReadingNoteLocation {
+        val locations = saved[legacy.kind to legacy.noteTime].orEmpty()
+        return preferredBookUrl?.let { url ->
+            locations.firstOrNull { it.bookUrl == url }
+        } ?: locations.firstOrNull { it.bookUrl == legacy.bookUrl } ?: legacy
     }
 
     private fun localFileAvailable(book: Book): Boolean = runCatching {
@@ -272,6 +372,11 @@ internal object ReadingNoteTaskScanner {
             row.archive.book?.author ?: row.note.author,
         )
     }
+
+    private data class BookChapters(
+        val list: List<BookChapter>,
+        val index: ReadingNoteChapter.ChapterIndex,
+    )
 
     private data class CandidateRow(
         val archive: NoteBook,

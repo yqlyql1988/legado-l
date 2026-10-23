@@ -355,6 +355,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     private var justInitData: Boolean = false
     private var relocatingNoteKind: String? = null
     private var relocatingNoteTime: Long = -1
+    private var relocatingNoteText: String = ""
     private var relocationHint: Snackbar? = null
     private var syncDialog: AlertDialog? = null
 
@@ -367,6 +368,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("relocatingNoteKind", relocatingNoteKind)
         outState.putLong("relocatingNoteTime", relocatingNoteTime)
+        outState.putString("relocatingNoteText", relocatingNoteText)
         outState.putBundle("pdfZoom", binding.readView.pdfZoom.save())
         outState.putBundle("aloudControls", aloudControls.save())
         editingHighlight?.let { outState.putParcelable(STATE_EDITING_HIGHLIGHT, it) }
@@ -380,6 +382,8 @@ class ReadBookActivity : BaseReadBookActivity(),
             ?: intent.getStringExtra(ReadingNoteNavigation.EXTRA_KIND)
         relocatingNoteTime = savedInstanceState?.getLong("relocatingNoteTime", -1)
             ?: intent.getLongExtra(ReadingNoteNavigation.EXTRA_TIME, -1)
+        relocatingNoteText = savedInstanceState?.getString("relocatingNoteText")
+            ?: intent.getStringExtra(ReadingNoteNavigation.EXTRA_TEXT).orEmpty()
         showRelocationHint()
         viewModel.pendingSourceReimport.observe(this) { showPendingSourceReimport() }
         viewModel.resourceRefreshing.observe(this) { loading ->
@@ -453,6 +457,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         setIntent(intent)
         relocatingNoteKind = intent.getStringExtra(ReadingNoteNavigation.EXTRA_KIND)
         relocatingNoteTime = intent.getLongExtra(ReadingNoteNavigation.EXTRA_TIME, -1)
+        relocatingNoteText = intent.getStringExtra(ReadingNoteNavigation.EXTRA_TEXT).orEmpty()
         showRelocationHint()
         editingHighlight = null
         resetBookmarkObserver()
@@ -512,6 +517,9 @@ class ReadBookActivity : BaseReadBookActivity(),
             }
         }
         ReadBook.startReadSession()
+        if (relocatingNoteKind != null && relocationHint?.isShown != true) {
+            showRelocationHint()
+        }
     }
 
     override fun onPostResume() {
@@ -1394,8 +1402,21 @@ class ReadBookActivity : BaseReadBookActivity(),
     private fun showRelocationHint() {
         relocationHint?.dismiss()
         if (relocatingNoteKind == null || relocatingNoteTime < 0) return
-        relocationHint = Snackbar.make(binding.root, R.string.reading_note_manual_hint, Snackbar.LENGTH_INDEFINITE)
+        val quote = relocatingNoteText.trim()
+        val message = if (quote.isBlank()) {
+            getString(R.string.reading_note_manual_hint)
+        } else {
+            getString(R.string.reading_note_manual_hint_quote, quotePreview(quote))
+        }
+        relocationHint = Snackbar.make(binding.root, message, Snackbar.LENGTH_INDEFINITE)
             .setAction(R.string.cancel) { clearNoteRelocation() }.also { it.show() }
+    }
+
+    private fun quotePreview(text: String, limit: Int = 60): String {
+        if (text.length <= limit) return text
+        var end = limit
+        while (end > 0 && Character.isHighSurrogate(text[end - 1])) end--
+        return text.substring(0, end) + "…"
     }
 
     private fun clearNoteRelocation() {
@@ -1405,9 +1426,11 @@ class ReadBookActivity : BaseReadBookActivity(),
     private fun clearNoteRelocation(clearQueue: Boolean) {
         relocatingNoteKind = null
         relocatingNoteTime = -1
+        relocatingNoteText = ""
         if (clearQueue) ReadingNoteNavigation.clearQueue()
         intent.removeExtra(ReadingNoteNavigation.EXTRA_KIND)
         intent.removeExtra(ReadingNoteNavigation.EXTRA_TIME)
+        intent.removeExtra(ReadingNoteNavigation.EXTRA_TEXT)
         relocationHint?.dismiss()
         relocationHint = null
     }

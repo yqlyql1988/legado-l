@@ -160,7 +160,8 @@ class BookmarkFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmark
             }
             if (target == null) {
                 activity?.let {
-                    ReadingNoteNavigation.unavailable(it, book, "bookmark", bookmark.time)
+                    ReadingNoteNavigation.unavailable(
+                        it, book, ReadingNotes.legacy(bookmark, book.bookUrl))
                 }
                 return@launch
             }
@@ -183,7 +184,7 @@ class BookmarkFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmark
             if (position == 0) showDialogFragment(BookmarkDialog(bookmark, pos))
             else viewModel.bookData.value?.let { book ->
                 ReadingNoteNavigation.relocate(
-                    requireActivity(), book, "bookmark", bookmark.time)
+                    requireActivity(), book, ReadingNotes.legacy(bookmark, book.bookUrl))
             }
         }.show()
     }
