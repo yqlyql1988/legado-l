@@ -30,6 +30,7 @@ import androidx.core.widget.doAfterTextChanged
 import androidx.core.view.ViewCompat
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.tabs.TabLayout
 import io.legado.app.R
 import io.legado.app.base.BaseActivity
 import io.legado.app.base.adapter.ItemViewHolder
@@ -119,10 +120,17 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         adapter.addHeaderView { header }
         binding.recyclerView.adapter = adapter
         binding.recyclerView.applyNavigationBarPadding()
-        header.tabAll.setOnClickListener { selectPeriod(ReadStatisticsPeriod.ALL) }
-        header.tabYear.setOnClickListener { selectPeriod(ReadStatisticsPeriod.YEAR) }
-        header.tabMonth.setOnClickListener { selectPeriod(ReadStatisticsPeriod.MONTH) }
-        header.tabDay.setOnClickListener { selectPeriod(ReadStatisticsPeriod.DAY) }
+        header.periodTabs.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab) {
+                ReadStatisticsPeriod.entries.getOrNull(tab.position)
+                    ?.takeIf { it != period }
+                    ?.let { selectPeriod(it) }
+            }
+
+            override fun onTabUnselected(tab: TabLayout.Tab) = Unit
+
+            override fun onTabReselected(tab: TabLayout.Tab) = Unit
+        })
         header.graphTrend.setOnClickListener { showHours = false; render() }
         header.graphHours.setOnClickListener { showHours = true; render() }
         header.hourInterval.setOnClickListener { showIntervalPicker() }
@@ -137,10 +145,7 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         header.tvPeriod.setOnClickListener { showPeriodPicker() }
         header.scopeAll.setOnClickListener { selectScope(false) }
         header.scopeQualified.setOnClickListener { selectScope(true) }
-        val surface = ColorUtils.blendColors(backgroundColor, accentColor, .06f)
-        header.summary.background = rounded(ColorUtils.blendColors(backgroundColor, contentPrimary, .025f))
         header.summaryDivider.setBackgroundColor(ColorUtils.blendColors(backgroundColor, contentSecondary, .16f))
-        header.trendPanel.background = rounded(surface)
     }
 
     override fun onResume() {
@@ -459,7 +464,7 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
     )
 
     private fun wordCount(value: Long): String = when {
-        value <= 0L -> getString(R.string.read_statistics_no_words)
+        value <= 0L -> getString(R.string.read_statistics_no_value)
         value >= 10_000L -> String.format(Locale.getDefault(), "%.1f万字", value / 10_000.0)
         else -> getString(R.string.read_statistics_word_value, value)
     }
@@ -467,7 +472,7 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
     private fun speed(value: Long): String = if (value > 0L) {
         getString(R.string.read_statistics_speed_value, value)
     } else {
-        getString(R.string.read_statistics_no_speed)
+        getString(R.string.read_statistics_no_value)
     }
 
     private fun summaryValue(value: String, numberScale: Float, unitScale: Float = 1f) =
@@ -484,6 +489,11 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
                     start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
         }
+
+    /** 有数字时按“数值大、单位小”排版，无数据占位符保持普通主色文字。 */
+    private fun TextView.setStatisticText(value: String, numberScale: Float, unitScale: Float = 1f) {
+        text = if (value.any { it.isDigit() }) summaryValue(value, numberScale, unitScale) else value
+    }
 
     private fun qualifiedOnly() = !isSingleBook && AppConfig.readStatisticsQualifiedOnly
 
@@ -521,17 +531,12 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
             button.background = rounded(
                 if (selected) ColorUtils.blendColors(backgroundColor, accentColor, .20f)
                 else Color.TRANSPARENT,
-            ).apply { cornerRadius = 8.dpToPx().toFloat() }
+                radius = 8,
+            )
             button.setTextColor(if (selected) accentColor else contentSecondary)
         }
-        val buttons = listOf(header.tabAll, header.tabYear, header.tabMonth, header.tabDay)
-        buttons.forEachIndexed { index, button ->
-            val selected = index == period.ordinal
-            button.isSelected = selected
-            button.backgroundTintList = ColorStateList.valueOf(
-                ColorUtils.blendColors(backgroundColor, accentColor, if (selected) .20f else .04f),
-            )
-            button.setTextColor(if (selected) accentColor else contentPrimary)
+        if (header.periodTabs.selectedTabPosition != period.ordinal) {
+            header.periodTabs.getTabAt(period.ordinal)?.select()
         }
         val today = LocalDate.now()
         val first = earliestDate()
@@ -579,16 +584,22 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
                 Triple(tvBooks, tvBooksLabel, getString(R.string.read_statistics_book_count, summary.books.size)),
                 Triple(tvAverage, tvAverageLabel, duration(summary.average)),
             ).forEach { (value, label, text) ->
-                value.text = summaryValue(text, 22f / 13)
+                value.setStatisticText(text, 1f, .66f)
                 value.contentDescription = "$text\n${label.text}"
-                label.setTextColor(contentSecondary)
             }
-            tvWords.text = summaryValue(wordCount(summary.words), 22f / 13)
+            tvDurationHint.isVisible = summary.duration <= 0L
+            if (summary.duration <= 0L) {
+                tvDurationHint.setText(when (period) {
+                    ReadStatisticsPeriod.DAY -> R.string.read_statistics_empty_today
+                    ReadStatisticsPeriod.MONTH -> R.string.read_statistics_empty_month
+                    ReadStatisticsPeriod.YEAR -> R.string.read_statistics_empty_year
+                    ReadStatisticsPeriod.ALL -> R.string.read_statistics_empty_all
+                })
+            }
+            tvWords.setStatisticText(wordCount(summary.words), 1f, .9f)
             tvWords.contentDescription = "${wordCount(summary.words)}\n${tvWordsLabel.text}"
-            tvSpeed.text = summaryValue(speed(summary.speed), 22f / 13)
+            tvSpeed.setStatisticText(speed(summary.speed), 1f, .9f)
             tvSpeed.contentDescription = "${speed(summary.speed)}\n${tvSpeedLabel.text}"
-            tvWordsLabel.setTextColor(contentSecondary)
-            tvSpeedLabel.setTextColor(contentSecondary)
             tvHistory.isVisible = period == ReadStatisticsPeriod.ALL && summary.historyDuration > 0
             tvHistory.text = getString(R.string.read_statistics_history, duration(summary.historyDuration))
             tvRankTitle.setText(when (period) {
@@ -611,7 +622,10 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
                 val selected = (index == 1) == hours
                 button.isSelected = selected
                 button.backgroundTintList = null
-                button.background = rounded(if (selected) ColorUtils.blendColors(backgroundColor, accentColor, .18f) else Color.TRANSPARENT)
+                button.background = rounded(
+                    if (selected) ColorUtils.blendColors(backgroundColor, accentColor, .18f) else Color.TRANSPARENT,
+                    radius = 8,
+                )
                 button.setTextColor(if (selected) accentColor else contentSecondary)
             }
             hourInterval.isVisible = hours
@@ -629,6 +643,20 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
             header.tvTrendTitle.setText(R.string.read_statistics_calendar)
             renderCalendar(summary)
         } else renderChart(summary)
+        val emptyChart = header.chart.isVisible && header.chart.bars.all { it.duration <= 0L }
+        header.chartEmpty.isVisible = emptyChart
+        if (emptyChart) {
+            val hourlyChart = showHours || period == ReadStatisticsPeriod.DAY
+            header.tvChartEmpty.setText(
+                if (hourlyChart) R.string.read_statistics_hour_chart_empty
+                else R.string.read_statistics_chart_empty
+            )
+            header.tvChartEmptyHint.setText(
+                if (hourlyChart) R.string.read_statistics_hour_chart_empty_hint
+                else R.string.read_statistics_chart_empty_hint
+            )
+        }
+        header.tvPeak.isVisible = header.chart.isVisible && !emptyChart
         adapter.setItems(visibleBooks)
     }
 
@@ -661,7 +689,10 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
     private fun renderHourly() {
         val interval = AppConfig.readStatisticsIntervalHours
         val buckets = hourly.buckets
-        if (buckets.isEmpty()) return
+        if (buckets.isEmpty()) {
+            header.chart.bars = emptyList()
+            return
+        }
         val peak = buckets.maxBy { it.duration }
         if (selectedHour !in 0..23) selectedHour = peak.startHour
         val index = (selectedHour / interval).coerceIn(buckets.indices)
@@ -834,9 +865,9 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         }
     }
 
-    private fun rounded(color: Int, selected: Boolean = false) = GradientDrawable().apply {
+    private fun rounded(color: Int, selected: Boolean = false, radius: Int = 12) = GradientDrawable().apply {
         setColor(color)
-        cornerRadius = 12.dpToPx().toFloat()
+        cornerRadius = radius.dpToPx().toFloat()
         if (selected) setStroke(2.dpToPx(), accentColor) else setStroke(2.dpToPx(), Color.TRANSPARENT)
     }
 
@@ -848,6 +879,7 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         bookSpeed: Long = 0L,
     ) {
         row.tvRank.text = (index + 1).toString()
+        row.divider.isVisible = index > 0
         row.tvBookName.text = item.bookName
         row.tvAuthor.text = item.displayAuthor.ifBlank { getString(R.string.read_record_no_author) }
         val metrics = if (bookSpeed > 0L) {

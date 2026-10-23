@@ -37,6 +37,15 @@
     <string name="read_statistics_speed_value">%1$d字/分</string>
     <string name="read_statistics_no_words">暂无字数数据</string>
     <string name="read_statistics_no_speed">暂无速度数据</string>
+    <string name="read_statistics_no_value">—</string>
+    <string name="read_statistics_empty_today">今天还没有阅读记录</string>
+    <string name="read_statistics_empty_month">本月还没有阅读记录</string>
+    <string name="read_statistics_empty_year">今年还没有阅读记录</string>
+    <string name="read_statistics_empty_all">还没有阅读记录</string>
+    <string name="read_statistics_chart_empty">还没有阅读数据</string>
+    <string name="read_statistics_chart_empty_hint">开始阅读后，这里会显示时长分布</string>
+    <string name="read_statistics_hour_chart_empty">还没有时段数据</string>
+    <string name="read_statistics_hour_chart_empty_hint">开始阅读后，这里按小时显示分布</string>
     <string name="read_statistics_book_metrics">%1$s · %2$s</string>
     <string name="read_statistics_book_metrics_speed">%1$s · %2$s · %3$s</string>
     <string name="read_statistics_book_days">本书阅读日</string>

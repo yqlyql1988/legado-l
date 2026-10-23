@@ -11,6 +11,7 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.google.android.material.tabs.TabLayout
 import io.legado.app.R
 import io.legado.app.constant.BookType
 import io.legado.app.data.appDb
@@ -20,6 +21,7 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.ReadRecord
 import io.legado.app.data.entities.ReadRecordDaily
 import io.legado.app.help.book.BookHelp
+import io.legado.app.help.book.ReadStatisticsPeriod
 import io.legado.app.help.config.AppConfig
 import io.legado.app.ui.book.read.ReadBookActivity
 import io.legado.app.ui.book.search.SearchActivity
@@ -122,13 +124,14 @@ class ReadStatisticsUiTest {
         ActivityScenario.launch<ReadStatisticsActivity>(Intent(context, ReadStatisticsActivity::class.java)).use { scenario ->
             await(scenario) { it.findViewById<TextView>(R.id.tv_duration)?.text?.isNotEmpty() == true }
             scenario.onActivity { activity ->
-                assertTrue(activity.findViewById<View>(R.id.tab_day).isSelected)
+                val tabs = activity.findViewById<TabLayout>(R.id.period_tabs)
+                assertEquals(ReadStatisticsPeriod.DAY.ordinal, tabs.selectedTabPosition)
                 assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.hour_details).visibility)
-                activity.findViewById<View>(R.id.tab_all).performClick()
+                tabs.getTabAt(ReadStatisticsPeriod.ALL.ordinal)?.select()
                 assertTrue(activity.findViewById<TextView>(R.id.tv_history).visibility == View.VISIBLE)
-                activity.findViewById<View>(R.id.tab_year).performClick()
+                tabs.getTabAt(ReadStatisticsPeriod.YEAR.ordinal)?.select()
                 assertTrue(activity.findViewById<TextView>(R.id.tv_period).text.contains(today.year.toString()))
-                activity.findViewById<View>(R.id.tab_month).performClick()
+                tabs.getTabAt(ReadStatisticsPeriod.MONTH.ordinal)?.select()
                 activity.findViewById<View>(R.id.graph_trend).performClick()
                 val grid = activity.findViewById<GridLayout>(R.id.calendar_grid)
                 val day = (0 until grid.childCount).map { grid.getChildAt(it) }.first {
