@@ -10,8 +10,9 @@
         android:id="@+id/period_tabs"
         android:layout_width="match_parent"
         android:layout_height="44dp"
-        android:layout_marginTop="4dp"
-        android:orientation="horizontal">
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal"
+        android:padding="3dp">
 
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/tab_all"
@@ -50,15 +51,26 @@
     </LinearLayout>
 
     <LinearLayout
+        android:id="@+id/date_row"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="44dp"
+        android:layout_marginTop="8dp"
         android:gravity="center"
         android:orientation="horizontal">
 
+        <LinearLayout
+            android:id="@+id/date_nav"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp">
+
         <androidx.appcompat.widget.AppCompatImageButton
             android:id="@+id/previous_period"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/read_statistics_previous_year"
             android:rotation="180"
@@ -75,20 +87,22 @@
             android:gravity="center"
             android:minHeight="44dp"
             android:minWidth="120dp"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
             android:textColor="@color/primaryText"
             android:textSize="16sp" />
 
         <androidx.appcompat.widget.AppCompatImageButton
             android:id="@+id/next_period"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/read_statistics_next_year"
             android:scaleType="centerInside"
             app:srcCompat="@drawable/ic_arrow_right"
             app:tint="@color/read_statistics_nav_tint" />
+        </LinearLayout>
+
     </LinearLayout>
 
     <androidx.cardview.widget.CardView
@@ -157,7 +171,7 @@
                 android:textColor="@color/primaryText"
                 android:textSize="38sp"
                 app:autoSizeMaxTextSize="38sp"
-                app:autoSizeMinTextSize="28sp"
+                app:autoSizeMinTextSize="32sp"
                 app:autoSizeStepGranularity="1sp"
                 app:autoSizeTextType="uniform" />
 
@@ -249,7 +263,7 @@
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
+                    android:layout_weight="1.35"
                     android:orientation="vertical">
 
                     <TextView
@@ -268,52 +282,72 @@
                 </LinearLayout>
             </LinearLayout>
 
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="14dp"
+                android:alpha="0.18"
+                android:background="@color/secondaryText"
+                android:importantForAccessibility="no" />
+
             <LinearLayout
-                android:id="@+id/detail_row"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:gravity="center_vertical"
+                android:layout_marginTop="14dp"
+                android:baselineAligned="false"
                 android:orientation="horizontal">
 
-                <TextView
-                    android:id="@+id/tv_words_label"
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="@string/read_statistics_words"
-                    android:textColor="@color/secondaryText"
-                    android:textSize="12sp" />
+                    android:layout_weight="1"
+                    android:orientation="vertical">
 
-                <TextView
-                    android:id="@+id/tv_words"
-                    style="@style/ReadStatisticsDetailValue"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp" />
+                    <TextView
+                        android:id="@+id/tv_words_label"
+                        style="@style/ReadStatisticsMetricLabel"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/read_statistics_words" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:layout_marginEnd="8dp"
-                    android:text="·"
-                    android:textColor="@color/secondaryText"
-                    android:textSize="12sp" />
+                    <TextView
+                        android:id="@+id/tv_words"
+                        style="@style/ReadStatisticsMetricValue"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="5dp" />
+                </LinearLayout>
 
-                <TextView
-                    android:id="@+id/tv_speed_label"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/read_statistics_speed"
-                    android:textColor="@color/secondaryText"
-                    android:textSize="12sp" />
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="34dp"
+                    android:layout_gravity="center_vertical"
+                    android:layout_marginStart="12dp"
+                    android:layout_marginEnd="12dp"
+                    android:alpha="0.18"
+                    android:background="@color/secondaryText"
+                    android:importantForAccessibility="no" />
 
-                <TextView
-                    android:id="@+id/tv_speed"
-                    style="@style/ReadStatisticsDetailValue"
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp" />
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/tv_speed_label"
+                        style="@style/ReadStatisticsMetricLabel"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/read_statistics_speed" />
+
+                    <TextView
+                        android:id="@+id/tv_speed"
+                        style="@style/ReadStatisticsMetricValue"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="5dp" />
+                </LinearLayout>
             </LinearLayout>
         </LinearLayout>
     </androidx.cardview.widget.CardView>
