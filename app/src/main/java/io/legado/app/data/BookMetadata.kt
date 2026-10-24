@@ -26,6 +26,7 @@ internal fun Book.applyEditedMetadata(edited: Book) {
     name = edited.name
     author = edited.author
     type = edited.type
+    customTag = edited.customTag
     customCoverUrl = edited.customCoverUrl
     persistedCoverUrl = edited.persistedCoverUrl
     customIntro = edited.customIntro

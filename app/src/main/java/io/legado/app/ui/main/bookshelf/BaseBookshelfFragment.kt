@@ -34,6 +34,7 @@ import io.legado.app.ui.book.import.remote.RemoteBookActivity
 import io.legado.app.ui.book.info.BookInfoActivity
 import io.legado.app.ui.book.manage.BookshelfManageActivity
 import io.legado.app.ui.book.search.SearchActivity
+import io.legado.app.ui.book.tag.BookTagActivity
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.main.MainFragmentInterface
 import io.legado.app.ui.main.MainViewModel
@@ -215,6 +216,8 @@ abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfVi
             R.id.menu_bookshelf_manage -> startActivity<BookshelfManageActivity> {
                 putExtra("groupId", groupId)
             }
+
+            R.id.menu_book_tags -> startActivity<BookTagActivity>()
 
             R.id.menu_download -> startActivity<CacheActivity> {
                 putExtra("groupId", groupId)

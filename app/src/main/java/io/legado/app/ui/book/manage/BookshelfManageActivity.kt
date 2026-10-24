@@ -21,6 +21,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.bookTags
 import io.legado.app.databinding.ActivityArrangeBookBinding
 import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.help.DirectLinkUpload
@@ -327,6 +328,8 @@ class BookshelfManageActivity :
 
             R.id.menu_add_to_group -> selectGroup(addToGroupRequestCode, 0)
             R.id.menu_remove_to_group -> selectGroup(removeToGroupRequestCode, 0)
+            R.id.menu_add_tags -> showBatchTagDialog(remove = false)
+            R.id.menu_remove_tags -> showBatchTagDialog(remove = true)
             R.id.menu_change_source -> showDialogFragment<SourcePickerDialog>()
             R.id.menu_clear_cache -> viewModel.clearCache(adapter.selection)
             R.id.menu_persist_covers -> viewModel.persistNetworkCovers(adapter.selection)
@@ -337,6 +340,27 @@ class BookshelfManageActivity :
             R.id.menu_create_book_update_tasks -> showCreateBookUpdateTasksDialog()
         }
         return false
+    }
+
+    private fun showBatchTagDialog(remove: Boolean) {
+        val dialogBinding = DialogEditTextBinding.inflate(layoutInflater).apply {
+            editView.setHint(R.string.book_custom_tags_hint)
+            editView.setSingleLine(false)
+            editView.minLines = 2
+            editView.maxLines = 6
+        }
+        alert(if (remove) R.string.book_tag_remove_batch else R.string.book_tag_add_batch) {
+            customView { dialogBinding.root }
+            okButton {
+                val tags = dialogBinding.editView.text?.toString().bookTags()
+                if (tags.isEmpty()) {
+                    toastOnUi(R.string.book_tag_name_invalid)
+                } else {
+                    viewModel.updateTags(adapter.selection, tags, remove)
+                }
+            }
+            cancelButton()
+        }
     }
 
     private fun alertRestoreNetworkCovers() {

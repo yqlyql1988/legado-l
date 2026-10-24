@@ -6,10 +6,16 @@ import android.view.Menu
 import android.view.MenuItem
 import androidx.activity.viewModels
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
 import io.legado.app.constant.BookType
+import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.aggregateBookTagStats
+import io.legado.app.data.entities.bookTags
+import io.legado.app.data.entities.normalizeBookTags
+import io.legado.app.data.entities.userTags
 import io.legado.app.databinding.ActivityBookInfoEditBinding
 import io.legado.app.help.book.addType
 import io.legado.app.help.book.hasEditedNetworkCover
@@ -32,6 +38,10 @@ import io.legado.app.utils.setOnApplyWindowInsetsListenerCompat
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
+import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import splitties.init.appCtx
 import splitties.views.bottomPadding
 import java.io.FileOutputStream
@@ -58,6 +68,7 @@ class BookInfoEditActivity :
         }
         initView()
         initEvent()
+        loadCommonTags()
     }
 
     override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {
@@ -101,6 +112,31 @@ class BookInfoEditActivity :
         }
     }
 
+    private fun loadCommonTags() {
+        lifecycleScope.launch {
+            val tags = withContext(IO) {
+                aggregateBookTagStats(
+                    appDb.bookDao.flowShelfTagBooks().first(),
+                    sourceTags = false,
+                )
+            }
+            binding.lbCommonTag.setLabels(
+                tags.map { it.name },
+                style = io.legado.app.ui.widget.LabelStyle.TONAL,
+                onClick = ::appendTag,
+            )
+        }
+    }
+
+    private fun appendTag(tag: String) {
+        binding.tieCustomTag.run {
+            val tags = text?.toString().bookTags()
+            if (tags.any { it.equals(tag, ignoreCase = true) }) return
+            setText(normalizeBookTags(tags + tag))
+            setSelection(text?.length ?: 0)
+        }
+    }
+
     private fun upView(book: Book) = binding.run {
         tieBookName.setText(book.name)
         tieBookAuthor.setText(book.author)
@@ -112,6 +148,7 @@ class BookInfoEditActivity :
                 else -> 0
             }
         )
+        tieCustomTag.setText(book.userTags().joinToString(","))
         tieCoverUrl.setText(book.customCoverUrl?.takeIf { it.isNotEmpty() } ?: book.coverUrl)
         tieBookIntro.setText(book.getDisplayIntro())
         upCover()
@@ -145,6 +182,7 @@ class BookInfoEditActivity :
         book.customCoverUrl = if (customCoverUrl == book.coverUrl) null else customCoverUrl
         val customIntro = tieBookIntro.text?.toString()
         book.customIntro = if (customIntro == book.intro) null else customIntro
+        book.customTag = normalizeBookTags(tieCustomTag.text?.toString())
         val metadataChanged = oldBook.name != book.name || oldBook.author != book.author
         if (!metadataChanged) {
             saveBook(book, false)

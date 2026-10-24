@@ -37,10 +37,9 @@ import io.legado.app.data.entities.BaseSource
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
-import io.legado.app.data.entities.normalizeBookTags
+import io.legado.app.data.entities.sourceTags
 import io.legado.app.data.entities.userTags
 import io.legado.app.databinding.ActivityBookInfoBinding
-import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.GlideImageGetter
@@ -100,6 +99,8 @@ import io.legado.app.ui.video.VideoPlayerActivity
 import io.legado.app.ui.widget.dialog.PhotoDialog
 import io.legado.app.ui.widget.dialog.VariableDialog
 import io.legado.app.ui.widget.dialog.WaitDialog
+import io.legado.app.ui.widget.LabelStyle
+import io.legado.app.ui.widget.StyledLabel
 import io.legado.app.ui.widget.text.ScrollTextView
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.ConvertUtils
@@ -649,8 +650,7 @@ class BookInfoActivity :
         }
         menuCustomBtn?.isVisible = viewModel.hasCustomBtn
         upTvBookshelf()
-        upKinds(book)
-        upCustomTags(book)
+        upLabels(book)
         upGroup(book.group)
     }
 
@@ -923,9 +923,18 @@ class BookInfoActivity :
         visible()
     }
 
-    private fun upKinds(book: Book) = binding.run {
+    private fun upLabels(book: Book) = binding.run {
         lifecycleScope.launch {
-            var kinds = book.getKindList()
+            val sourceTags = book.sourceTags()
+            val labels = arrayListOf<StyledLabel>()
+            val displayedKeys = hashSetOf<String>()
+            fun addLabel(text: String, style: LabelStyle) {
+                if (text.isNotBlank() && displayedKeys.add(text.lowercase())) {
+                    labels.add(StyledLabel(text, style))
+                }
+            }
+            book.wordCount?.let { addLabel(it, LabelStyle.FILLED) }
+            sourceTags.forEach { addLabel(it, LabelStyle.FILLED) }
             if (book.isLocal) {
                 withContext(IO) {
                     val size = try {
@@ -935,98 +944,57 @@ class BookInfoActivity :
                         0L
                     }
                     if (size > 0) {
-                        kinds = kinds.toMutableList()
-                        kinds.add(ConvertUtils.formatFileSize(size))
+                        addLabel(ConvertUtils.formatFileSize(size), LabelStyle.FILLED)
                     }
                 }
             }
-            if (kinds.isEmpty()) {
+            book.userTags().forEach { addLabel(it, LabelStyle.TONAL) }
+            if (labels.isEmpty()) {
                 lbKind.gone()
             } else {
                 lbKind.visible()
                 val source = viewModel.bookSource
-                if (source == null) {
-                    lbKind.setLabels(kinds)
-                    return@launch
-                }
-                lbKind.setLabels(
-                    kinds,
-                    { kind ->
-                        SourceCallBack.callBackBtn(
-                            this@BookInfoActivity,
-                            SourceCallBack.CLICK_BOOK_LABEL,
-                            source,
-                            book,
-                            null,
-                            result = kind
-                        ) {
-                            SearchActivity.start(this@BookInfoActivity, source, kind)
+                lbKind.setStyledLabels(
+                    labels,
+                    onClick = { label ->
+                        val sourceTag = sourceTags.any { it.equals(label, ignoreCase = true) }
+                        if (sourceTag && source != null) {
+                            SourceCallBack.callBackBtn(
+                                this@BookInfoActivity,
+                                SourceCallBack.CLICK_BOOK_LABEL,
+                                source,
+                                book,
+                                null,
+                                result = label
+                            ) {
+                                SearchActivity.startLocal(this@BookInfoActivity, label)
+                            }
+                        } else if (sourceTag || book.userTags().any {
+                                it.equals(label, ignoreCase = true)
+                            }) {
+                            SearchActivity.startLocal(this@BookInfoActivity, label)
                         }
                     },
-                    { kind ->
-                        SourceCallBack.callBackBtn(
-                            this@BookInfoActivity,
-                            SourceCallBack.LONG_CLICK_BOOK_LABEL,
-                            source,
-                            book,
-                            null,
-                            result = kind
-                        )
-                        true
+                    onLongClick = { label ->
+                        if (source != null && sourceTags.any {
+                                it.equals(label, ignoreCase = true)
+                            }) {
+                            SourceCallBack.callBackBtn(
+                                this@BookInfoActivity,
+                                SourceCallBack.LONG_CLICK_BOOK_LABEL,
+                                source,
+                                book,
+                                null,
+                                result = label
+                            )
+                            true
+                        } else {
+                            false
+                        }
                     }
                 )
             }
         }
-    }
-
-    private fun upCustomTags(book: Book) = binding.run {
-        val tags = book.userTags()
-        lbCustomTag.setLabels(
-            tags,
-            onClick = { tag ->
-                SearchActivity.startLocal(this@BookInfoActivity, tag)
-            },
-            onLongClick = {
-                editCustomTags(book)
-                true
-            }
-        )
-        ivEditCustomTag.setOnClickListener {
-            editCustomTags(book)
-        }
-    }
-
-    private fun editCustomTags(book: Book) {
-        if (!viewModel.inBookshelf) {
-            alert(R.string.book_custom_tags, R.string.book_custom_tags_need_shelf) {
-                yesButton {
-                    viewModel.addToBookshelf {
-                        upTvBookshelf()
-                        editCustomTags(book)
-                    }
-                }
-                noButton()
-            }
-            return
-        }
-        val alertBinding = DialogEditTextBinding.inflate(layoutInflater).apply {
-            editView.setHint(R.string.book_custom_tags_hint)
-            editView.setSingleLine(false)
-            editView.minLines = 2
-            editView.maxLines = 6
-            editView.setText(book.userTags().joinToString("，"))
-            editView.setSelection(editView.text?.length ?: 0)
-        }
-        alert(R.string.book_custom_tags_edit) {
-            customView { alertBinding.root }
-            okButton {
-                book.customTag = normalizeBookTags(alertBinding.editView.text?.toString())
-                viewModel.saveBook(book) {
-                    upCustomTags(book)
-                }
-            }
-            cancelButton()
-        }.requestInputMethod()
     }
 
     private fun showCover(book: Book) {

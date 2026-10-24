@@ -18,11 +18,15 @@ import io.legado.app.data.entities.BookCacheInfo
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.BookshelfBook
+import io.legado.app.data.entities.ShelfBookTags
 import io.legado.app.help.book.isNotShelf
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+
+private const val SHELF_TAG_BOOK_URL_CHUNK_SIZE = 900
 
 @Dao
 interface BookDao {
@@ -118,28 +122,29 @@ interface BookDao {
     )
     fun flowShelfSearch(key: String): Flow<List<Book>>
 
+    fun flowShelfTagSearch(tag: String): Flow<List<Book>> {
+        if (tag.isBlank()) return flowOf(emptyList())
+        return flowShelfTagBooks().map { books ->
+            books.asSequence()
+                .filter { it.hasTag(tag) }
+                .map { it.bookUrl }
+                .toList()
+                .chunked(SHELF_TAG_BOOK_URL_CHUNK_SIZE)
+                .flatMap(::getShelfBooksByUrls)
+        }
+    }
+
     @Query(
-        """
-        SELECT * FROM books
-        WHERE type & ${BookType.notShelf} = 0
-        AND instr(
-            ',' ||
-            replace(
-                replace(
-                    replace(
-                        replace(coalesce(customTag, ''), '，', ','),
-                        '、', ','
-                    ),
-                    char(10), ','
-                ),
-                char(13), ','
-            ) ||
-            ',',
-            ',' || :tag || ','
-        ) > 0
-        """
+        "SELECT bookUrl, kind, customTag FROM books " +
+            "WHERE type & ${BookType.notShelf} = 0"
     )
-    fun flowShelfTagSearch(tag: String): Flow<List<Book>>
+    fun flowShelfTagBooks(): Flow<List<ShelfBookTags>>
+
+    @Query(
+        "SELECT * FROM books WHERE type & ${BookType.notShelf} = 0 " +
+            "AND bookUrl IN (:bookUrls)"
+    )
+    fun getShelfBooksByUrls(bookUrls: List<String>): List<Book>
 
     @Query("SELECT * FROM books where type & ${BookType.updateError} > 0 order by durChapterTime desc")
     fun flowUpdateError(): Flow<List<Book>>
@@ -431,6 +436,7 @@ interface BookDao {
         deleteRows(oldBook)
         insert(
             newBook.copy(
+                customTag = oldBook.customTag,
                 customCoverUrl = customCoverUrl,
                 persistedCoverUrl = persistedCoverUrl,
                 readConfig = readConfig,

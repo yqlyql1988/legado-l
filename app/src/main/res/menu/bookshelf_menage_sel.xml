@@ -22,6 +22,14 @@
         android:title="@string/remove_group" />
 
     <item
+        android:id="@+id/menu_add_tags"
+        android:title="@string/book_tag_add_batch" />
+
+    <item
+        android:id="@+id/menu_remove_tags"
+        android:title="@string/book_tag_remove_batch" />
+
+    <item
         android:id="@+id/menu_change_source"
         android:title="@string/change_source_batch" />
 

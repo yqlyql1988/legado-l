@@ -140,45 +140,6 @@
                                 app:flexWrap="wrap"
                                 app:justifyContent="center" />
 
-                            <LinearLayout
-                                android:id="@+id/ll_custom_tag"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:gravity="center_vertical"
-                                android:orientation="horizontal"
-                                android:paddingBottom="6dp">
-
-                                <TextView
-                                    android:id="@+id/tv_custom_tag_title"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginEnd="6dp"
-                                    android:text="@string/book_custom_tags"
-                                    android:textColor="@color/tv_text_summary"
-                                    android:textSize="13sp" />
-
-                                <io.legado.app.ui.widget.LabelsBar
-                                    android:id="@+id/lb_custom_tag"
-                                    android:layout_width="0dp"
-                                    android:layout_height="wrap_content"
-                                    android:layout_weight="1"
-                                    app:alignItems="center"
-                                    app:flexDirection="row"
-                                    app:flexWrap="wrap"
-                                    app:justifyContent="flex_start" />
-
-                                <androidx.appcompat.widget.AppCompatImageView
-                                    android:id="@+id/iv_edit_custom_tag"
-                                    android:layout_width="36dp"
-                                    android:layout_height="36dp"
-                                    android:background="?android:attr/selectableItemBackgroundBorderless"
-                                    android:contentDescription="@string/book_custom_tags_edit"
-                                    android:padding="7dp"
-                                    android:src="@drawable/ic_edit"
-                                    android:tint="@color/tv_text_summary" />
-
-                            </LinearLayout>
-
                         </LinearLayout>
 
                         <LinearLayout

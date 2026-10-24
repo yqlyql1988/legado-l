@@ -32,6 +32,8 @@ class BookInfoEditLayoutTest {
             "tie_book_name",
             "tie_book_author",
             "sp_type",
+            "tie_custom_tag",
+            "lb_common_tag",
             "tie_cover_url",
             "tv_select_cover",
             "tv_change_cover",
