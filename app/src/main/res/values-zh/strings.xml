@@ -94,6 +94,12 @@
     <string name="origin_format">来源：%s</string>
     <string name="read_dur_progress">最近：%s</string>
     <string name="book_name">书名</string>
+    <string name="book_custom_tags">我的标签</string>
+    <string name="book_custom_tags_edit">编辑我的标签</string>
+    <string name="book_custom_tags_hint">多个标签用逗号或换行分隔</string>
+    <string name="book_custom_tags_need_shelf">请先将书籍加入书架，再添加标签</string>
+    <string name="book_shelf_search">书架搜索</string>
+    <string name="book_shelf_search_hint">搜索书名、作者或标签</string>
     <string name="lasted_show">最新：%s</string>
     <string name="check_add_bookshelf">是否将《%s》放入书架？</string>
     <string name="import_books_count">共 %s 个文本文件</string>

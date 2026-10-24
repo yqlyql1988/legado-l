@@ -37,7 +37,10 @@ import io.legado.app.data.entities.BaseSource
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.normalizeBookTags
+import io.legado.app.data.entities.userTags
 import io.legado.app.databinding.ActivityBookInfoBinding
+import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.GlideImageGetter
@@ -111,6 +114,7 @@ import io.legado.app.utils.longToastOnUi
 import io.legado.app.utils.observeEvent
 import io.legado.app.utils.openFileUri
 import io.legado.app.utils.openUrl
+import io.legado.app.utils.requestInputMethod
 import io.legado.app.utils.sendToClip
 import io.legado.app.utils.setHtml
 import io.legado.app.utils.setMarkdown
@@ -646,6 +650,7 @@ class BookInfoActivity :
         menuCustomBtn?.isVisible = viewModel.hasCustomBtn
         upTvBookshelf()
         upKinds(book)
+        upCustomTags(book)
         upGroup(book.group)
     }
 
@@ -972,6 +977,56 @@ class BookInfoActivity :
                 )
             }
         }
+    }
+
+    private fun upCustomTags(book: Book) = binding.run {
+        val tags = book.userTags()
+        lbCustomTag.setLabels(
+            tags,
+            onClick = { tag ->
+                SearchActivity.startLocal(this@BookInfoActivity, tag)
+            },
+            onLongClick = {
+                editCustomTags(book)
+                true
+            }
+        )
+        ivEditCustomTag.setOnClickListener {
+            editCustomTags(book)
+        }
+    }
+
+    private fun editCustomTags(book: Book) {
+        if (!viewModel.inBookshelf) {
+            alert(R.string.book_custom_tags, R.string.book_custom_tags_need_shelf) {
+                yesButton {
+                    viewModel.addToBookshelf {
+                        upTvBookshelf()
+                        editCustomTags(book)
+                    }
+                }
+                noButton()
+            }
+            return
+        }
+        val alertBinding = DialogEditTextBinding.inflate(layoutInflater).apply {
+            editView.setHint(R.string.book_custom_tags_hint)
+            editView.setSingleLine(false)
+            editView.minLines = 2
+            editView.maxLines = 6
+            editView.setText(book.userTags().joinToString("，"))
+            editView.setSelection(editView.text?.length ?: 0)
+        }
+        alert(R.string.book_custom_tags_edit) {
+            customView { alertBinding.root }
+            okButton {
+                book.customTag = normalizeBookTags(alertBinding.editView.text?.toString())
+                viewModel.saveBook(book) {
+                    upCustomTags(book)
+                }
+            }
+            cancelButton()
+        }.requestInputMethod()
     }
 
     private fun showCover(book: Book) {

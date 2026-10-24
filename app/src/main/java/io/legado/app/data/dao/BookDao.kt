@@ -98,8 +98,48 @@ interface BookDao {
     @Query("SELECT * FROM books WHERE (`group` & :group) > 0")
     fun flowByUserGroup(group: Long): Flow<List<Book>>
 
-    @Query("SELECT * FROM books WHERE name like '%'||:key||'%' or author like '%'||:key||'%'")
+    @Query(
+        """
+        SELECT * FROM books WHERE name like '%'||:key||'%' or author like '%'||:key||'%'
+        or kind like '%'||:key||'%' or customTag like '%'||:key||'%'
+        """
+    )
     fun flowSearch(key: String): Flow<List<Book>>
+
+    @Query(
+        """
+        SELECT * FROM books
+        WHERE type & ${BookType.notShelf} = 0
+        AND (
+            name like '%'||:key||'%' or author like '%'||:key||'%'
+            or kind like '%'||:key||'%' or customTag like '%'||:key||'%'
+        )
+        """
+    )
+    fun flowShelfSearch(key: String): Flow<List<Book>>
+
+    @Query(
+        """
+        SELECT * FROM books
+        WHERE type & ${BookType.notShelf} = 0
+        AND instr(
+            ',' ||
+            replace(
+                replace(
+                    replace(
+                        replace(coalesce(customTag, ''), '，', ','),
+                        '、', ','
+                    ),
+                    char(10), ','
+                ),
+                char(13), ','
+            ) ||
+            ',',
+            ',' || :tag || ','
+        ) > 0
+        """
+    )
+    fun flowShelfTagSearch(tag: String): Flow<List<Book>>
 
     @Query("SELECT * FROM books where type & ${BookType.updateError} > 0 order by durChapterTime desc")
     fun flowUpdateError(): Flow<List<Book>>
