@@ -117,6 +117,8 @@ import io.legado.app.ui.book.read.page.entities.TextPage
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.ui.book.read.page.provider.LayoutProgressListener
 import io.legado.app.ui.book.searchContent.SearchContentActivity
+import io.legado.app.ui.book.searchContent.ContentSearchAnchor
+import io.legado.app.ui.book.searchContent.ContentSearchAnchorException
 import io.legado.app.ui.book.searchContent.SearchResult
 import io.legado.app.model.SourceCallBack
 import io.legado.app.ui.book.source.edit.BookSourceEditActivity
@@ -165,6 +167,7 @@ import io.legado.app.utils.throttle
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.visible
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers.Default
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.Job
@@ -287,6 +290,9 @@ class ReadBookActivity : BaseReadBookActivity(),
     private var backupJob: Job? = null
     private var bookmarkJob: Job? = null
     private var replacePreviewJob: Job? = null
+    private var openSearchJob: Job? = null
+    private var searchJumpJob: Job? = null
+    private var searchJumpGeneration = 0L
     private var replacePreviewGeneration = 0L
     private val bookmarkToggleMutex = Mutex()
     private var bookmarkTogglePending = false
@@ -1377,10 +1383,8 @@ class ReadBookActivity : BaseReadBookActivity(),
 
     override fun onHighlightStyleChanged(style: HighlightStyle) {
         editingHighlight?.let { highlight ->
-            val visibleStyle = visibleHighlightStyle(style)
-            highlight.applyStyle(visibleStyle)
-            ReadBook.updateHighlight(highlight)
-            ReadBook.saveLastHighlightStyle(visibleStyle)
+            ReadBook.updateHighlightStyle(highlight, style)
+            ReadBook.saveLastHighlightStyle(style)
         }
     }
 
@@ -1728,7 +1732,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         lifecycleScope.launch {
             val shouldResetPageOffset = resetPageOffset &&
                 (readPositionVersion == null || isReadPositionVersionCurrent(readPositionVersion))
-            binding.readView.cancelTouchGestures()
+            binding.readView.cancelTouchGesturesOnContentUpdate()
             binding.readView.upContent(relativePosition, shouldResetPageOffset)
             scheduleAloudFollowCheck()
             observeBookmarks()
@@ -1758,7 +1762,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     ) = withContext(Main.immediate) {
         val shouldResetPageOffset = resetPageOffset &&
             (readPositionVersion == null || isReadPositionVersionCurrent(readPositionVersion))
-        binding.readView.cancelTouchGestures()
+        binding.readView.cancelTouchGesturesOnContentUpdate()
         binding.readView.upContent(relativePosition, shouldResetPageOffset)
         scheduleAloudFollowCheck()
         observeBookmarks()
@@ -2034,13 +2038,32 @@ class ReadBookActivity : BaseReadBookActivity(),
      */
     override fun openSearchActivity(searchWord: String?) {
         val book = ReadBook.book ?: return
-        searchContentActivity.launch {
-            putExtra("bookUrl", book.bookUrl)
-            putExtra("searchWord", searchWord ?: viewModel.searchContentQuery)
-            putExtra("searchResultIndex", viewModel.searchResultIndex)
-            viewModel.searchResultList?.first()?.let {
-                if (it.query == viewModel.searchContentQuery) {
-                    IntentData.put("searchResultList", viewModel.searchResultList)
+        binding.readView.updateScrollReadPosition()
+        val chapterIndex = ReadBook.durChapterIndex
+        val chapterPosition = ReadBook.durChapterPos
+        val chapter = ReadBook.curTextChapter?.takeIf {
+            it.isCompleted && it.chapter.bookUrl == book.bookUrl && it.chapter.index == chapterIndex
+        }
+        val query = searchWord ?: viewModel.searchContentQuery
+        val results = viewModel.searchResultList?.takeIf { it.firstOrNull()?.query == query }
+        val resultIndex = viewModel.searchResultIndex
+        openSearchJob?.cancel()
+        openSearchJob = lifecycleScope.launch {
+            val anchor = withContext(Default) {
+                chapter?.let {
+                    ContentSearchAnchor.capture(
+                        chapterIndex, it.getContent(), it.layoutTitleLength, chapterPosition,
+                    )
+                }
+            }
+            searchContentActivity.launch {
+                putExtra("bookUrl", book.bookUrl)
+                putExtra("searchChapterIndex", chapterIndex)
+                putExtra("searchAnchorKey", IntentData.put(anchor))
+                putExtra("searchWord", query)
+                putExtra("searchResultIndex", resultIndex)
+                results?.let {
+                    IntentData.put("searchResultList", it)
                 }
             }
         }
@@ -2090,6 +2113,8 @@ class ReadBookActivity : BaseReadBookActivity(),
 
     // 退出全文搜索
     override fun exitSearchMenu() {
+        searchJumpGeneration++
+        searchJumpJob?.cancel()
         if (isShowingSearchResult) {
             isShowingSearchResult = false
             binding.searchMenu.invalidate()
@@ -2859,39 +2884,56 @@ class ReadBookActivity : BaseReadBookActivity(),
 
     /* 全文搜索跳转 */
     private fun skipToSearch(searchResult: SearchResult) {
+        val generation = ++searchJumpGeneration
+        searchJumpJob?.cancel()
         if (searchResult.chapterIndex != ReadBook.durChapterIndex) {
             viewModel.openChapter(searchResult.chapterIndex) {
-                jumpToPosition(searchResult)
+                if (generation == searchJumpGeneration) jumpToPosition(searchResult, generation)
             }
         } else {
-            jumpToPosition(searchResult)
+            jumpToPosition(searchResult, generation)
         }
     }
 
-    private fun jumpToPosition(searchResult: SearchResult) {
+    private fun jumpToPosition(searchResult: SearchResult, generation: Long) {
         val curTextChapter = ReadBook.curTextChapter ?: return
-        binding.searchMenu.updateSearchInfo()
-        val searchResultPositions =
-            viewModel.searchResultPositions(curTextChapter, searchResult)
-        val (pageIndex, lineIndex, charIndex, addLine, charIndex2) = searchResultPositions
-        ReadBook.skipToPage(pageIndex) {
-            isSelectingSearchResult = true
-            binding.readView.curPage.selectStartMoveIndex(0, lineIndex, charIndex)
-            when (addLine) {
-                0 -> binding.readView.curPage.selectEndMoveIndex(
-                    0,
-                    lineIndex,
-                    charIndex + searchResultPositions[5] - 1
-                )
-
-                1 -> binding.readView.curPage.selectEndMoveIndex(
-                    0, lineIndex + 1, charIndex2
-                )
-                //consider change page, jump to scroll position
-                -1 -> binding.readView.curPage.selectEndMoveIndex(1, 0, charIndex2)
+        searchJumpJob?.cancel()
+        searchJumpJob = lifecycleScope.launch {
+            binding.searchMenu.updateSearchInfo()
+            val searchResultPositions = try {
+                withContext(Default) {
+                    viewModel.searchResultPositions(curTextChapter, searchResult)
+                }
+            } catch (_: ContentSearchAnchorException) {
+                toastOnUi(R.string.content_search_result_unavailable)
+                return@launch
             }
-            binding.readView.isTextSelected = true
-            isSelectingSearchResult = false
+            if (generation != searchJumpGeneration || ReadBook.curTextChapter !== curTextChapter) return@launch
+            val (pageIndex, lineIndex, charIndex, addLine, charIndex2) = searchResultPositions
+            ReadBook.skipToPage(pageIndex) {
+                if (generation != searchJumpGeneration || ReadBook.curTextChapter !== curTextChapter) return@skipToPage
+                if (searchResultPositions[5] <= 0) {
+                    binding.readView.cancelSelect(true)
+                    return@skipToPage
+                }
+                isSelectingSearchResult = true
+                binding.readView.curPage.selectStartMoveIndex(0, lineIndex, charIndex)
+                when (addLine) {
+                    0 -> binding.readView.curPage.selectEndMoveIndex(
+                        0,
+                        lineIndex,
+                        charIndex + searchResultPositions[5] - 1
+                    )
+
+                    1 -> binding.readView.curPage.selectEndMoveIndex(
+                        0, lineIndex + 1, charIndex2
+                    )
+                    //consider change page, jump to scroll position
+                    -1 -> binding.readView.curPage.selectEndMoveIndex(1, 0, charIndex2)
+                }
+                binding.readView.isTextSelected = true
+                isSelectingSearchResult = false
+            }
         }
     }
 
@@ -3127,9 +3169,9 @@ class ReadBookActivity : BaseReadBookActivity(),
         highlightPopup?.dismiss()
         highlightActionPopup?.dismiss()
         binding.readView.onDestroy()
-        ReadBook.unregister(this)
+        val wasCurrentReader = ReadBook.unregister(this)
         handler.removeCallbacksAndMessages(null) // 清理Handler消息
-        if (!ReadBook.inBookshelf && !isChangingConfigurations) {
+        if (wasCurrentReader && !ReadBook.inBookshelf && !isChangingConfigurations) {
             viewModel.removeFromBookshelf(null)
         }
         if (!BuildConfig.DEBUG) {

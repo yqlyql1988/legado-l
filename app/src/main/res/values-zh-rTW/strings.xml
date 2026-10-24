@@ -1345,6 +1345,17 @@
     <string name="book_memo_discard">放棄未儲存的修改並關閉？</string>
     <string name="book_memo_save_failed">備忘儲存失敗：%1$s</string>
     <string name="reimport_book_source">重新匯入本書書源</string>
+    <string name="book_metadata_sync_title">書籍資訊同步</string>
+    <string name="book_metadata_sync_summary">修改書名或作者後，同步對應書籤和閱讀記錄，保留位置、時長和進度。適用於所有書籍。</string>
+    <string name="book_metadata_sync_yes">同步</string>
+    <string name="book_metadata_sync_no">不同步</string>
+    <string name="book_metadata_sync_ask">每次提醒</string>
+    <string name="book_metadata_sync_prompt">書名或作者已修改，是否將對應書籤和閱讀記錄同步為新的書名、作者？</string>
     <string name="customize_my">自訂我的頁面</string>
     <string name="my_more_items">將選取的功能移至更多</string>
+    <string name="content_search_scope_all">全局</string>
+    <string name="content_search_scope_down">向下</string>
+    <string name="content_search_scope_up">向上</string>
+    <string name="content_search_anchor_unavailable">正文處理後無法可靠定位目前閱讀位置。請返回閱讀頁重試，或切換為全域搜尋。</string>
+    <string name="content_search_result_unavailable">無法在閱讀正文中可靠定位此結果。請檢查替換淨化和標題設定後重新搜尋。</string>
 </resources>

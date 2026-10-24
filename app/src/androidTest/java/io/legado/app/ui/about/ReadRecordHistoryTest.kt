@@ -21,6 +21,9 @@ import androidx.core.view.isVisible
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.action.ViewActions.replaceText
+import androidx.test.espresso.action.ViewActions.closeSoftKeyboard
+import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
@@ -32,6 +35,7 @@ import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
+import io.legado.app.data.entities.Bookmark
 import io.legado.app.data.entities.ReadRecord
 import io.legado.app.data.entities.ReadRecordAuthors
 import io.legado.app.data.entities.replaceBookAfterSourceChange
@@ -41,6 +45,7 @@ import io.legado.app.databinding.ActivityReadRecordBinding
 import io.legado.app.databinding.ItemReadRecordDisplayBinding
 import io.legado.app.help.book.ReadRecordCoverCache
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.BookMetadataSync
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.storage.BackupConfig
 import io.legado.app.help.storage.Restore
@@ -48,6 +53,7 @@ import io.legado.app.help.storage.writePreferenceSnapshot
 import io.legado.app.lib.theme.ThemeStore
 import io.legado.app.lib.theme.ThemeStorePrefKeys
 import io.legado.app.ui.book.read.ReadBookActivity
+import io.legado.app.ui.book.info.edit.BookInfoEditActivity
 import io.legado.app.utils.defaultSharedPreferences
 import io.legado.app.utils.GSON
 import kotlinx.coroutines.Dispatchers
@@ -187,6 +193,74 @@ class ReadRecordHistoryTest {
             assertEquals(expected, dao.all.toSet())
             scenario!!.close()
             scenario = null
+        }
+    }
+
+    @Test
+    fun bookInfoMetadataSyncHonorsAllChoicesAndPreservesBookmarkIdentity() {
+        val dao = appDb.readRecordDao
+        val originalPreference = prefs.getString(PreferKey.bookMetadataSync, null)
+        val backup = File(context.cacheDir, "metadata-setting-$id").apply { mkdirs() }
+        val mark = Bookmark(time = System.currentTimeMillis(), bookName = book.name, bookAuthor = book.author,
+            chapterIndex = 6, chapterPos = 25, chapterName = "Chapter 7", bookText = "Original text", content = "Note")
+        try {
+            prefs.edit().remove(PreferKey.bookMetadataSync).commit()
+            assertEquals(BookMetadataSync.ASK, AppConfig.bookMetadataSync)
+            assertTrue(BackupConfig.keyIsNotIgnore(PreferKey.bookMetadataSync))
+            for ((mode, choice) in listOf("never" to 0, "sync" to 0, "ask" to 1, "ask" to 2, "ask" to 3)) {
+                prefs.edit().putString(PreferKey.bookMetadataSync, mode).commit()
+                appDb.bookDao.update(book)
+                appDb.bookmarkDao.insert(mark)
+                dao.clear()
+                dao.insert(ReadRecord(deviceId = AppConst.androidId, bookName = book.name, author = book.author, readTime = 100))
+                val intent = Intent(context, BookInfoEditActivity::class.java).putExtra("bookUrl", book.bookUrl)
+                ActivityScenario.launch<BookInfoEditActivity>(intent).use { editor ->
+                    val deadline = SystemClock.uptimeMillis() + 10_000
+                    var loaded = false
+                    while (!loaded && SystemClock.uptimeMillis() < deadline) {
+                        editor.onActivity { loaded = it.findViewById<TextView>(R.id.tie_book_name).text.toString() == book.name }
+                        if (!loaded) SystemClock.sleep(25)
+                    }
+                    assertTrue("Book information must load", loaded)
+                    onView(withId(R.id.tie_book_name)).perform(replaceText("New book"))
+                    onView(withId(R.id.tie_book_author)).perform(replaceText("New author"), closeSoftKeyboard())
+                    onView(withId(R.id.menu_save)).perform(click())
+                    if (mode == "ask") {
+                        assertEquals(book.name, appDb.bookDao.getBook(book.bookUrl)!!.name)
+                        assertEquals(mark, appDb.bookmarkDao.all.single { it.time == mark.time })
+                        screenshot("book-metadata-sync-ask-$choice")
+                        onView(withId(when (choice) { 1 -> android.R.id.button1; 2 -> android.R.id.button2; else -> android.R.id.button3 }))
+                            .inRoot(isDialog()).perform(click())
+                    }
+                    if (choice != 3) {
+                        val end = SystemClock.uptimeMillis() + 10_000
+                        while (appDb.bookDao.getBook(book.bookUrl)!!.name != "New book" && SystemClock.uptimeMillis() < end) SystemClock.sleep(25)
+                        assertEquals("New book", appDb.bookDao.getBook(book.bookUrl)!!.name)
+                    } else assertEquals(book.name, appDb.bookDao.getBook(book.bookUrl)!!.name)
+                    val sync = mode == "sync" || mode == "ask" && choice == 1
+                    assertEquals(if (sync) mark.copy(bookName = "New book", bookAuthor = "New author") else mark,
+                        appDb.bookmarkDao.all.single { it.time == mark.time })
+                    val display = dao.allShow.single()
+                    assertEquals(if (sync) "New book" else book.name, display.bookName)
+                    assertEquals(if (sync) "New author" else book.author, display.author)
+                    assertEquals(100L, display.readTime)
+                    assertNotNull(dao.getRecord(AppConst.androidId, book.name, book.author))
+                }
+            }
+            prefs.edit().putString(PreferKey.bookMetadataSync, "sync").commit()
+            writePreferenceSnapshot(context, backup.absolutePath, "config") {
+                putString(PreferKey.bookMetadataSync, "sync")
+            }
+            prefs.edit().putString(PreferKey.bookMetadataSync, "never").commit()
+            runBlocking(Dispatchers.IO) { Restore.restoreLocked(backup.absolutePath) }
+            assertEquals(BookMetadataSync.SYNC, AppConfig.bookMetadataSync)
+        } finally {
+            appDb.bookDao.update(book)
+            appDb.bookmarkDao.delete(mark)
+            prefs.edit().apply {
+                if (originalPreference == null) remove(PreferKey.bookMetadataSync) else putString(PreferKey.bookMetadataSync, originalPreference)
+            }.commit()
+            backup.deleteRecursively()
         }
     }
 

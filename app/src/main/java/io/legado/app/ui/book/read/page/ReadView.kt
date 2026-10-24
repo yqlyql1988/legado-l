@@ -151,6 +151,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
     val defaultAnimationSpeed = 300
     private var pressDown = false
     internal val isTouching: Boolean get() = pressDown
+    private val isPageDragging: Boolean get() = pressDown && pageDelegate?.isMoved == true
     private var isMove = false
     private val readPositionVersion = ReadPositionVersion()
 
@@ -599,8 +600,20 @@ class ReadView(context: Context, attrs: AttributeSet) :
         cancelNonPdfGestures()
     }
 
+    /**
+     * Keep an in-progress page drag alive while adjacent content is refreshed.
+     */
+    fun cancelTouchGesturesOnContentUpdate() {
+        if (isPageDragging) return
+        cancelTouchGestures()
+    }
+
     internal fun cancelNonPdfGestures() {
-        endSelectionDrag()
+        if (isPageDragging) {
+            pageDelegate?.isCancel = true
+            pageDelegate?.abortAnim()
+            invalidate()
+        }
         curPage.cancelHighlightTap()
         removeCallbacks(longPressRunnable)
         longPressed = false

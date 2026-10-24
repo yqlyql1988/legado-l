@@ -73,7 +73,7 @@ interface BookHighlightDao {
     fun updateBookMetadata(bookUrl: String, bookName: String, bookAuthor: String)
 
     @Update
-    fun update(highlight: BookHighlight)
+    fun update(vararg highlight: BookHighlight)
 
     @Query("""UPDATE highlights SET chapterUrl = :chapterUrl, chapterIndex = :chapterIndex,
         chapterName = :chapterName, chapterPos = :start, chapterPosEnd = :end,

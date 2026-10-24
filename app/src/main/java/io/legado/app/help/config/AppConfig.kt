@@ -38,6 +38,9 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     var showSourceCheckStatus: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.showSourceCheckStatus, false)
         set(value) = appCtx.putPrefBoolean(PreferKey.showSourceCheckStatus, value)
+    var showSourceBookshelfCount: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.showSourceBookshelfCount, false)
+        set(value) = appCtx.putPrefBoolean(PreferKey.showSourceBookshelfCount, value)
     var blockSourceNavigation: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.blockSourceNavigation, false)
         set(value) = appCtx.putPrefBoolean(PreferKey.blockSourceNavigation, value)
@@ -227,6 +230,24 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         get() = appCtx.getPrefBoolean(PreferKey.showSearchReadRecord, true)
         set(value) {
             appCtx.putPrefBoolean(PreferKey.showSearchReadRecord, value)
+        }
+
+    var contentSearchScope: Int
+        get() = appCtx.getPrefInt(PreferKey.contentSearchScope, 0)
+        set(value) {
+            appCtx.putPrefInt(PreferKey.contentSearchScope, value)
+        }
+
+    var contentSearchReplace: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.contentSearchReplace, false)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.contentSearchReplace, value)
+        }
+
+    var contentSearchRegex: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.contentSearchRegex, false)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.contentSearchRegex, value)
         }
 
     var bookshelfReadProgressMode: Int
@@ -621,6 +642,12 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefBoolean(PreferKey.enableReadRecord, value)
         }
 
+    var enableRssReadRecord: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.enableRssReadRecord, true)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.enableRssReadRecord, value)
+        }
+
     val autoChangeSource: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.autoChangeSource, true)
 
@@ -770,6 +797,13 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
     val webDavBookAutoRestore
         get() = appCtx.getPrefBoolean(PreferKey.webDavBookAutoRestore, false)
+
+    val webDavBackupKeepCount: Int
+        get() = appCtx.getPrefString(PreferKey.webDavBackupKeepCount)
+            ?.trim()?.toIntOrNull()?.coerceAtLeast(0) ?: 0
+
+    val webDavBookAutoUpload
+        get() = appCtx.getPrefBoolean(PreferKey.webDavBookAutoUpload, false)
 
     val recordHeapDump get() = appCtx.getPrefBoolean(PreferKey.recordHeapDump, false)
 
