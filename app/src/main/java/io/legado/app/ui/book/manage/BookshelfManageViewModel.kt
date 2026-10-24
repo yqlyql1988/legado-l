@@ -13,6 +13,8 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.replaceBookAfterSourceChange
 import io.legado.app.data.entities.saveReadRecordSnapshot
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.normalizeBookTags
+import io.legado.app.data.entities.userTags
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.installPersistentCover
 import io.legado.app.help.book.isLocal
@@ -39,6 +41,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Semaphore
 import java.io.File
+import java.util.Locale
 
 internal data class PersistentCoverResult(
     val saved: Int,
@@ -74,6 +77,29 @@ class BookshelfManageViewModel(application: Application) : BaseViewModel(applica
     fun updateBook(vararg book: Book) {
         execute {
             appDb.bookDao.updatePreservingCustomCoverUrl(*book)
+        }
+    }
+
+    fun updateTags(books: List<Book>, tags: List<String>, remove: Boolean) {
+        execute {
+            val tagKeys = tags.mapTo(hashSetOf()) { it.lowercase(Locale.ROOT) }
+            appDb.runInTransaction {
+                val changed = books.mapNotNull { selected ->
+                    val current = appDb.bookDao.getBook(selected.bookUrl) ?: return@mapNotNull null
+                    val currentTags = current.userTags()
+                    val nextTags = if (remove) {
+                        currentTags.filterNot { it.lowercase(Locale.ROOT) in tagKeys }
+                    } else {
+                        currentTags + tags
+                    }
+                    val customTag = normalizeBookTags(nextTags)
+                    if (customTag == current.customTag) null
+                    else current.copy(customTag = customTag)
+                }
+                if (changed.isNotEmpty()) {
+                    appDb.bookDao.updatePreservingCustomCoverUrl(*changed.toTypedArray())
+                }
+            }
         }
     }
 
