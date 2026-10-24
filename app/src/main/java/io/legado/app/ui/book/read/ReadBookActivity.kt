@@ -356,6 +356,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     private var relocatingNoteKind: String? = null
     private var relocatingNoteTime: Long = -1
     private var relocatingNoteText: String = ""
+    private var relocationExpanded = false
     private var syncDialog: AlertDialog? = null
 
     @Suppress("DEPRECATION")
@@ -388,6 +389,12 @@ class ReadBookActivity : BaseReadBookActivity(),
             val word = relocationSearchWord()
             if (word.isBlank()) toastOnUi(R.string.reading_note_find_empty)
             else openSearchActivity(word)
+        }
+        binding.relocationBar.btnRelocationExpand.setOnClickListener {
+            toggleRelocationExpanded()
+        }
+        binding.relocationBar.tvRelocationQuote.setOnClickListener {
+            toggleRelocationExpanded()
         }
         binding.relocationBar.btnRelocationCancel.setOnClickListener { clearNoteRelocation() }
         showRelocationHint()
@@ -1407,20 +1414,37 @@ class ReadBookActivity : BaseReadBookActivity(),
             binding.relocationBar.root.isVisible = false
             return
         }
+        relocationExpanded = false
         val quote = relocatingNoteText.trim()
         binding.relocationBar.tvRelocationQuote.text = if (quote.isBlank()) {
             getString(R.string.reading_note_manual_hint)
         } else {
-            getString(R.string.reading_note_manual_bar_quote, quotePreview(quote))
+            getString(R.string.reading_note_manual_bar_quote, quotePreview(quote, 200))
         }
         val background = bottomBackground
         val textColor = getPrimaryTextColor(ColorUtils.isColorLight(background))
         binding.relocationBar.root.setBackgroundColor(background)
         binding.relocationBar.tvRelocationQuote.setTextColor(textColor)
+        binding.relocationBar.btnRelocationExpand.setTextColor(textColor)
         binding.relocationBar.btnRelocationFind.setTextColor(accentColor)
         binding.relocationBar.btnRelocationCancel.setTextColor(textColor)
+        binding.relocationBar.btnRelocationExpand.isVisible = quote.isNotBlank()
         binding.relocationBar.btnRelocationFind.isVisible = quote.isNotBlank()
+        applyRelocationExpanded()
         binding.relocationBar.root.isVisible = true
+    }
+
+    private fun toggleRelocationExpanded() {
+        relocationExpanded = !relocationExpanded
+        applyRelocationExpanded()
+    }
+
+    private fun applyRelocationExpanded() {
+        binding.relocationBar.tvRelocationQuote.maxLines = if (relocationExpanded) 6 else 1
+        binding.relocationBar.btnRelocationExpand.text = getString(
+            if (relocationExpanded) R.string.reading_note_collapse
+            else R.string.reading_note_expand
+        )
     }
 
     private fun relocationSearchWord(): String {
@@ -1447,6 +1471,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         relocatingNoteKind = null
         relocatingNoteTime = -1
         relocatingNoteText = ""
+        relocationExpanded = false
         if (clearQueue) ReadingNoteNavigation.clearQueue()
         intent.removeExtra(ReadingNoteNavigation.EXTRA_KIND)
         intent.removeExtra(ReadingNoteNavigation.EXTRA_TIME)

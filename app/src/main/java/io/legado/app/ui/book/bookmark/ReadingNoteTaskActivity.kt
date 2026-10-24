@@ -271,6 +271,18 @@ class ReadingNoteTaskActivity : BaseActivity<ActivityReadingNoteTaskBinding>() {
                 task.note.chapterName,
                 task.chapter?.title ?: task.note.chapterName))
             append("\n").append(reasonText(task))
+            val noteText = task.note.note.trim()
+            if (noteText.isNotBlank()) {
+                append("\n").append(getString(R.string.reading_note_task_note, noteText))
+            }
+            if (task.note.tags.isNotEmpty()) {
+                append("\n").append(
+                    getString(
+                        R.string.reading_note_task_tags,
+                        task.note.tags.joinToString("、") { it.name },
+                    )
+                )
+            }
         }
         if (parts.isEmpty()) {
             dialogBinding.tvBefore.text = beforeContext
@@ -456,6 +468,18 @@ class ReadingNoteTaskActivity : BaseActivity<ActivityReadingNoteTaskBinding>() {
                 tvAfter.text = if (tvAfter.isVisible) {
                     getString(R.string.reading_note_task_after, task.afterQuote)
                 } else ""
+                val noteText = task.note.note.trim()
+                tvNote.isVisible = noteText.isNotBlank()
+                tvNote.text = if (tvNote.isVisible) {
+                    getString(R.string.reading_note_task_note, noteText)
+                } else ""
+                tvTags.isVisible = task.note.tags.isNotEmpty()
+                tvTags.text = if (tvTags.isVisible) {
+                    getString(
+                        R.string.reading_note_task_tags,
+                        task.note.tags.joinToString("、") { it.name },
+                    )
+                } else ""
                 tvMeta.text = getString(
                     R.string.reading_note_task_meta,
                     getString(if (task.note.highlight != null) R.string.book_notes_highlight
@@ -495,6 +519,7 @@ private fun ReadingNoteTask.matches(query: String): Boolean {
     val key = query.trim()
     if (key.isBlank()) return true
     return listOf(
-        archive.name, archive.author, note.chapterName, beforeQuote, afterQuote
+        archive.name, archive.author, note.chapterName, beforeQuote, afterQuote,
+        note.note, note.tags.joinToString(" ") { it.name },
     ).any { it.contains(key, true) }
 }
