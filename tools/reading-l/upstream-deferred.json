@@ -1,5 +1,6 @@
 {
   "updated_on": "2026-10-24",
+  "policy": "app_first_selective_adaptation",
   "items": [
     {
       "feature": "边距控件扩大触摸区域",

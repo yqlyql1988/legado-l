@@ -41,6 +41,10 @@ class SourceChecks(unittest.TestCase):
         with self.assertRaises(manage.ManagementError):
             manage.latest_log_date("# 更新日志\n无日期")
 
+    def test_legacy_upstream_policy_is_rejected(self):
+        with self.assertRaisesRegex(manage.ManagementError, "当前 App 优先"):
+            manage.validate_upstream_policy("merge_filtered_source_snapshot")
+
 
 class GitOperations(unittest.TestCase):
     def setUp(self):
