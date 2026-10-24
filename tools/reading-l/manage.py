@@ -13,6 +13,7 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[2]
 ORIGIN = "https://github.com/yqlyql1988/legado-l.git"
 BRANCHES = ("main", "upstream-source")
+UPSTREAM_INTEGRATION = "app_first_selective_adaptation"
 PRIVATE_SUFFIXES = {".apk", ".aab", ".bundle", ".jks", ".keystore", ".p12", ".pfx"}
 PRIVATE_FILES = {"local.properties", "keystore.properties", "signing.properties"}
 LOCAL_DIRECTORIES = {"build", ".gradle", ".idea", ".kotlin", "node_modules", ".git"}
@@ -20,6 +21,11 @@ LOCAL_DIRECTORIES = {"build", ".gradle", ".idea", ".kotlin", "node_modules", ".g
 
 class ManagementError(RuntimeError):
     pass
+
+
+def validate_upstream_policy(policy):
+    if policy != UPSTREAM_INTEGRATION:
+        raise ManagementError("上游同步策略不是当前 App 优先的选择性适配")
 
 
 def git(*arguments):
@@ -97,15 +103,21 @@ def check_project():
     ]
     if dates[0] != dates[1]:
         raise ManagementError("两份更新日志的最新日期不一致")
+    deferred = json.loads(
+        (ROOT / "tools/reading-l/upstream-deferred.json").read_text(encoding="utf-8")
+    )
+    validate_upstream_policy(deferred.get("policy"))
     state = json.loads((ROOT / "tools/reading-l/upstream-state.json").read_text(encoding="utf-8"))
     for field in ("original_upstream_commit", "synced_upstream_commit", "snapshot_commit"):
         if not re.fullmatch(r"[0-9a-f]{40}", state.get(field, "")):
             raise ManagementError("上游记录中的提交号无效：" + field)
     if state.get("snapshot_branch") != "upstream-source":
         raise ManagementError("上游快照分支发生变化")
+    validate_upstream_policy(state.get("integration"))
     git("merge-base", "--is-ancestor", state["snapshot_commit"], "HEAD")
     return {"tracked_files": count, "app_name": "阅读L", "log_date": dates[0],
-            "upstream": state["synced_upstream_commit"], "status": "passed"}
+            "upstream": state["synced_upstream_commit"],
+            "integration": state["integration"], "status": "passed"}
 
 
 def require_clean():
