@@ -27,6 +27,7 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.data.entities.SearchKeyword
+import io.legado.app.data.entities.displayTags
 import io.legado.app.databinding.ActivityBookSearchBinding
 import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.help.config.AppConfig
@@ -96,14 +97,17 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
     private var precisionSearchMenuItem: MenuItem? = null
     private var showReadRecordMenuItem: MenuItem? = null
     private var isManualStopSearch = false
+    private var localSearch = false
+    private var localTag: String? = null
+    private var localBooksFlowJob: Job? = null
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         binding.llInputHelp.setBackgroundColor(backgroundColor)
         initRecyclerView()
         initSearchView()
         initOtherView()
-        initData()
         receiptIntent(intent)
+        initData()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -124,10 +128,12 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
         precisionSearchMenuItem?.isChecked = getPrefBoolean(PreferKey.precisionSearch)
         showReadRecordMenuItem = menu.findItem(R.id.menu_show_read_record)
         showReadRecordMenuItem?.isChecked = AppConfig.showSearchReadRecord
+        updateLocalSearchMenu()
         return super.onCompatCreateOptionsMenu(menu)
     }
 
     override fun onMenuOpened(featureId: Int, menu: Menu): Boolean {
+        if (localSearch) return super.onMenuOpened(featureId, menu)
         menu.transaction {
             menu.removeGroup(R.id.menu_group_1)
             menu.removeGroup(R.id.menu_group_2)
@@ -210,10 +216,14 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
             override fun onQueryTextSubmit(query: String): Boolean {
                 searchView.clearFocus()
                 query.trim().let { searchKey ->
-                    isManualStopSearch = false
-                    viewModel.saveSearchKey(searchKey)
-                    viewModel.searchKey = ""
-                    viewModel.search(searchKey)
+                    if (localSearch) {
+                        searchLocalBooks(searchKey, localTag == searchKey)
+                    } else {
+                        isManualStopSearch = false
+                        viewModel.saveSearchKey(searchKey)
+                        viewModel.searchKey = ""
+                        viewModel.search(searchKey)
+                    }
                 }
                 visibleInputHelp(false)
                 return true
@@ -222,6 +232,9 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
             override fun onQueryTextChange(newText: String): Boolean {
                 viewModel.stop()
                 binding.fbStartStop.invisible()
+                if (localSearch && newText.trim() != localTag) {
+                    localTag = null
+                }
                 upHistory(newText.trim())
                 return false
             }
@@ -342,13 +355,15 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
                 groups = it
             }
         }
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.RESUMED) {
-                viewModel.resume()
-                try {
-                    awaitCancellation()
-                } finally {
-                    viewModel.pause()
+        if (!localSearch) {
+            lifecycleScope.launch {
+                repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                    viewModel.resume()
+                    try {
+                        awaitCancellation()
+                    } finally {
+                        viewModel.pause()
+                    }
                 }
             }
         }
@@ -358,6 +373,16 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
      * 处理传入数据
      */
     private fun receiptIntent(intent: Intent? = null) {
+        localSearch = intent?.getBooleanExtra("localSearch", false) == true
+        localTag = intent?.getStringExtra("localTag")?.trim()?.takeIf(String::isNotEmpty)
+        updateLocalSearchMenu()
+        if (localSearch) {
+            binding.titleBar.title = getString(R.string.book_shelf_search)
+            searchView.queryHint = getString(R.string.book_shelf_search_hint)
+        } else {
+            binding.titleBar.title = getString(R.string.search)
+            searchView.queryHint = getString(R.string.search_book_key)
+        }
         val searchScope = intent?.getStringExtra("searchScope")
         searchScope?.let {
             viewModel.searchScope.update(searchScope, postValue = false, save = false)
@@ -368,6 +393,42 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
                 .requestFocus()
         } else {
             searchView.setQuery(key, true)
+        }
+    }
+
+    private fun updateLocalSearchMenu() {
+        menu?.let {
+            it.findItem(R.id.menu_precision_search)?.isVisible = !localSearch
+            it.findItem(R.id.menu_show_read_record)?.isVisible = !localSearch
+            it.findItem(R.id.menu_search_result_filter)?.isVisible = !localSearch
+            it.findItem(R.id.menu_source_manage)?.isVisible = !localSearch
+            it.findItem(R.id.menu_search_scope)?.isVisible = !localSearch
+        }
+        if (localSearch) {
+            binding.fbStartStop.invisible()
+        }
+    }
+
+    private fun searchLocalBooks(key: String, exactTag: Boolean) {
+        localBooksFlowJob?.cancel()
+        localBooksFlowJob = lifecycleScope.launch {
+            val books = if (exactTag) {
+                appDb.bookDao.flowShelfTagSearch(key)
+            } else {
+                appDb.bookDao.flowShelfSearch(key)
+            }
+            books
+                .flowOn(IO)
+                .conflate()
+                .collect { items ->
+                    adapter.setItems(
+                        items.map { book ->
+                            book.toSearchBook().apply {
+                                kind = book.displayTags().joinToString(",")
+                            }
+                        }
+                    )
+                }
         }
     }
 
@@ -617,6 +678,14 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
             context.startActivity<SearchActivity> {
                 putExtra("key", key)
                 putExtra("searchScope", SearchScope(source).toString())
+            }
+        }
+
+        fun startLocal(context: Context, tag: String? = null) {
+            context.startActivity<SearchActivity> {
+                putExtra("localSearch", true)
+                putExtra("localTag", tag)
+                putExtra("key", tag)
             }
         }
 

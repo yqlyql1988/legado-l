@@ -91,6 +91,12 @@
     <string name="origin_format">Origin: %s</string>
     <string name="read_dur_progress">Origin: %s</string>
     <string name="book_name">Title</string>
+    <string name="book_custom_tags">My tags</string>
+    <string name="book_custom_tags_edit">Edit my tags</string>
+    <string name="book_custom_tags_hint">Separate tags with commas or new lines</string>
+    <string name="book_custom_tags_need_shelf">Add the book to your bookshelf before adding tags</string>
+    <string name="book_shelf_search">Bookshelf search</string>
+    <string name="book_shelf_search_hint">Search book name, author or tag</string>
     <string name="lasted_show">Latest: %s</string>
     <string name="check_add_bookshelf">Would you like to add %s to your Bookshelf?</string>
     <string name="import_books_count">%s text file(s) in total</string>
