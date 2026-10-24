@@ -1,0 +1,35 @@
+{
+  "updated_on": "2026-10-24",
+  "items": [
+    {
+      "feature": "边距控件扩大触摸区域",
+      "source_commit": "cc38e90a5",
+      "status": "deferred",
+      "reason": "用户确认本次暂不同步，保留阅读L现有边距控件尺寸和行为。"
+    },
+    {
+      "feature": "边距面板上下联动、大小控件和备份恢复",
+      "source_commit": "967433c84",
+      "status": "deferred",
+      "reason": "用户确认本次暂不同步，避免引入新的边距配置、控件模式和备份字段。"
+    },
+    {
+      "feature": "正文字号上限提高到 100",
+      "source_commit": "65d3ad16a",
+      "status": "deferred",
+      "reason": "用户确认本次暂不同步，保留现有正文字号范围。"
+    },
+    {
+      "feature": "阅读记录页面长按编辑显示名称",
+      "source_commit": "2553502c4",
+      "status": "deferred",
+      "reason": "用户确认不加入阅读记录页面长按编辑入口；同一提交中的书籍信息同步能力继续保留，但不保留显示名称字段或数据库升级。"
+    },
+    {
+      "feature": "RSS 每个订阅源单独控制阅读记录（PR #1391）",
+      "source_commit": "10e8b44fe",
+      "status": "deferred",
+      "reason": "用户确认采用后续 PR #1396 的全局开关方案，不保留 RssSource 字段，不升级数据库；普通 RSS 和 JS openUrl 记录写入仍由全局开关控制。"
+    }
+  ]
+}
