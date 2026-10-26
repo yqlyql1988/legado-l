@@ -38,6 +38,7 @@ class BookTagEditDialog() : BaseDialogFragment(R.layout.dialog_book_tag_edit) {
         } else {
             book.customTag
         }
+        binding.tagEditor.collapseCommonTags = false
         binding.tagEditor.setBook(book, customTags)
         binding.tagEditor.loadCommonTags(viewLifecycleOwner)
         binding.btnCancel.setOnClickListener { dismiss() }
