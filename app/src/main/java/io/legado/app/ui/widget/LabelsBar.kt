@@ -6,27 +6,26 @@ import android.text.TextUtils
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.View
-import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.widget.AppCompatImageButton
 import com.google.android.flexbox.FlexWrap
 import com.google.android.flexbox.FlexboxLayout
-import io.legado.app.lib.theme.secondaryTextColor
+import io.legado.app.R
 import io.legado.app.ui.widget.text.AccentBgTextView
 import io.legado.app.ui.widget.text.AccentTonalBgTextView
 import io.legado.app.utils.dpToPx
+import io.legado.app.utils.getCompatColor
 
 enum class LabelStyle {
     FILLED,
     TONAL,
+    OUTLINED,
 }
 
 data class StyledLabel(
     val text: String,
     val style: LabelStyle,
-    val actionIcon: Int? = null,
-    val actionDescription: String? = null,
-    val actionTint: Int? = null,
+    val description: String? = null,
 )
 
 @Suppress("unused", "MemberVisibilityCanBePrivate")
@@ -55,15 +54,11 @@ class LabelsBar @JvmOverloads constructor(
         labels: List<StyledLabel>,
         onClick: ((String) -> Unit)? = null,
         onLongClick: ((String) -> Boolean)? = null,
-        onActionClick: ((String) -> Unit)? = null,
     ) {
         clear()
         labels.forEach {
-            if (it.actionIcon != null && onActionClick != null) {
-                addActionLabel(it, onClick, onLongClick, onActionClick)
-            } else {
-                addLabel(it.text, onClick, onLongClick, it.style)
-            }
+            addLabel(it.text, onClick, onLongClick, it.style)
+            usedViews.last().contentDescription = it.description
         }
     }
 
@@ -81,13 +76,13 @@ class LabelsBar @JvmOverloads constructor(
     ) {
         val reusableIndex = unUsedViews.indexOfLast { view ->
             when (style) {
-                LabelStyle.FILLED -> view is AccentBgTextView
+                LabelStyle.FILLED, LabelStyle.OUTLINED -> view is AccentBgTextView
                 LabelStyle.TONAL -> view is AccentTonalBgTextView
             }
         }
         val tv = if (reusableIndex == -1) {
             when (style) {
-                LabelStyle.FILLED -> AccentBgTextView(context, null)
+                LabelStyle.FILLED, LabelStyle.OUTLINED -> AccentBgTextView(context, null)
                 LabelStyle.TONAL -> AccentTonalBgTextView(context, null)
             }.apply {
                 setPadding(3.dpToPx(), 0, 3.dpToPx(), 0)
@@ -110,12 +105,16 @@ class LabelsBar @JvmOverloads constructor(
             unUsedViews.removeAt(reusableIndex)
         }
         when (tv) {
-            is AccentBgTextView -> tv.setRadius(2)
+            is AccentBgTextView -> {
+                tv.setRadius(2)
+                tv.setOutlined(style == LabelStyle.OUTLINED)
+            }
             is AccentTonalBgTextView -> tv.setRadius(2)
         }
         usedViews.add(tv)
         tv.textSize = textSize
         tv.text = label
+        tv.contentDescription = null
         tv.setOnClickListener(null)
         tv.setOnLongClickListener(null)
         tv.isClickable = false
@@ -129,22 +128,11 @@ class LabelsBar @JvmOverloads constructor(
         addView(tv)
     }
 
-    private fun addActionLabel(
-        label: StyledLabel,
-        onClick: ((String) -> Unit)?,
-        onLongClick: ((String) -> Boolean)?,
-        onActionClick: (String) -> Unit,
+    fun addAction(
+        icon: Int,
+        description: String,
+        onClick: (View) -> Unit,
     ) {
-        val chip = createLabelView(label.text, label.style).apply {
-            setOnClickListener(onClick?.let { callback -> View.OnClickListener { callback(label.text) } })
-            setOnLongClickListener(
-                onLongClick?.let { callback ->
-                    View.OnLongClickListener { callback(label.text) }
-                }
-            )
-            isClickable = onClick != null
-            isLongClickable = onLongClick != null
-        }
         val action = AppCompatImageButton(context).apply {
             val selectableBackground = TypedValue()
             context.theme.resolveAttribute(
@@ -153,46 +141,21 @@ class LabelsBar @JvmOverloads constructor(
                 true,
             )
             setBackgroundResource(selectableBackground.resourceId)
-            setImageResource(label.actionIcon!!)
-            imageTintList = ColorStateList.valueOf(label.actionTint ?: context.secondaryTextColor)
-            contentDescription = label.actionDescription
-            tooltipText = label.actionDescription
-            setPadding(8.dpToPx(), 8.dpToPx(), 8.dpToPx(), 8.dpToPx())
-            setOnClickListener { onActionClick(label.text) }
-            layoutParams = LinearLayout.LayoutParams(40.dpToPx(), 40.dpToPx())
-        }
-        val container = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = android.view.Gravity.CENTER_VERTICAL
-            addView(
-                chip,
-                LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT),
-            )
-            addView(action)
+            setImageResource(icon)
+            imageTintList = ColorStateList.valueOf(context.getCompatColor(R.color.secondaryText))
+            contentDescription = description
+            tooltipText = description
+            setPadding(6.dpToPx(), 6.dpToPx(), 6.dpToPx(), 6.dpToPx())
+            setOnClickListener { onClick(it) }
             layoutParams = FlexboxLayout.LayoutParams(
-                LayoutParams.WRAP_CONTENT,
-                LayoutParams.WRAP_CONTENT,
+                28.dpToPx(),
+                28.dpToPx(),
             ).apply {
+                marginStart = 2.dpToPx()
                 bottomMargin = 2.dpToPx()
+                flexShrink = 0f
             }
         }
-        addView(container)
-    }
-
-    private fun createLabelView(label: String, style: LabelStyle): TextView {
-        return when (style) {
-            LabelStyle.FILLED -> AccentBgTextView(context, null)
-            LabelStyle.TONAL -> AccentTonalBgTextView(context, null)
-        }.apply {
-            setPadding(3.dpToPx(), 0, 3.dpToPx(), 0)
-            ellipsize = TextUtils.TruncateAt.END
-            maxLines = 1
-            when (this) {
-                is AccentBgTextView -> setRadius(2)
-                is AccentTonalBgTextView -> setRadius(2)
-            }
-            textSize = this@LabelsBar.textSize
-            text = label
-        }
+        addView(action)
     }
 }

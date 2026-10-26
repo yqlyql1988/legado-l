@@ -17,6 +17,7 @@ class AccentBgTextView @JvmOverloads constructor(
 ) : AppCompatTextView(context, attrs) {
 
     private var radius = 0
+    private var outlined = false
 
     init {
         val typedArray = context.obtainStyledAttributes(attrs, R.styleable.AccentBgTextView)
@@ -30,6 +31,12 @@ class AccentBgTextView @JvmOverloads constructor(
         upBackground()
     }
 
+    fun setOutlined(outlined: Boolean) {
+        if (this.outlined == outlined) return
+        this.outlined = outlined
+        upBackground()
+    }
+
     private fun upBackground() {
         val accentColor = if (isInEditMode) {
             context.getCompatColor(R.color.accent)
@@ -38,6 +45,8 @@ class AccentBgTextView @JvmOverloads constructor(
         }
         background = Selector.shapeBuild()
             .setCornerRadius(radius)
+            .setStrokeWidth(if (outlined) 1.dpToPx() else 0)
+            .setDefaultStrokeColor(context.getCompatColor(R.color.primaryText))
             .setDefaultBgColor(accentColor)
             .setPressedBgColor(ColorUtils.darkenColor(accentColor))
             .create()

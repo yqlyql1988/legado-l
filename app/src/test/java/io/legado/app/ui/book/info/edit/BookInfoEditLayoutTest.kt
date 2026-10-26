@@ -32,8 +32,7 @@ class BookInfoEditLayoutTest {
             "tie_book_name",
             "tie_book_author",
             "sp_type",
-            "tie_custom_tag",
-            "lb_common_tag",
+            "tag_editor",
             "tie_cover_url",
             "tv_select_cover",
             "tv_change_cover",
@@ -41,6 +40,14 @@ class BookInfoEditLayoutTest {
             "tie_book_intro"
         ).forEach { id ->
             assertTrue("$id must scroll with the form", document.elementById(id).hasAncestor(SCROLL_VIEW))
+        }
+        val editor = document.elementById("tag_editor")
+        assertEquals("io.legado.app.ui.widget.BookTagEditor", editor.tagName)
+        assertEquals("wrap_content", editor.androidAttribute("layout_height"))
+        val editorDocument = parse("app/src/main/res/layout/view_book_tag_editor.xml")
+        assertEquals("wrap_content", editorDocument.documentElement.androidAttribute("layout_height"))
+        listOf("tie_custom_tag", "tie_common_tag_search", "lb_common_tag").forEach { id ->
+            assertTrue("$id remains within the scrolling editor", editorDocument.elementById(id).hasAncestor("LinearLayout"))
         }
     }
 

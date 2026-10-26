@@ -97,6 +97,45 @@ class BookTagsTest {
     }
 
     @Test
+    fun `my tag sorting changes ranking while preserving totals and source only tags`() {
+        val books = listOf(
+            ShelfBookTags("book-1", "总攻,主攻", "主攻,已读"),
+            ShelfBookTags("book-2", "总攻", "已读"),
+            ShelfBookTags("book-3", "总攻", null),
+        )
+        val totalOrder = aggregateBookTagOverview(books)
+        val userOrder = aggregateBookTagOverview(books, BookTagSort.USER)
+
+        assertEquals(listOf("总攻", "已读", "主攻"), totalOrder.map { it.name })
+        assertEquals(listOf("已读", "主攻", "总攻"), userOrder.map { it.name })
+        assertEquals(totalOrder.toSet(), userOrder.toSet())
+        assertEquals(BookTagOverviewStat("总攻", 3, 3, 0), userOrder.last())
+        assertEquals(totalOrder, sortBookTagOverview(userOrder, BookTagSort.TOTAL))
+    }
+
+    @Test
+    fun `equal tag counts use stable case insensitive name order`() {
+        val tags = listOf(
+            BookTagOverviewStat("zeta", 5, 5, 1),
+            BookTagOverviewStat("Alpha", 1, 0, 1),
+        )
+
+        assertEquals(listOf("Alpha", "zeta"), sortBookTagOverview(tags, BookTagSort.USER).map { it.name })
+    }
+
+    @Test
+    fun `tag filters keep shared tags in both categories and all selection deduplicates`() {
+        val tags = aggregateBookTagOverview(listOf(
+            ShelfBookTags("book-1", "总攻,主攻", "总攻,已读"),
+        ))
+
+        assertEquals(3, tags.filter(BookTagFilter.ALL::includes).size)
+        assertEquals(setOf("总攻", "已读"), tags.filter(BookTagFilter.USER::includes).map { it.name }.toSet())
+        assertEquals(setOf("总攻", "主攻"), tags.filter(BookTagFilter.SOURCE::includes).map { it.name }.toSet())
+        assertEquals(BookTagOverviewStat("总攻", 1, 1, 1), tags.first { it.name == "总攻" })
+    }
+
+    @Test
     fun `tag pinning adds a source tag to user tags without duplicate names`() {
         assertEquals("常读,总攻", addBookTag("常读", "总攻"))
         assertEquals("总攻", addBookTag("总攻", "总攻"))
