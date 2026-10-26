@@ -38,6 +38,8 @@ public class BookTagUiTest {
     private SQLiteDatabase db;
     private ActivityScenario<Activity> scenario;
     private SharedPreferences preferences;
+    private String bookUrl = prefix + "-0";
+    private File localBook;
 
     private int id(String name) {
         int result = context.getResources().getIdentifier(name, "id", context.getPackageName());
@@ -63,11 +65,14 @@ public class BookTagUiTest {
         if (scenario != null) scenario.close();
         Intent intent = new Intent().setClassName(context.getPackageName(), activity);
         if (activity.endsWith("BookInfoActivity") || activity.endsWith("BookInfoEditActivity")) {
-            intent.putExtra("bookUrl", prefix + "-0");
+            intent.putExtra("bookUrl", bookUrl);
         }
         scenario = ActivityScenario.launch(intent);
-        scenario.onActivity(screen ->
-                screen.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT));
+        boolean landscape = InstrumentationRegistry.getArguments()
+                .getString("tagVariant", "").contains("landscape");
+        scenario.onActivity(screen -> screen.setRequestedOrientation(landscape
+                ? android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                : android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT));
         InstrumentationRegistry.getInstrumentation().waitForIdleSync();
         SystemClock.sleep(250);
     }
@@ -208,37 +213,160 @@ public class BookTagUiTest {
         onView(allOf(withText(name), isDescendantOfA(withId(id("lb_common_tag"))))).perform(click());
     }
 
-    private void filterDetail(String option) {
-        onView(allOf(withContentDescription(startsWith(text("book_tag_filter") + " · ")),
-                isDescendantOfA(withId(id("lb_kind"))))).perform(scrollTo(), click());
-        choose(text(option));
+    private int dp(float value) {
+        return Math.round(value * context.getResources().getDisplayMetrics().density);
     }
 
-    @Test public void detailRemembersSourceFilterAndKeepsSharedTagsInBothSelections() throws Exception {
+    private void updateDetail(String kind, String customTag) {
+        ContentValues values = new ContentValues();
+        values.put("kind", kind);
+        values.put("customTag", customTag);
+        db.update("books", values, "bookUrl=?", new String[]{bookUrl});
+    }
+
+    private void waitForLabels(int count) {
+        await(() -> {
+            final boolean[] ready = {false};
+            scenario.onActivity(screen -> {
+                android.view.ViewGroup labels = screen.findViewById(id("lb_kind"));
+                ready[0] = labels.getChildCount() == count && labels.getHeight() > 0
+                        && !labels.isLayoutRequested();
+            });
+            return ready[0];
+        });
+    }
+
+    private void assertActionGeometry() {
+        scenario.onActivity(screen -> {
+            android.view.ViewGroup labels = screen.findViewById(id("lb_kind"));
+            android.widget.ImageButton action = screen.findViewById(id("ib_edit_tags"));
+            android.view.ViewGroup header = (android.view.ViewGroup) action.getParent();
+            int[] origin = new int[2], bar = new int[2], button = new int[2];
+            header.getLocationOnScreen(origin);
+            labels.getLocationOnScreen(bar);
+            action.getLocationOnScreen(button);
+            assertEquals("Labels stay centered without counting the action",
+                    origin[0] + header.getWidth() / 2, bar[0] + labels.getWidth() / 2, 1);
+            assertTrue("Entire touch target stays in its container", action.getLeft() >= 0
+                    && action.getRight() <= header.getWidth());
+            assertTrue("Retain a large target within the available margin",
+                    action.getWidth() >= dp(14) && action.getWidth() <= dp(28));
+            assertEquals(dp(28), action.getHeight());
+            assertEquals(android.widget.ImageView.ScaleType.FIT_CENTER, action.getScaleType());
+            assertEquals(dp(14), action.getWidth() - action.getPaddingLeft() - action.getPaddingRight());
+            if (labels.getChildCount() == 0) {
+                assertEquals(bar[0] + labels.getWidth() / 2,
+                        button[0] + action.getPaddingLeft() + dp(14) / 2, 1);
+                return;
+            }
+            android.view.View last = labels.getChildAt(labels.getChildCount() - 1);
+            int[] tail = new int[2];
+            last.getLocationOnScreen(tail);
+            assertTrue("The edit action never intercepts tag taps",
+                    button[0] >= tail[0] + last.getWidth());
+            assertEquals("Action uses the existing end margin with a 2dp visual gap",
+                    tail[0] + last.getWidth() + dp(2), button[0] + action.getPaddingLeft(), 1);
+            assertEquals("Action stays on the last label row",
+                    tail[1] + last.getHeight() / 2, button[1] + action.getHeight() / 2, 1);
+        });
+    }
+
+    @Test public void fullRowKeepsItsOriginalWidthAndNeverWrapsTheAction() throws Exception {
+        updateDetail(new String(new char[80]).replace(String.valueOf((char) 0), "总攻"), null);
         launch("io.legado.app.ui.book.info.BookInfoActivity");
-        filterDetail("book_source_tags");
-        onView(allOf(withText("已读"), isDescendantOfA(withId(id("lb_kind"))))).check(doesNotExist());
-        onView(allOf(withText("主攻"), isDescendantOfA(withId(id("lb_kind")))))
-                .check(matches(isDisplayed()));
-        onView(allOf(withText("总攻"), isDescendantOfA(withId(id("lb_kind")))))
-                .check(matches(withContentDescription("总攻，书源与我的标签")));
-        screenshot("detail-source");
+        waitForLabels(1);
+        final int[] before = new int[6];
+        scenario.onActivity(screen -> {
+            android.view.ViewGroup labels = screen.findViewById(id("lb_kind"));
+            android.view.View last = labels.getChildAt(0);
+            android.view.View action = screen.findViewById(id("ib_edit_tags"));
+            android.view.ViewGroup header = (android.view.ViewGroup) action.getParent();
+            boolean landscape = context.getResources().getConfiguration().orientation
+                    == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+            assertEquals("Use the original full label width", header.getWidth() - dp(landscape ? 32 : 36),
+                    labels.getWidth(), 1);
+            assertTrue("The label actually fills the row", last.getWidth() >= labels.getWidth() - dp(2) - 1);
+            before[0] = labels.getWidth();
+            before[1] = labels.getHeight();
+            before[2] = last.getLeft();
+            before[3] = last.getTop();
+            before[4] = last.getWidth();
+            before[5] = last.getHeight();
+            action.setVisibility(android.view.View.GONE);
+        });
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+        scenario.onActivity(screen -> {
+            android.view.ViewGroup labels = screen.findViewById(id("lb_kind"));
+            android.view.View last = labels.getChildAt(0);
+            assertArrayEquals("Showing the action never changes label layout", before,
+                    new int[]{labels.getWidth(), labels.getHeight(), last.getLeft(), last.getTop(),
+                            last.getWidth(), last.getHeight()});
+            screen.findViewById(id("ib_edit_tags")).setVisibility(android.view.View.VISIBLE);
+        });
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+        assertActionGeometry();
+        onView(withId(id("ib_edit_tags"))).perform(scrollTo());
+        screenshot("detail-full-row");
+        openEditor();
+        onView(withId(id("tie_custom_tag"))).check(matches(withText("")));
+    }
+
+    @Test public void multilineAndEmptyTagsKeepAnIndependentEditAction() throws Exception {
+        StringBuilder tags = new StringBuilder("总攻,主攻");
+        for (int index = 1; index <= 16; index++) tags.append(",示例标签").append(index);
+        updateDetail(tags.toString(), "已读");
+        preferences.edit().putString("bookInfoTagFilter", "SOURCE").commit();
         launch("io.legado.app.ui.book.info.BookInfoActivity");
-        assertEquals("SOURCE", preferences.getString("bookInfoTagFilter", ""));
-        onView(allOf(withText("已读"), isDescendantOfA(withId(id("lb_kind"))))).check(doesNotExist());
-        filterDetail("book_my_tags");
-        onView(allOf(withText("主攻"), isDescendantOfA(withId(id("lb_kind"))))).check(doesNotExist());
-        onView(allOf(withText("总攻"), isDescendantOfA(withId(id("lb_kind")))))
-                .check(matches(isDisplayed()));
+        waitForLabels(19);
         onView(allOf(withText("已读"), isDescendantOfA(withId(id("lb_kind")))))
                 .check(matches(isDisplayed()));
-        screenshot("detail-mine");
-        scenario.recreate();
-        assertEquals("USER", preferences.getString("bookInfoTagFilter", ""));
-        onView(allOf(withText("主攻"), isDescendantOfA(withId(id("lb_kind"))))).check(doesNotExist());
-        filterDetail("book_tag_filter_all");
-        onView(allOf(withText("主攻"), isDescendantOfA(withId(id("lb_kind")))))
-                .check(matches(isDisplayed()));
+        scenario.onActivity(screen -> {
+            android.view.ViewGroup labels = screen.findViewById(id("lb_kind"));
+            assertTrue("Test multiple rows", labels.getChildAt(0).getTop()
+                    < labels.getChildAt(labels.getChildCount() - 1).getTop());
+        });
+        assertActionGeometry();
+        onView(withId(id("ib_edit_tags"))).perform(scrollTo());
+        screenshot("detail-multiline");
+        updateDetail(null, null);
+        launch("io.legado.app.ui.book.info.BookInfoActivity");
+        waitForLabels(0);
+        assertActionGeometry();
+        screenshot("detail-empty");
+        openEditor();
+        onView(withId(id("tie_custom_tag"))).check(matches(withText("")));
+    }
+
+    @Test public void wordCountAndLocalSizeUseFilledMetadataWithoutBecomingPersonalTags() throws Exception {
+        localBook = new File(context.getFilesDir(), prefix + ".txt");
+        try (FileOutputStream stream = new FileOutputStream(localBook)) {
+            stream.write(new byte[2048]);
+        }
+        ContentValues values = new ContentValues();
+        bookUrl = localBook.getAbsolutePath();
+        values.put("bookUrl", bookUrl);
+        values.put("origin", "loc_book");
+        values.put("type", 256);
+        values.put("wordCount", "12万字");
+        db.update("books", values, "bookUrl=?", new String[]{prefix + "-0"});
+        launch("io.legado.app.ui.book.info.BookInfoActivity");
+        waitForLabels(5);
+        onView(withId(id("lb_kind"))).check((view, error) -> {
+            if (error != null) throw error;
+            android.view.ViewGroup labels = (android.view.ViewGroup) view;
+            assertEquals("Metadata, source and shared tags keep solid backgrounds",
+                    "AccentBgTextView", labels.getChildAt(0).getClass().getSimpleName());
+            assertEquals("File size also keeps a solid background",
+                    "AccentBgTextView", labels.getChildAt(3).getClass().getSimpleName());
+            assertEquals("Only personal tags use a light background",
+                    "AccentTonalBgTextView", labels.getChildAt(4).getClass().getSimpleName());
+            assertNull(labels.getChildAt(0).getContentDescription());
+            assertNull(labels.getChildAt(3).getContentDescription());
+        });
+        assertActionGeometry();
+        screenshot("detail-metadata");
+        openEditor();
+        onView(withId(id("tie_custom_tag"))).check(matches(withText("总攻,已读")));
     }
 
     @Test public void detailEditingPreservesSourceTagsAndCancelLeavesSavedTagsUntouched() throws Exception {
@@ -277,7 +405,7 @@ public class BookTagUiTest {
 
     @Test public void editorCollapsesLongCandidatesAndKeepsDraftAfterRecreation() throws Exception {
         StringBuilder sourceTags = new StringBuilder("总攻,主攻");
-        for (int index = 1; index <= 24; index++) sourceTags.append(",示例标签").append(index);
+        for (int index = 1; index <= 64; index++) sourceTags.append(",示例标签").append(index);
         ContentValues values = new ContentValues();
         values.put("kind", sourceTags.toString());
         db.update("books", values, "bookUrl=?", new String[]{prefix + "-0"});
@@ -315,7 +443,7 @@ public class BookTagUiTest {
             final boolean[] ready = {false};
             scenario.onActivity(screen -> {
                 android.view.ViewGroup labels = screen.findViewById(id("lb_common_tag"));
-                ready[0] = labels.getChildCount() >= 27 && labels.getHeight() > 0 && !labels.isLayoutRequested();
+                ready[0] = labels.getChildCount() >= 67 && labels.getHeight() > 0 && !labels.isLayoutRequested();
             });
             return ready[0];
         });
@@ -334,6 +462,7 @@ public class BookTagUiTest {
 
     @After public void cleanup() {
         if (scenario != null) scenario.close();
+        if (localBook != null) assertTrue(localBook.delete());
         if (db != null) {
             db.delete("books", "author=?", new String[]{prefix});
             db.close();
