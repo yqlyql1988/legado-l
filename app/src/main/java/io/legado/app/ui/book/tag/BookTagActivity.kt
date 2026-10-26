@@ -51,12 +51,13 @@ class BookTagActivity : BaseActivity<ActivityBookTagBinding>() {
     override val binding by viewBinding(ActivityBookTagBinding::inflate)
 
     private val searchView: SearchView by lazy {
-        binding.root.findViewById(R.id.search_view)
+        binding.titleBar.findViewById(R.id.search_view)
     }
     private val adapter = TagAdapter()
     private var tagStats = emptyList<BookTagOverviewStat>()
     private var sort = BookTagSort.TOTAL
     private var filter = BookTagFilter.ALL
+    private var filterItem: MenuItem? = null
     private var sortItem: MenuItem? = null
     private var sortView: TextView? = null
 
@@ -65,7 +66,7 @@ class BookTagActivity : BaseActivity<ActivityBookTagBinding>() {
             ?: BookTagSort.TOTAL
         filter = BookTagFilter.entries.firstOrNull { it.name == getPrefString(FILTER_PREFERENCE) }
             ?: BookTagFilter.ALL
-        updateFilterLabel()
+        supportActionBar?.setDisplayShowTitleEnabled(false)
         binding.recyclerView.layoutManager = LinearLayoutManager(this)
         binding.recyclerView.addItemDecoration(VerticalDivider(this))
         binding.recyclerView.applyNavigationBarPadding()
@@ -80,7 +81,6 @@ class BookTagActivity : BaseActivity<ActivityBookTagBinding>() {
             }
             override fun onQueryTextChange(newText: String?) = render().let { false }
         })
-        searchView.isVisible = savedInstanceState?.getBoolean("searchVisible") == true
         searchView.setQuery(savedInstanceState?.getString("query").orEmpty(), false)
 
         lifecycleScope.launch {
@@ -97,6 +97,8 @@ class BookTagActivity : BaseActivity<ActivityBookTagBinding>() {
 
     override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.book_tag, menu)
+        filterItem = menu.findItem(R.id.menu_filter)
+        updateFilterLabel()
         sortItem = menu.findItem(R.id.menu_sort).apply {
             val configuration = resources.configuration
             if (configuration.screenWidthDp < 360 * configuration.fontScale) {
@@ -123,21 +125,10 @@ class BookTagActivity : BaseActivity<ActivityBookTagBinding>() {
                 ?: binding.titleBar.toolbar)
             return true
         }
-        if (item.itemId == R.id.menu_search) {
-            searchView.isVisible = !searchView.isVisible
-            if (searchView.isVisible) {
-                searchView.requestFocus()
-            } else {
-                searchView.setQuery("", false)
-                searchView.clearFocus()
-            }
-            return true
-        }
         return super.onCompatOptionsItemSelected(item)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
-        outState.putBoolean("searchVisible", searchView.isVisible)
         outState.putString("query", searchView.query.toString())
         super.onSaveInstanceState(outState)
     }
@@ -189,7 +180,9 @@ class BookTagActivity : BaseActivity<ActivityBookTagBinding>() {
     })
 
     private fun updateFilterLabel() {
-        binding.titleBar.subtitle = if (filter == BookTagFilter.ALL) null else filterTitle(filter)
+        val description = filterTitle(filter)
+        filterItem?.contentDescription = description
+        filterItem?.tooltipText = description
     }
 
     private fun showFilterMenu(anchor: View) = PopupAction(this).apply {

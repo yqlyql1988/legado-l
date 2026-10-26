@@ -37,6 +37,13 @@ class BookTagEditor @JvmOverloads constructor(
     private var expanded = false
     private var renderVersion = 0
 
+    var collapseCommonTags = true
+        set(value) {
+            if (field == value) return
+            field = value
+            render()
+        }
+
     val tags: String?
         get() = normalizeBookTags(binding.tieCustomTag.text?.toString())
 
@@ -132,6 +139,10 @@ class BookTagEditor @JvmOverloads constructor(
             binding.tieCommonTagSearch.text?.clear()
         })
         binding.lbCommonTag.children.forEach { it.isVisible = true }
+        if (!collapseCommonTags) {
+            binding.tvCommonTagExpand.isVisible = false
+            return
+        }
         binding.lbCommonTag.doOnNextLayout {
             if (version != renderVersion) return@doOnNextLayout
             val visibleCount = binding.lbCommonTag.flexLines.take(3).sumOf { it.itemCount }

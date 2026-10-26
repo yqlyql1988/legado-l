@@ -178,7 +178,22 @@ public class BookTagUiTest {
         launch("io.legado.app.ui.book.tag.BookTagActivity");
         firstTag("总攻");
         onView(allOf(withText(text("book_tag_manage")), isDescendantOfA(withId(id("toolbar")))))
+                .check(doesNotExist());
+        onView(allOf(withId(id("search_view")), isDescendantOfA(withId(id("toolbar")))))
                 .check(matches(isDisplayed()));
+        onView(withId(id("search_src_text"))).perform(replaceText("攻"));
+        androidx.test.espresso.Espresso.closeSoftKeyboard();
+        onView(withText("已读")).check(doesNotExist());
+        onView(withText("主攻")).check(matches(isDisplayed()));
+        scenario.recreate();
+        onView(withId(id("search_src_text"))).check(matches(withText("攻")));
+        onView(withText("已读")).check(doesNotExist());
+        onView(withId(id("search_src_text"))).perform(replaceText("没有匹配的标签"));
+        androidx.test.espresso.Espresso.closeSoftKeyboard();
+        onView(withId(id("tv_empty"))).check(matches(isDisplayed()));
+        onView(withId(id("search_src_text"))).perform(replaceText(""));
+        androidx.test.espresso.Espresso.closeSoftKeyboard();
+        firstTag("总攻");
         screenshot("management");
         onView(withId(id("menu_sort"))).perform(click());
         choose(text("book_tag_sort_user"));
@@ -403,40 +418,60 @@ public class BookTagUiTest {
                 .check(matches(withContentDescription("总攻，仅书源标签")));
     }
 
-    @Test public void editorCollapsesLongCandidatesAndKeepsDraftAfterRecreation() throws Exception {
-        StringBuilder sourceTags = new StringBuilder("总攻,主攻");
-        for (int index = 1; index <= 64; index++) sourceTags.append(",示例标签").append(index);
-        ContentValues values = new ContentValues();
-        values.put("kind", sourceTags.toString());
-        db.update("books", values, "bookUrl=?", new String[]{prefix + "-0"});
-        launch("io.legado.app.ui.book.info.BookInfoActivity");
-        openEditor();
-        onView(withId(id("tv_common_tag_expand"))).perform(scrollTo()).check(matches(isDisplayed()));
+    private void assertAllCandidatesVisible() {
+        await(() -> {
+            final boolean[] ready = {false};
+            onView(withId(id("lb_common_tag"))).check((view, error) -> {
+                if (error != null) throw error;
+                android.view.ViewGroup labels = (android.view.ViewGroup) view;
+                ready[0] = labels.getChildCount() >= 67 && labels.getHeight() > 0 && !labels.isLayoutRequested();
+            });
+            return ready[0];
+        });
+        onView(withId(id("tv_common_tag_expand"))).check(matches(withEffectiveVisibility(Visibility.GONE)));
         onView(withId(id("lb_common_tag"))).check((view, error) -> {
             if (error != null) throw error;
             android.view.ViewGroup labels = (android.view.ViewGroup) view;
             java.util.Set<Integer> rows = new java.util.HashSet<>();
-            int visible = 0;
+            assertTrue("Load all existing personal tags", labels.getChildCount() >= 67);
             for (int index = 0; index < labels.getChildCount(); index++) {
                 android.view.View child = labels.getChildAt(index);
-                if (child.getVisibility() == android.view.View.VISIBLE) {
-                    rows.add(child.getTop());
-                    visible++;
-                }
+                assertEquals("Every candidate remains available", android.view.View.VISIBLE, child.getVisibility());
+                rows.add(child.getTop());
             }
-            assertEquals(3, rows.size());
-            assertTrue("Remaining candidates must be hidden", visible < labels.getChildCount());
+            assertTrue("Candidates extend beyond the previous three-row limit", rows.size() > 3);
         });
-        screenshot("editor-collapsed");
-        onView(withId(id("tv_common_tag_expand"))).perform(scrollTo(), click());
-        onView(withId(id("tv_common_tag_expand"))).check(matches(withText(text("book_tag_existing_collapse"))));
-        screenshot("editor-expanded");
+    }
+
+    @Test public void dialogShowsAllCandidatesAndKeepsDraftWhileFullEditorStillCollapses() throws Exception {
+        StringBuilder commonTags = new StringBuilder();
+        for (int index = 1; index <= 64; index++) {
+            if (index > 1) commonTags.append(",");
+            commonTags.append("示例标签").append(index);
+        }
+        insertBook(3, null, commonTags.toString());
+        launch("io.legado.app.ui.book.info.BookInfoActivity");
+        openEditor();
+        assertAllCandidatesVisible();
+        onView(allOf(withText("示例标签64"), isDescendantOfA(withId(id("lb_common_tag")))))
+                .perform(scrollTo(), click());
+        onView(withId(id("tie_custom_tag"))).check(matches(withText("总攻,已读,示例标签64")));
+        screenshot("editor-all-candidates");
+        onView(withId(id("tie_common_tag_search"))).perform(scrollTo(), replaceText("攻"));
+        androidx.test.espresso.Espresso.closeSoftKeyboard();
+        onView(allOf(withText("总攻"), isDescendantOfA(withId(id("lb_common_tag")))))
+                .check(matches(isDisplayed()));
+        onView(withId(id("tie_common_tag_search"))).perform(replaceText(""));
+        androidx.test.espresso.Espresso.closeSoftKeyboard();
+        assertAllCandidatesVisible();
         onView(withId(id("tie_custom_tag"))).perform(scrollTo(), replaceText("总攻,收藏"));
         androidx.test.espresso.Espresso.closeSoftKeyboard();
         scenario.recreate();
         onView(withId(id("tie_custom_tag"))).check(matches(withText("总攻,收藏")));
+        assertAllCandidatesVisible();
         onView(withId(id("btn_ok"))).perform(click());
         await(() -> "总攻,收藏".equals(column("customTag")));
+        assertEquals("总攻,主攻", column("kind"));
         launch("io.legado.app.ui.book.info.edit.BookInfoEditActivity");
         onView(withId(id("tie_custom_tag"))).perform(scrollTo()).check(matches(withText("总攻,收藏")));
         await(() -> {
@@ -455,9 +490,12 @@ public class BookTagUiTest {
                 android.view.View child = labels.getChildAt(index);
                 if (child.getVisibility() == android.view.View.VISIBLE) rows.add(child.getTop());
             }
-            assertTrue("Full editor also limits candidates to three rows", rows.size() > 0 && rows.size() <= 3);
+            assertEquals("Full editor keeps its existing three-row limit", 3, rows.size());
         });
-        screenshot("full-editor");
+        onView(withId(id("tv_common_tag_expand"))).perform(scrollTo(), click());
+        onView(withId(id("tv_common_tag_expand")))
+                .check(matches(withText(text("book_tag_existing_collapse"))));
+        screenshot("full-editor-expanded");
     }
 
     @After public void cleanup() {
