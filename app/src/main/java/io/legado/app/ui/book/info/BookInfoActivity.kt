@@ -14,7 +14,6 @@ import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
-import android.view.View
 import android.view.textclassifier.TextClassifier
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -38,7 +37,6 @@ import io.legado.app.data.entities.BaseSource
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
-import io.legado.app.data.entities.BookTagFilter
 import io.legado.app.data.entities.sourceTags
 import io.legado.app.data.entities.userTags
 import io.legado.app.databinding.ActivityBookInfoBinding
@@ -103,7 +101,6 @@ import io.legado.app.ui.widget.dialog.PhotoDialog
 import io.legado.app.ui.widget.dialog.VariableDialog
 import io.legado.app.ui.widget.dialog.WaitDialog
 import io.legado.app.ui.widget.LabelStyle
-import io.legado.app.ui.widget.PopupAction
 import io.legado.app.ui.widget.StyledLabel
 import io.legado.app.ui.widget.text.ScrollTextView
 import io.legado.app.utils.ColorUtils
@@ -114,13 +111,11 @@ import io.legado.app.utils.StartActivityContract
 import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.gone
-import io.legado.app.utils.getPrefString
 import io.legado.app.utils.longSnackbar
 import io.legado.app.utils.longToastOnUi
 import io.legado.app.utils.observeEvent
 import io.legado.app.utils.openFileUri
 import io.legado.app.utils.openUrl
-import io.legado.app.utils.putPrefString
 import io.legado.app.utils.requestInputMethod
 import io.legado.app.utils.sendToClip
 import io.legado.app.utils.setHtml
@@ -153,7 +148,6 @@ class BookInfoActivity :
 
     private var reviewJob: Job? = null
     private var reviewIdentity: Pair<String, String>? = null
-    private var tagFilter = BookTagFilter.ALL
 
     private val tocActivityResult = registerForActivityResult(TocActivityResult()) {
         it?.let {
@@ -275,9 +269,6 @@ class BookInfoActivity :
 
     @SuppressLint("PrivateResource")
     override fun onActivityCreated(savedInstanceState: Bundle?) {
-        tagFilter = BookTagFilter.entries.firstOrNull {
-            it.name == getPrefString(TAG_FILTER_PREFERENCE)
-        } ?: BookTagFilter.ALL
         binding.titleBar.setBackgroundResource(R.color.transparent)
         binding.refreshLayout?.setColorSchemeColors(accentColor)
         binding.refreshProgressBar.secondColor = accentColor
@@ -957,10 +948,9 @@ class BookInfoActivity :
                     )
                 }
             }
-            book.wordCount?.let { addLabel(it, LabelStyle.TONAL) }
+            book.wordCount?.let { addLabel(it, LabelStyle.FILLED) }
             sourceTags.forEach { tag ->
                 val pinned = tag.lowercase(Locale.ROOT) in userKeys
-                if (tagFilter == BookTagFilter.USER && !pinned) return@forEach
                 addLabel(
                     text = tag,
                     style = if (pinned) LabelStyle.OUTLINED else LabelStyle.FILLED,
@@ -979,14 +969,12 @@ class BookInfoActivity :
                         0L
                     }
                     if (size > 0) {
-                        addLabel(ConvertUtils.formatFileSize(size), LabelStyle.TONAL)
+                        addLabel(ConvertUtils.formatFileSize(size), LabelStyle.FILLED)
                     }
                 }
             }
             userTags.forEach {
-                if (tagFilter != BookTagFilter.SOURCE) {
-                    addLabel(it, LabelStyle.TONAL, getString(R.string.book_tag_origin_user, it))
-                }
+                addLabel(it, LabelStyle.TONAL, getString(R.string.book_tag_origin_user, it))
             }
             lbKind.visible()
             val source = viewModel.bookSource
@@ -1039,11 +1027,8 @@ class BookInfoActivity :
                     }
                 },
             )
-            lbKind.addAction(
-                R.drawable.ic_filter_list,
-                getString(R.string.book_tag_filter) + " · " + tagFilterTitle(tagFilter),
-            ) { showTagFilterMenu(it) }
-            lbKind.addAction(R.drawable.ic_edit, getString(R.string.book_custom_tags_edit)) {
+            ibEditTags.visible()
+            ibEditTags.setOnClickListener {
                 if (viewModel.inBookshelf) {
                     showDialogFragment(BookTagEditDialog(book.bookUrl))
                 } else {
@@ -1051,31 +1036,6 @@ class BookInfoActivity :
                 }
             }
         }
-    }
-
-    private fun tagFilterTitle(filter: BookTagFilter) = getString(when (filter) {
-        BookTagFilter.ALL -> R.string.book_tag_filter_all
-        BookTagFilter.USER -> R.string.book_my_tags
-        BookTagFilter.SOURCE -> R.string.book_source_tags
-    })
-
-    private fun showTagFilterMenu(anchor: View): PopupAction = PopupAction(this).apply {
-        setVertical(true)
-        setActionItems(BookTagFilter.entries.map { option ->
-            PopupAction.PopupActionItem(
-                title = tagFilterTitle(option),
-                value = option.name,
-                checkable = true,
-                checked = tagFilter == option,
-            )
-        })
-        onActionClick = { value ->
-            dismiss()
-            tagFilter = BookTagFilter.valueOf(value)
-            putPrefString(TAG_FILTER_PREFERENCE, tagFilter.name)
-            book?.let { upLabels(it) }
-        }
-        showAsDropDown(anchor, 0, 4.dpToPx())
     }
 
     override fun onBookTagsEdited(bookUrl: String, tags: String?) {
@@ -1752,10 +1712,6 @@ class BookInfoActivity :
     private fun destroyWeb() {
         pooledWebView?.let { WebViewPool.release(it) }
         pooledWebView = null
-    }
-
-    private companion object {
-        const val TAG_FILTER_PREFERENCE = "bookInfoTagFilter"
     }
 }
 
