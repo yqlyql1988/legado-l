@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.appcompat.widget.AppCompatTextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:drawableEnd="@drawable/ic_arrow_drop_down"
+    android:gravity="center"
+    android:maxWidth="132dp"
+    android:minHeight="48dp"
+    android:paddingStart="8dp"
+    android:paddingEnd="4dp"
+    android:textSize="13sp" />

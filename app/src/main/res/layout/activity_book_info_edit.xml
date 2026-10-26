@@ -98,71 +98,11 @@
 
             </LinearLayout>
 
-            <io.legado.app.ui.widget.text.TextInputLayout
-                android:id="@+id/til_custom_tag"
+            <io.legado.app.ui.widget.BookTagEditor
+                android:id="@+id/tag_editor"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:hint="@string/book_custom_tags">
-
-                <io.legado.app.lib.theme.view.ThemeEditText
-                    android:id="@+id/tie_custom_tag"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="top|start"
-                    android:minLines="2" />
-            </io.legado.app.ui.widget.text.TextInputLayout>
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="@string/book_common_tags"
-                android:textColor="@color/secondaryText"
-                android:textSize="12sp" />
-
-            <io.legado.app.ui.widget.text.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:hint="@string/book_tag_existing_search">
-
-                <io.legado.app.lib.theme.view.ThemeEditText
-                    android:id="@+id/tie_common_tag_search"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:singleLine="true" />
-            </io.legado.app.ui.widget.text.TextInputLayout>
-
-            <TextView
-                android:id="@+id/tv_common_tag_add"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="end|center_vertical"
-                android:minHeight="40dp"
-                android:paddingHorizontal="8dp"
-                android:textColor="@color/accent"
-                android:visibility="gone" />
-
-            <io.legado.app.ui.widget.LabelsBar
-                android:id="@+id/lb_common_tag"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                app:alignItems="center"
-                app:flexDirection="row"
-                app:flexWrap="wrap"
-                app:justifyContent="flex_start" />
-
-            <TextView
-                android:id="@+id/tv_common_tag_expand"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="end|center_vertical"
-                android:minHeight="40dp"
-                android:paddingHorizontal="8dp"
-                android:textColor="@color/accent"
-                android:visibility="gone" />
+                android:layout_marginTop="10dp" />
 
             <io.legado.app.ui.widget.text.TextInputLayout
                 android:id="@+id/til_cover_url"

@@ -14,6 +14,7 @@ import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
+import android.view.View
 import android.view.textclassifier.TextClassifier
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -37,8 +38,7 @@ import io.legado.app.data.entities.BaseSource
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
-import io.legado.app.data.entities.addBookTag
-import io.legado.app.data.entities.removeBookTag
+import io.legado.app.data.entities.BookTagFilter
 import io.legado.app.data.entities.sourceTags
 import io.legado.app.data.entities.userTags
 import io.legado.app.databinding.ActivityBookInfoBinding
@@ -87,6 +87,7 @@ import io.legado.app.ui.book.changecover.ChangeCoverDialog
 import io.legado.app.ui.book.changesource.ChangeBookSourceDialog
 import io.legado.app.ui.book.group.GroupSelectDialog
 import io.legado.app.ui.book.info.edit.BookInfoEditActivity
+import io.legado.app.ui.book.info.edit.BookTagEditDialog
 import io.legado.app.ui.book.manga.ReadMangaActivity
 import io.legado.app.ui.book.read.ReadBookActivity
 import io.legado.app.ui.book.read.ReadBookActivity.Companion.RESULT_DELETED
@@ -102,6 +103,7 @@ import io.legado.app.ui.widget.dialog.PhotoDialog
 import io.legado.app.ui.widget.dialog.VariableDialog
 import io.legado.app.ui.widget.dialog.WaitDialog
 import io.legado.app.ui.widget.LabelStyle
+import io.legado.app.ui.widget.PopupAction
 import io.legado.app.ui.widget.StyledLabel
 import io.legado.app.ui.widget.text.ScrollTextView
 import io.legado.app.utils.ColorUtils
@@ -112,11 +114,13 @@ import io.legado.app.utils.StartActivityContract
 import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.gone
+import io.legado.app.utils.getPrefString
 import io.legado.app.utils.longSnackbar
 import io.legado.app.utils.longToastOnUi
 import io.legado.app.utils.observeEvent
 import io.legado.app.utils.openFileUri
 import io.legado.app.utils.openUrl
+import io.legado.app.utils.putPrefString
 import io.legado.app.utils.requestInputMethod
 import io.legado.app.utils.sendToClip
 import io.legado.app.utils.setHtml
@@ -144,10 +148,12 @@ class BookInfoActivity :
     GroupSelectDialog.CallBack,
     ChangeBookSourceDialog.CallBack,
     ChangeCoverDialog.CallBack,
+    BookTagEditDialog.Callback,
     VariableDialog.Callback {
 
     private var reviewJob: Job? = null
     private var reviewIdentity: Pair<String, String>? = null
+    private var tagFilter = BookTagFilter.ALL
 
     private val tocActivityResult = registerForActivityResult(TocActivityResult()) {
         it?.let {
@@ -269,6 +275,9 @@ class BookInfoActivity :
 
     @SuppressLint("PrivateResource")
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        tagFilter = BookTagFilter.entries.firstOrNull {
+            it.name == getPrefString(TAG_FILTER_PREFERENCE)
+        } ?: BookTagFilter.ALL
         binding.titleBar.setBackgroundResource(R.color.transparent)
         binding.refreshLayout?.setColorSchemeColors(accentColor)
         binding.refreshProgressBar.secondColor = accentColor
@@ -930,42 +939,35 @@ class BookInfoActivity :
         lifecycleScope.launch {
             val sourceTags = book.sourceTags()
             val userTags = book.userTags()
+            val userKeys = userTags.mapTo(hashSetOf()) { it.lowercase(Locale.ROOT) }
             val labels = arrayListOf<StyledLabel>()
             val displayedKeys = hashSetOf<String>()
             fun addLabel(
                 text: String,
                 style: LabelStyle,
-                actionIcon: Int? = null,
-                actionDescription: String? = null,
-                actionTint: Int? = null,
+                description: String? = null,
             ) {
                 if (text.isNotBlank() && displayedKeys.add(text.lowercase(Locale.ROOT))) {
                     labels.add(
                         StyledLabel(
                             text = text,
                             style = style,
-                            actionIcon = actionIcon,
-                            actionDescription = actionDescription,
-                            actionTint = actionTint,
+                            description = description,
                         )
                     )
                 }
             }
-            book.wordCount?.let { addLabel(it, LabelStyle.FILLED) }
+            book.wordCount?.let { addLabel(it, LabelStyle.TONAL) }
             sourceTags.forEach { tag ->
-                val pinned = userTags.any { it.equals(tag, ignoreCase = true) }
+                val pinned = tag.lowercase(Locale.ROOT) in userKeys
+                if (tagFilter == BookTagFilter.USER && !pinned) return@forEach
                 addLabel(
                     text = tag,
-                    style = LabelStyle.FILLED,
-                    actionIcon = when {
-                        !viewModel.inBookshelf -> null
-                        pinned -> R.drawable.ic_push_pin_filled_24dp
-                        else -> R.drawable.ic_push_pin_outline_24dp
-                    },
-                    actionDescription = getString(
-                        if (pinned) R.string.book_tag_unpin else R.string.book_tag_pin
+                    style = if (pinned) LabelStyle.OUTLINED else LabelStyle.FILLED,
+                    description = getString(
+                        if (pinned) R.string.book_tag_origin_both else R.string.book_tag_origin_source,
+                        tag,
                     ),
-                    actionTint = accentColor.takeIf { pinned },
                 )
             }
             if (book.isLocal) {
@@ -977,82 +979,109 @@ class BookInfoActivity :
                         0L
                     }
                     if (size > 0) {
-                        addLabel(ConvertUtils.formatFileSize(size), LabelStyle.FILLED)
+                        addLabel(ConvertUtils.formatFileSize(size), LabelStyle.TONAL)
                     }
                 }
             }
-            userTags.forEach { addLabel(it, LabelStyle.TONAL) }
-            if (labels.isEmpty()) {
-                lbKind.gone()
-            } else {
-                lbKind.visible()
-                val source = viewModel.bookSource
-                lbKind.setStyledLabels(
-                    labels,
-                    onClick = { label ->
-                        val sourceTag = sourceTags.any { it.equals(label, ignoreCase = true) }
-                        if (sourceTag && source != null) {
-                            SourceCallBack.callBackBtn(
-                                this@BookInfoActivity,
-                                SourceCallBack.CLICK_BOOK_LABEL,
-                                source,
-                                book,
-                                null,
-                                result = label
-                            ) {
-                                SearchActivity.startBookTagSearch(
-                                    this@BookInfoActivity,
-                                    label,
-                                    source,
-                                    sourceTag = true,
-                                )
-                            }
-                        } else if (sourceTag || book.userTags().any {
-                                it.equals(label, ignoreCase = true)
-                            }) {
+            userTags.forEach {
+                if (tagFilter != BookTagFilter.SOURCE) {
+                    addLabel(it, LabelStyle.TONAL, getString(R.string.book_tag_origin_user, it))
+                }
+            }
+            lbKind.visible()
+            val source = viewModel.bookSource
+            lbKind.setStyledLabels(
+                labels,
+                onClick = { label ->
+                    val sourceTag = sourceTags.any { it.equals(label, ignoreCase = true) }
+                    if (sourceTag && source != null) {
+                        SourceCallBack.callBackBtn(
+                            this@BookInfoActivity,
+                            SourceCallBack.CLICK_BOOK_LABEL,
+                            source,
+                            book,
+                            null,
+                            result = label
+                        ) {
                             SearchActivity.startBookTagSearch(
                                 this@BookInfoActivity,
                                 label,
                                 source,
-                                sourceTag = sourceTag,
+                                sourceTag = true,
                             )
                         }
-                    },
-                    onLongClick = { label ->
-                        if (source != null && sourceTags.any {
-                                it.equals(label, ignoreCase = true)
-                            }) {
-                            SourceCallBack.callBackBtn(
-                                this@BookInfoActivity,
-                                SourceCallBack.LONG_CLICK_BOOK_LABEL,
-                                source,
-                                book,
-                                null,
-                                result = label
-                            )
-                            true
-                        } else {
-                            false
-                        }
-                    },
-                    onActionClick = { label ->
-                        togglePinnedBookTag(book, label)
+                    } else if (sourceTag || book.userTags().any {
+                            it.equals(label, ignoreCase = true)
+                        }) {
+                        SearchActivity.startBookTagSearch(
+                            this@BookInfoActivity,
+                            label,
+                            source,
+                            sourceTag = sourceTag,
+                        )
                     }
-                )
+                },
+                onLongClick = { label ->
+                    if (source != null && sourceTags.any {
+                            it.equals(label, ignoreCase = true)
+                        }) {
+                        SourceCallBack.callBackBtn(
+                            this@BookInfoActivity,
+                            SourceCallBack.LONG_CLICK_BOOK_LABEL,
+                            source,
+                            book,
+                            null,
+                            result = label
+                        )
+                        true
+                    } else {
+                        false
+                    }
+                },
+            )
+            lbKind.addAction(
+                R.drawable.ic_filter_list,
+                getString(R.string.book_tag_filter) + " · " + tagFilterTitle(tagFilter),
+            ) { showTagFilterMenu(it) }
+            lbKind.addAction(R.drawable.ic_edit, getString(R.string.book_custom_tags_edit)) {
+                if (viewModel.inBookshelf) {
+                    showDialogFragment(BookTagEditDialog(book.bookUrl))
+                } else {
+                    toastOnUi(R.string.book_custom_tags_need_shelf)
+                }
             }
         }
     }
 
-    private fun togglePinnedBookTag(book: Book, tag: String) {
+    private fun tagFilterTitle(filter: BookTagFilter) = getString(when (filter) {
+        BookTagFilter.ALL -> R.string.book_tag_filter_all
+        BookTagFilter.USER -> R.string.book_my_tags
+        BookTagFilter.SOURCE -> R.string.book_source_tags
+    })
+
+    private fun showTagFilterMenu(anchor: View): PopupAction = PopupAction(this).apply {
+        setVertical(true)
+        setActionItems(BookTagFilter.entries.map { option ->
+            PopupAction.PopupActionItem(
+                title = tagFilterTitle(option),
+                value = option.name,
+                checkable = true,
+                checked = tagFilter == option,
+            )
+        })
+        onActionClick = { value ->
+            dismiss()
+            tagFilter = BookTagFilter.valueOf(value)
+            putPrefString(TAG_FILTER_PREFERENCE, tagFilter.name)
+            book?.let { upLabels(it) }
+        }
+        showAsDropDown(anchor, 0, 4.dpToPx())
+    }
+
+    override fun onBookTagsEdited(bookUrl: String, tags: String?) {
         if (!viewModel.inBookshelf) return
-        val isPinned = book.userTags().any { it.equals(tag, ignoreCase = true) }
-        val updated = book.copy(
-            customTag = if (isPinned) {
-                removeBookTag(book.customTag, tag)
-            } else {
-                addBookTag(book.customTag, tag)
-            }
-        )
+        val book = book?.takeIf { it.bookUrl == bookUrl } ?: return
+        val updated = book.copy(customTag = tags)
         if (updated.customTag == book.customTag) return
         viewModel.saveBook(updated) {
             book.customTag = updated.customTag
@@ -1725,6 +1754,9 @@ class BookInfoActivity :
         pooledWebView = null
     }
 
+    private companion object {
+        const val TAG_FILTER_PREFERENCE = "bookInfoTagFilter"
+    }
 }
 
 internal fun resolveBookInfoTocTitle(

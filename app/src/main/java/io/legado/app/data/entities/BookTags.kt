@@ -45,6 +45,32 @@ data class BookTagOverviewStat(
     val userBookCount: Int,
 )
 
+enum class BookTagSort {
+    TOTAL,
+    USER,
+}
+
+enum class BookTagFilter {
+    ALL,
+    USER,
+    SOURCE;
+
+    fun includes(tag: BookTagOverviewStat): Boolean = when (this) {
+        ALL -> true
+        USER -> tag.userBookCount > 0
+        SOURCE -> tag.sourceBookCount > 0
+    }
+}
+
+fun sortBookTagOverview(
+    tags: List<BookTagOverviewStat>,
+    sort: BookTagSort,
+): List<BookTagOverviewStat> = tags.sortedWith(
+    compareByDescending<BookTagOverviewStat> {
+        if (sort == BookTagSort.USER) it.userBookCount else it.totalBookCount
+    }.thenBy { it.name.lowercase(Locale.ROOT) }
+)
+
 fun Book.userTags(): List<String> = customTag.bookTags()
 
 fun Book.sourceTags(): List<String> = kind.bookTags()
@@ -82,6 +108,7 @@ fun aggregateBookTagStats(
 
 fun aggregateBookTagOverview(
     books: Iterable<ShelfBookTags>,
+    sort: BookTagSort = BookTagSort.TOTAL,
 ): List<BookTagOverviewStat> {
     data class Counts(
         var totalBooks: Int = 0,
@@ -111,17 +138,14 @@ fun aggregateBookTagOverview(
             }
         }
     }
-    return counts.map { (key, tagCounts) ->
+    return sortBookTagOverview(counts.map { (key, tagCounts) ->
         BookTagOverviewStat(
             name = names.getValue(key),
             totalBookCount = tagCounts.totalBooks,
             sourceBookCount = tagCounts.sourceBooks,
             userBookCount = tagCounts.userBooks,
         )
-    }.sortedWith(
-        compareByDescending<BookTagOverviewStat> { it.totalBookCount }
-            .thenBy { it.name.lowercase(Locale.ROOT) }
-    )
+    }, sort)
 }
 
 fun addBookTag(value: String?, tag: String): String? {
