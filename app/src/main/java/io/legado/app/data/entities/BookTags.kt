@@ -38,6 +38,13 @@ data class BookTagStat(
     val bookCount: Int,
 )
 
+data class BookTagOverviewStat(
+    val name: String,
+    val totalBookCount: Int,
+    val sourceBookCount: Int,
+    val userBookCount: Int,
+)
+
 fun Book.userTags(): List<String> = customTag.bookTags()
 
 fun Book.sourceTags(): List<String> = kind.bookTags()
@@ -71,6 +78,54 @@ fun aggregateBookTagStats(
     return names.keys
         .map { key -> BookTagStat(names.getValue(key), bookUrls.getValue(key).size) }
         .sortedWith(compareByDescending<BookTagStat> { it.bookCount }.thenBy { it.name.lowercase(Locale.ROOT) })
+}
+
+fun aggregateBookTagOverview(
+    books: Iterable<ShelfBookTags>,
+): List<BookTagOverviewStat> {
+    data class Counts(
+        var totalBooks: Int = 0,
+        var sourceBooks: Int = 0,
+        var userBooks: Int = 0,
+    )
+
+    val names = linkedMapOf<String, String>()
+    val counts = linkedMapOf<String, Counts>()
+    books.forEach { book ->
+        val sourceTags = book.kind.bookTags()
+        val sourceKeys = sourceTags.mapTo(hashSetOf()) { it.lowercase(Locale.ROOT) }
+        sourceTags.forEach { tag ->
+            val key = tag.lowercase(Locale.ROOT)
+            names.putIfAbsent(key, tag)
+            counts.getOrPut(key) { Counts() }.apply {
+                totalBooks++
+                sourceBooks++
+            }
+        }
+        book.customTag.bookTags().forEach { tag ->
+            val key = tag.lowercase(Locale.ROOT)
+            names.putIfAbsent(key, tag)
+            counts.getOrPut(key) { Counts() }.apply {
+                userBooks++
+                if (key !in sourceKeys) totalBooks++
+            }
+        }
+    }
+    return counts.map { (key, tagCounts) ->
+        BookTagOverviewStat(
+            name = names.getValue(key),
+            totalBookCount = tagCounts.totalBooks,
+            sourceBookCount = tagCounts.sourceBooks,
+            userBookCount = tagCounts.userBooks,
+        )
+    }.sortedWith(
+        compareByDescending<BookTagOverviewStat> { it.totalBookCount }
+            .thenBy { it.name.lowercase(Locale.ROOT) }
+    )
+}
+
+fun addBookTag(value: String?, tag: String): String? {
+    return normalizeBookTags(value.bookTags() + tag)
 }
 
 fun replaceBookTag(value: String?, oldTag: String, newTag: String): String? {
