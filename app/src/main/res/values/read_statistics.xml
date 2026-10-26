@@ -34,7 +34,7 @@
     <string name="read_statistics_words">阅读字数</string>
     <string name="read_statistics_speed">平均速度</string>
     <string name="read_statistics_word_value">%1$d字</string>
-    <string name="read_statistics_speed_value">%1$d字/小时</string>
+    <string name="read_statistics_speed_value">%1$s/小时</string>
     <string name="read_statistics_no_words">暂无字数数据</string>
     <string name="read_statistics_no_speed">暂无速度数据</string>
     <string name="read_statistics_no_value">—</string>

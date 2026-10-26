@@ -471,14 +471,14 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
     }
 
     private fun speed(value: Long): String = if (value > 0L) {
-        getString(R.string.read_statistics_speed_value, value)
+        getString(R.string.read_statistics_speed_value, wordCount(value))
     } else {
         getString(R.string.read_statistics_no_value)
     }
 
     private fun summaryValue(value: String, numberScale: Float, unitScale: Float = 1f) =
         SpannableStringBuilder(value).apply {
-            Regex("\\d+|\\D+").findAll(value).forEach { match ->
+            Regex("\\d+(?:[.,]\\d+)?|\\D+").findAll(value).forEach { match ->
                 val number = match.value.first().isDigit()
                 val start = match.range.first
                 val end = match.range.last + 1
