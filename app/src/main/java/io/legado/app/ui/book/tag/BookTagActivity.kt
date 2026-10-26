@@ -10,12 +10,11 @@ import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.tabs.TabLayout
 import io.legado.app.R
 import io.legado.app.base.BaseActivity
 import io.legado.app.data.appDb
-import io.legado.app.data.entities.BookTagStat
-import io.legado.app.data.entities.aggregateBookTagStats
+import io.legado.app.data.entities.BookTagOverviewStat
+import io.legado.app.data.entities.aggregateBookTagOverview
 import io.legado.app.data.entities.bookTags
 import io.legado.app.data.entities.normalizeBookTags
 import io.legado.app.data.entities.removeBookTag
@@ -44,9 +43,7 @@ class BookTagActivity : BaseActivity<ActivityBookTagBinding>() {
         binding.titleBar.findViewById(R.id.search_view)
     }
     private val adapter = TagAdapter()
-    private var sourceMode = false
-    private var userTags = emptyList<BookTagStat>()
-    private var sourceTags = emptyList<BookTagStat>()
+    private var tagStats = emptyList<BookTagOverviewStat>()
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         binding.recyclerView.layoutManager = LinearLayoutManager(this)
@@ -54,18 +51,6 @@ class BookTagActivity : BaseActivity<ActivityBookTagBinding>() {
         binding.recyclerView.applyNavigationBarPadding()
         binding.recyclerView.adapter = adapter
 
-        binding.tabLayout.addTab(binding.tabLayout.newTab().setText(R.string.book_my_tags))
-        binding.tabLayout.addTab(binding.tabLayout.newTab().setText(R.string.book_source_tags))
-        binding.tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
-            override fun onTabSelected(tab: TabLayout.Tab) {
-                sourceMode = tab.position == 1
-                searchView.setQuery("", false)
-                render()
-            }
-
-            override fun onTabUnselected(tab: TabLayout.Tab) = Unit
-            override fun onTabReselected(tab: TabLayout.Tab) = Unit
-        })
         searchView.applyTint(primaryTextColor)
         searchView.queryHint = getString(R.string.book_tag_search_hint)
         searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
@@ -76,8 +61,7 @@ class BookTagActivity : BaseActivity<ActivityBookTagBinding>() {
         lifecycleScope.launch {
             appDb.bookDao.flowShelfTagBooks().collect { books ->
                 withContext(IO) {
-                    userTags = aggregateBookTagStats(books, sourceTags = false)
-                    sourceTags = aggregateBookTagStats(books, sourceTags = true)
+                    tagStats = aggregateBookTagOverview(books)
                 }
                 render()
             }
@@ -86,7 +70,7 @@ class BookTagActivity : BaseActivity<ActivityBookTagBinding>() {
 
     private fun render() {
         val query = searchView.query.toString().trim()
-        val items = (if (sourceMode) sourceTags else userTags).filter {
+        val items = tagStats.filter {
             query.isEmpty() || it.name.contains(query, ignoreCase = true)
         }
         adapter.items = items
@@ -94,7 +78,7 @@ class BookTagActivity : BaseActivity<ActivityBookTagBinding>() {
         adapter.notifyDataSetChanged()
     }
 
-    private fun showUserTagMenu(anchor: View, tag: BookTagStat) {
+    private fun showUserTagMenu(anchor: View, tag: BookTagOverviewStat) {
         PopupMenu(this, anchor).apply {
             menu.add(R.string.book_tag_rename).setOnMenuItemClickListener {
                 renameTag(tag.name)
@@ -157,7 +141,7 @@ class BookTagActivity : BaseActivity<ActivityBookTagBinding>() {
     }
 
     private inner class TagAdapter : RecyclerView.Adapter<TagHolder>() {
-        var items: List<BookTagStat> = emptyList()
+        var items: List<BookTagOverviewStat> = emptyList()
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): TagHolder {
             return TagHolder(
@@ -170,15 +154,20 @@ class BookTagActivity : BaseActivity<ActivityBookTagBinding>() {
         override fun onBindViewHolder(holder: TagHolder, position: Int) {
             val tag = items[position]
             holder.binding.tvName.text = tag.name
-            holder.binding.tvCount.text = getString(R.string.book_tag_book_count, tag.bookCount)
+            holder.binding.tvCount.text = getString(
+                R.string.book_tag_overview_count,
+                tag.totalBookCount,
+                tag.sourceBookCount,
+                tag.userBookCount,
+            )
             holder.binding.root.setOnClickListener {
                 SearchActivity.startLocal(this@BookTagActivity, tag.name)
             }
             holder.binding.root.setOnLongClickListener {
-                if (sourceMode) false else {
+                if (tag.userBookCount > 0) {
                     showUserTagMenu(holder.binding.root, tag)
                     true
-                }
+                } else false
             }
         }
     }

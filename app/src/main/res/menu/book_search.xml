@@ -31,6 +31,12 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_book_tag_search_switch"
+        android:title="@string/book_tag_search_switch_to_shelf"
+        android:visible="false"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_log"
         android:title="@string/log"
         android:orderInCategory="9999"

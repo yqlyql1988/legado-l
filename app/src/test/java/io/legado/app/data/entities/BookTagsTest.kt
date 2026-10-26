@@ -79,6 +79,36 @@ class BookTagsTest {
     }
 
     @Test
+    fun `combined tag overview merges names and counts books once across categories`() {
+        val books = listOf(
+            ShelfBookTags("book-1", "总攻,都市,总攻", "总攻,已读"),
+            ShelfBookTags("book-2", "总攻", null),
+            ShelfBookTags("book-3", null, "总攻"),
+        )
+
+        assertEquals(
+            listOf(
+                BookTagOverviewStat("总攻", 3, 2, 2),
+                BookTagOverviewStat("已读", 1, 0, 1),
+                BookTagOverviewStat("都市", 1, 1, 0),
+            ),
+            aggregateBookTagOverview(books),
+        )
+    }
+
+    @Test
+    fun `tag pinning adds a source tag to user tags without duplicate names`() {
+        assertEquals("常读,总攻", addBookTag("常读", "总攻"))
+        assertEquals("总攻", addBookTag("总攻", "总攻"))
+        assertEquals("总攻", addBookTag("总攻", "总攻".uppercase()))
+    }
+
+    @Test
+    fun `renaming a tag to an existing user tag merges duplicates`() {
+        assertEquals("总攻", replaceBookTag("总攻,主攻", "主攻", "总攻"))
+    }
+
+    @Test
     fun `shelf tag matching trims tokens and searches both tag fields exactly`() {
         val book = ShelfBookTags("book-1", "都市, 科幻", "已读， 收藏")
 

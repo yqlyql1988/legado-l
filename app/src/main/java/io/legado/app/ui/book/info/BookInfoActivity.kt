@@ -37,6 +37,8 @@ import io.legado.app.data.entities.BaseSource
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.addBookTag
+import io.legado.app.data.entities.removeBookTag
 import io.legado.app.data.entities.sourceTags
 import io.legado.app.data.entities.userTags
 import io.legado.app.databinding.ActivityBookInfoBinding
@@ -135,6 +137,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
+import java.util.Locale
 
 class BookInfoActivity :
     VMBaseActivity<ActivityBookInfoBinding, BookInfoViewModel>(toolBarTheme = Theme.Dark, showOpenMenuIcon = false),
@@ -926,15 +929,45 @@ class BookInfoActivity :
     private fun upLabels(book: Book) = binding.run {
         lifecycleScope.launch {
             val sourceTags = book.sourceTags()
+            val userTags = book.userTags()
             val labels = arrayListOf<StyledLabel>()
             val displayedKeys = hashSetOf<String>()
-            fun addLabel(text: String, style: LabelStyle) {
-                if (text.isNotBlank() && displayedKeys.add(text.lowercase())) {
-                    labels.add(StyledLabel(text, style))
+            fun addLabel(
+                text: String,
+                style: LabelStyle,
+                actionIcon: Int? = null,
+                actionDescription: String? = null,
+                actionTint: Int? = null,
+            ) {
+                if (text.isNotBlank() && displayedKeys.add(text.lowercase(Locale.ROOT))) {
+                    labels.add(
+                        StyledLabel(
+                            text = text,
+                            style = style,
+                            actionIcon = actionIcon,
+                            actionDescription = actionDescription,
+                            actionTint = actionTint,
+                        )
+                    )
                 }
             }
             book.wordCount?.let { addLabel(it, LabelStyle.FILLED) }
-            sourceTags.forEach { addLabel(it, LabelStyle.FILLED) }
+            sourceTags.forEach { tag ->
+                val pinned = userTags.any { it.equals(tag, ignoreCase = true) }
+                addLabel(
+                    text = tag,
+                    style = LabelStyle.FILLED,
+                    actionIcon = when {
+                        !viewModel.inBookshelf -> null
+                        pinned -> R.drawable.ic_push_pin_filled_24dp
+                        else -> R.drawable.ic_push_pin_outline_24dp
+                    },
+                    actionDescription = getString(
+                        if (pinned) R.string.book_tag_unpin else R.string.book_tag_pin
+                    ),
+                    actionTint = accentColor.takeIf { pinned },
+                )
+            }
             if (book.isLocal) {
                 withContext(IO) {
                     val size = try {
@@ -948,7 +981,7 @@ class BookInfoActivity :
                     }
                 }
             }
-            book.userTags().forEach { addLabel(it, LabelStyle.TONAL) }
+            userTags.forEach { addLabel(it, LabelStyle.TONAL) }
             if (labels.isEmpty()) {
                 lbKind.gone()
             } else {
@@ -967,12 +1000,22 @@ class BookInfoActivity :
                                 null,
                                 result = label
                             ) {
-                                SearchActivity.startLocal(this@BookInfoActivity, label)
+                                SearchActivity.startBookTagSearch(
+                                    this@BookInfoActivity,
+                                    label,
+                                    source,
+                                    sourceTag = true,
+                                )
                             }
                         } else if (sourceTag || book.userTags().any {
                                 it.equals(label, ignoreCase = true)
                             }) {
-                            SearchActivity.startLocal(this@BookInfoActivity, label)
+                            SearchActivity.startBookTagSearch(
+                                this@BookInfoActivity,
+                                label,
+                                source,
+                                sourceTag = sourceTag,
+                            )
                         }
                     },
                     onLongClick = { label ->
@@ -991,9 +1034,29 @@ class BookInfoActivity :
                         } else {
                             false
                         }
+                    },
+                    onActionClick = { label ->
+                        togglePinnedBookTag(book, label)
                     }
                 )
             }
+        }
+    }
+
+    private fun togglePinnedBookTag(book: Book, tag: String) {
+        if (!viewModel.inBookshelf) return
+        val isPinned = book.userTags().any { it.equals(tag, ignoreCase = true) }
+        val updated = book.copy(
+            customTag = if (isPinned) {
+                removeBookTag(book.customTag, tag)
+            } else {
+                addBookTag(book.customTag, tag)
+            }
+        )
+        if (updated.customTag == book.customTag) return
+        viewModel.saveBook(updated) {
+            book.customTag = updated.customTag
+            upLabels(book)
         }
     }
 
