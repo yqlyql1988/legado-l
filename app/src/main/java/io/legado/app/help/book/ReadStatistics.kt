@@ -243,9 +243,10 @@ data class ReadStatisticsSummary(
     val speed: Long get() = readWordsSpeed(datedWords, wordDuration)
 }
 
+/** Average words per hour for the supplied reading duration in milliseconds. */
 internal fun readWordsSpeed(words: Long, duration: Long): Long {
     if (words <= 0 || duration <= 0) return 0L
-    return (words.toDouble() * 60_000.0 / duration).toLong().coerceAtLeast(0L)
+    return (words.toDouble() * 3_600_000.0 / duration).toLong().coerceAtLeast(0L)
 }
 
 /** A single immutable database snapshot supplies totals, charts, calendar and rankings. */

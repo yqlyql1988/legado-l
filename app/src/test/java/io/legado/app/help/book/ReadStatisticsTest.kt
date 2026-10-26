@@ -180,7 +180,7 @@ class ReadStatisticsTest {
         assertEquals(600L, summary.words)
         assertEquals(600L, summary.datedWords)
         assertEquals(600_000L, summary.wordDuration)
-        assertEquals(60L, summary.speed)
+        assertEquals(3600L, summary.speed)
         assertEquals(600L, snapshot.booksForDay("2026-10-17").single().readWords)
     }
 
@@ -199,8 +199,8 @@ class ReadStatisticsTest {
         assertEquals(7_200_000L, summary.datedDuration)
         assertEquals(600L, summary.datedWords)
         assertEquals(600_000L, summary.wordDuration)
-        assertEquals(60L, summary.speed)
-        assertEquals(60L, summary.bookSpeeds["Book" to "A"])
+        assertEquals(3600L, summary.speed)
+        assertEquals(3600L, summary.bookSpeeds["Book" to "A"])
     }
 
     @Test fun sameTitleDifferentAuthorsRemainSeparateInPeriodRanking() {
