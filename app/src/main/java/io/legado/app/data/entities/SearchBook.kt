@@ -62,6 +62,14 @@ data class SearchBook(
     @IgnoredOnParcel
     override var tocHtml: String? = null
 
+    @Ignore
+    @IgnoredOnParcel
+    var sourceTagNames: List<String> = emptyList()
+
+    @Ignore
+    @IgnoredOnParcel
+    var userTagNames: List<String> = emptyList()
+
     override fun equals(other: Any?) = other is SearchBook && other.bookUrl == bookUrl
 
     override fun hashCode() = bookUrl.hashCode()

@@ -11,8 +11,11 @@ import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.databinding.ItemSearchBinding
 import io.legado.app.help.config.AppConfig
+import io.legado.app.ui.widget.LabelStyle
+import io.legado.app.ui.widget.StyledLabel
 import io.legado.app.utils.gone
 import io.legado.app.utils.visible
+import java.util.Locale
 
 
 class SearchAdapter(context: Context, val callBack: CallBack) :
@@ -40,7 +43,10 @@ class SearchAdapter(context: Context, val callBack: CallBack) :
                 payload.putInt("origins", newItem.origins.size)
                 if (oldItem.coverUrl != newItem.coverUrl)
                     payload.putString("cover", newItem.coverUrl)
-                if (oldItem.kind != newItem.kind)
+                if (oldItem.kind != newItem.kind ||
+                    oldItem.sourceTagNames != newItem.sourceTagNames ||
+                    oldItem.userTagNames != newItem.userTagNames
+                )
                     payload.putString("kind", newItem.kind)
                 if (oldItem.latestChapterTitle != newItem.latestChapterTitle)
                     payload.putString("last", newItem.latestChapterTitle)
@@ -87,7 +93,7 @@ class SearchAdapter(context: Context, val callBack: CallBack) :
             bvOriginCount.setBadgeCount(searchBook.origins.size)
             upLasted(binding, searchBook.latestChapterTitle)
             tvIntroduce.text = searchBook.trimIntro(context)
-            upKind(binding, searchBook.getKindList())
+            upKind(binding, searchBook)
             ivCover.load(
                 searchBook,
                 AppConfig.loadCoverOnlyWifi
@@ -102,7 +108,7 @@ class SearchAdapter(context: Context, val callBack: CallBack) :
                     "origins" -> bvOriginCount.setBadgeCount(searchBook.origins.size)
                     "last" -> upLasted(binding, searchBook.latestChapterTitle)
                     "intro" -> tvIntroduce.text = searchBook.trimIntro(context)
-                    "kind" -> upKind(binding, searchBook.getKindList())
+                    "kind" -> upKind(binding, searchBook)
                     "isInBookshelf", "hasReadRecord" -> upIndicator(binding, searchBook)
                     "cover" -> ivCover.load(
                         searchBook,
@@ -134,12 +140,31 @@ class SearchAdapter(context: Context, val callBack: CallBack) :
         }
     }
 
-    private fun upKind(binding: ItemSearchBinding, kinds: List<String>) = binding.run {
-        if (kinds.isEmpty()) {
+    private fun upKind(binding: ItemSearchBinding, searchBook: SearchBook) = binding.run {
+        val sourceKeys = searchBook.sourceTagNames.mapTo(hashSetOf()) { it.lowercase(Locale.ROOT) }
+        val userKeys = searchBook.userTagNames.mapTo(hashSetOf()) { it.lowercase(Locale.ROOT) }
+        val labels = searchBook.getKindList().map { kind ->
+            val key = kind.lowercase(Locale.ROOT)
+            val isSource = key in sourceKeys
+            val isUser = key in userKeys
+            val style = when {
+                isSource && isUser -> LabelStyle.OUTLINED
+                isUser -> LabelStyle.TONAL
+                else -> LabelStyle.FILLED
+            }
+            val description = when {
+                isSource && isUser -> context.getString(R.string.book_tag_origin_both, kind)
+                isUser -> context.getString(R.string.book_tag_origin_user, kind)
+                isSource -> context.getString(R.string.book_tag_origin_source, kind)
+                else -> null
+            }
+            StyledLabel(kind, style, description)
+        }
+        if (labels.isEmpty()) {
             llKind.gone()
         } else {
             llKind.visible()
-            llKind.setLabels(kinds)
+            llKind.setStyledLabels(labels)
         }
     }
 

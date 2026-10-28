@@ -42,6 +42,35 @@ class TextReadProgressTrackerTest {
     }
 
     @Test
+    fun quickForwardThenBackwardDiscardsUnconfirmedWords() {
+        val tracker = TextReadProgressTracker()
+        val current = chapter(0, "ABCDEFGHIJ")
+
+        tracker.start(0, 0, current)
+
+        assertEquals(0L, tracker.update(0, 6, current, elapsed = 200))
+        assertEquals(0L, tracker.update(0, 3, current, elapsed = 200))
+        assertEquals(0L, tracker.update(0, 4, current, elapsed = 200))
+        assertEquals(2L, tracker.update(
+            0, 5, current, elapsed = TextReadProgressTracker.wordConfirmationMillis,
+        ))
+    }
+
+    @Test
+    fun stoppingAtTheForwardPositionConfirmsPendingWords() {
+        val tracker = TextReadProgressTracker()
+        val current = chapter(0, "ABCDEFGHIJ")
+
+        tracker.start(0, 0, current)
+
+        assertEquals(0L, tracker.update(0, 3, current, elapsed = 200))
+        assertEquals(
+            3L,
+            tracker.update(0, 3, current, elapsed = TextReadProgressTracker.wordConfirmationMillis),
+        )
+    }
+
+    @Test
     fun normalNextChapterCountsRemainingAndNewBody() {
         val tracker = TextReadProgressTracker()
         val first = chapter(0, "title\nAB", titleLength = 6)

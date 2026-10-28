@@ -718,8 +718,14 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
             }
             tvPeak.text = if (peak.duration > 0) getString(R.string.read_statistics_peak,
                 hourLabel(peak.startHour, peak.endHour), duration(peak.duration)) else getString(R.string.read_statistics_hour_empty)
-            tvSelectedHour.text = getString(R.string.read_statistics_hour_detail,
-                hourLabel(selected.startHour, selected.endHour), duration(selected.duration))
+            val selectedWordDuration = selected.books.filter { it.readWords > 0 }.sumOf { it.readTime }
+            tvSelectedHour.text = getString(
+                R.string.read_statistics_hour_metrics,
+                hourLabel(selected.startHour, selected.endHour),
+                duration(selected.duration),
+                wordCount(selected.words),
+                speed(readWordsSpeed(selected.words, selectedWordDuration)),
+            )
             previousHour.isEnabled = index > 0
             nextHour.isEnabled = index < buckets.lastIndex
             toggleHourBooks.setText(if (hourBooksExpanded) R.string.read_statistics_collapse_hour_books
