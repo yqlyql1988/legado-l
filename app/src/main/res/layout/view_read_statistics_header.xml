@@ -450,6 +450,7 @@
                 android:orientation="vertical">
 
                 <LinearLayout
+                    android:id="@+id/selected_hour_panel"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center_vertical"
@@ -487,14 +488,22 @@
                         app:tint="@color/read_statistics_nav_tint" />
                 </LinearLayout>
 
-                <androidx.appcompat.widget.AppCompatButton
+                <FrameLayout
                     android:id="@+id/toggle_hour_books"
-                    style="@style/ReadStatisticsScopeButton"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="start|center_vertical"
-                    android:minHeight="44dp"
-                    android:text="@string/read_statistics_expand_hour_books" />
+                    android:layout_height="28dp"
+                    android:clickable="true"
+                    android:contentDescription="@string/read_statistics_expand_hour_books"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackgroundBorderless">
+
+                    <View
+                        android:layout_width="18px"
+                        android:layout_height="4dp"
+                        android:layout_gravity="center"
+                        android:alpha="0.45"
+                        android:background="@drawable/bg_review_drag_handle" />
+                </FrameLayout>
 
                 <LinearLayout
                     android:id="@+id/hour_books"

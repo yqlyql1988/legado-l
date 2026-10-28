@@ -68,6 +68,10 @@ public class ReadHourlyUiTest {
     private String text(Activity activity, String name) {
         return ((TextView)activity.findViewById(id(name))).getText().toString();
     }
+    private String description(Activity activity, String name) {
+        CharSequence value = activity.findViewById(id(name)).getContentDescription();
+        return value == null ? "" : value.toString();
+    }
     private void await(ActivityScenario<Activity> scenario, String name, String expected) {
         String[] actual = {""};
         for (int i = 0; i < 120; i++) {
@@ -213,7 +217,7 @@ public class ReadHourlyUiTest {
                 assertEquals(View.VISIBLE, activity.findViewById(id("hour_details")).getVisibility());
                 assertEquals(string("read_statistics_interval", 1), text(activity, "hour_interval"));
                 assertEquals(View.GONE, activity.findViewById(id("hour_books")).getVisibility());
-                assertEquals(string("read_statistics_expand_hour_books"), text(activity, "toggle_hour_books"));
+                assertEquals(string("read_statistics_expand_hour_books"), description(activity, "toggle_hour_books"));
                 activity.findViewById(id("toggle_hour_books")).performClick();
                 assertEquals(View.VISIBLE, activity.findViewById(id("hour_books")).getVisibility());
                 assertTrue(((ViewGroup)activity.findViewById(id("hour_books"))).getChildCount() > 0);
@@ -249,7 +253,7 @@ public class ReadHourlyUiTest {
                 assertEquals(View.GONE, activity.findViewById(id("hour_books")).getVisibility());
                 activity.findViewById(id("toggle_hour_books")).performClick();
                 assertEquals(View.VISIBLE, activity.findViewById(id("hour_books")).getVisibility());
-                assertEquals(string("read_statistics_collapse_hour_books"), text(activity, "toggle_hour_books"));
+                assertEquals(string("read_statistics_collapse_hour_books"), description(activity, "toggle_hour_books"));
                 assertTrue(text(activity, "tv_selected_hour").contains("10:00"));
                 activity.findViewById(id("next_hour")).performClick();
                 assertTrue(text(activity, "tv_selected_hour").contains("15:00"));
@@ -263,7 +267,7 @@ public class ReadHourlyUiTest {
                 assertTrue(activity.findViewById(id("tab_month")).isSelected());
                 assertEquals(string("read_statistics_interval", 5), text(activity, "hour_interval"));
                 assertEquals(View.VISIBLE, activity.findViewById(id("hour_books")).getVisibility());
-                assertEquals(string("read_statistics_collapse_hour_books"), text(activity, "toggle_hour_books"));
+                assertEquals(string("read_statistics_collapse_hour_books"), description(activity, "toggle_hour_books"));
                 for (String period : new String[]{"tab_year", "tab_all", "tab_day"}) {
                     activity.findViewById(id(period)).performClick();
                     assertEquals(View.VISIBLE, activity.findViewById(id("hour_details")).getVisibility());
@@ -278,7 +282,7 @@ public class ReadHourlyUiTest {
             scenario.onActivity(activity -> {
                 assertTrue(activity.findViewById(id("tab_day")).isSelected());
                 assertEquals(View.GONE, activity.findViewById(id("hour_books")).getVisibility());
-                assertEquals(string("read_statistics_expand_hour_books"), text(activity, "toggle_hour_books"));
+                assertEquals(string("read_statistics_expand_hour_books"), description(activity, "toggle_hour_books"));
             });
             screenshot("hours-default-day");
         }

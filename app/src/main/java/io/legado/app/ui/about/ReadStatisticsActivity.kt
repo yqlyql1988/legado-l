@@ -147,6 +147,7 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         val controlSurface = ColorUtils.blendColors(backgroundColor, contentPrimary, .05f)
         header.periodTabs.background = rounded(controlSurface, radius = 13)
         header.dateNav.background = rounded(controlSurface, radius = 13)
+        header.selectedHourPanel.background = rounded(controlSurface, radius = 10)
     }
 
     override fun onResume() {
@@ -728,15 +729,10 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
             )
             previousHour.isEnabled = index > 0
             nextHour.isEnabled = index < buckets.lastIndex
-            toggleHourBooks.setText(if (hourBooksExpanded) R.string.read_statistics_collapse_hour_books
-                else R.string.read_statistics_expand_hour_books)
-            toggleHourBooks.setTextColor(contentSecondary)
-            toggleHourBooks.setCompoundDrawablesRelative(null, null,
-                getCompatDrawable(if (hourBooksExpanded) R.drawable.ic_expand_less
-                    else R.drawable.ic_expand_more)?.mutate()?.apply {
-                    setTint(contentSecondary)
-                    setBounds(0, 0, 20.dpToPx(), 20.dpToPx())
-                }, null)
+            toggleHourBooks.contentDescription = getString(
+                if (hourBooksExpanded) R.string.read_statistics_collapse_hour_books
+                else R.string.read_statistics_expand_hour_books
+            )
             hourBooks.isVisible = hourBooksExpanded
             hourBooks.removeAllViews()
             if (!hourBooksExpanded) return@with
