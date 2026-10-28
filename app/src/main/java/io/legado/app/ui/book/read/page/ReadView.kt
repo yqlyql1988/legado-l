@@ -849,7 +849,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
 
             1 -> pageDelegate?.nextPageByAnim(defaultAnimationSpeed)
             2 -> pageDelegate?.prevPageByAnim(defaultAnimationSpeed)
-            3 -> ReadBook.moveToNextChapter(true)
+            3 -> ReadBook.moveToNextChapter(true, countRemaining = false)
             4 -> ReadBook.moveToPrevChapter(upContent = true, toLast = false)
             5 -> ReadAloud.prevParagraph(context)
             6 -> ReadAloud.nextParagraph(context)

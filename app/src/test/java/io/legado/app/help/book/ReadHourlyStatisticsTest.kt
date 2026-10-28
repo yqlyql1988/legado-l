@@ -73,9 +73,9 @@ class ReadHourlyStatisticsTest {
         listOf(ReadRecordHourlyShow("Same", "A", "2025-12-31", 23, 1000),
             ReadRecordHourlyShow("Same", "A", "2026-09-01", 9, 2000),
             ReadRecordHourlyShow("Same", "A", "2026-10-17", 9, 3000),
-            ReadRecordHourlyShow("Same", "A", "2026-10-18", 9, 1000),
-            ReadRecordHourlyShow("Same", "A", "2026-10-18", 23, 2000),
-            ReadRecordHourlyShow("Same", "B", "2026-10-18", 9, 5000)),
+            ReadRecordHourlyShow("Same", "A", "2026-10-18", 9, 1000, 100),
+            ReadRecordHourlyShow("Same", "A", "2026-10-18", 23, 2000, 200),
+            ReadRecordHourlyShow("Same", "B", "2026-10-18", 9, 5000, 500)),
     )
 
     @Test fun hourlyGroupingRespectsScopeAuthorsAndPartialLastBucket() {
@@ -85,6 +85,8 @@ class ReadHourlyStatisticsTest {
         assertEquals(8000L, day.duration)
         assertEquals(1000L, day.unassignedDuration)
         assertEquals(listOf("B", "A"), day.buckets[1].books.map { it.author })
+        assertEquals(listOf(500L, 100L), day.buckets[1].books.map { it.readWords })
+        assertEquals(600L, day.buckets[1].words)
         assertEquals(8, day.buckets[1].books.last().lastChapterIndex)
         assertEquals(11_000L, snapshot.hourlySummary(ReadStatisticsPeriod.MONTH, 2026, 10).duration)
         assertEquals(13_000L, snapshot.hourlySummary(ReadStatisticsPeriod.YEAR, 2026, 10).duration)
@@ -107,6 +109,14 @@ class ReadHourlyStatisticsTest {
         assertEquals(30_000L, old.unassignedDuration)
         assertTrue(old.buckets.all { it.books.isEmpty() })
         assertEquals(0L, snapshot.hourlySummary(ReadStatisticsPeriod.DAY, 2026, 10, day = 16).duration)
+    }
+
+    @Test fun hourlyBookRowsUseWordsFromTheSelectedHours() {
+        val day = snapshot.hourlySummary(ReadStatisticsPeriod.DAY, 2026, 10, day = 18)
+
+        assertEquals(500L, day.buckets[9].books.single { it.author == "B" }.readWords)
+        assertEquals(100L, day.buckets[9].books.single { it.author == "A" }.readWords)
+        assertEquals(200L, day.buckets[23].books.single { it.author == "A" }.readWords)
     }
 
     @Test fun intervalRejectsSubHourAndOverDayValues() {

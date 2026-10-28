@@ -204,6 +204,7 @@ data class ReadHourBucket(
     val books: List<ReadRecordShow>,
 ) {
     val duration: Long get() = books.sumOf { it.readTime }
+    val words: Long get() = books.sumOf { it.readWords }
 }
 
 data class ReadHourlySummary(
@@ -343,10 +344,17 @@ data class ReadStatisticsSnapshot(
         }
         val buckets = (0 until 24 step intervalHours).map { start ->
             val end = minOf(start + intervalHours, 24)
-            val times = selected.filter { it.hour in start until end }
-                .groupBy { it.bookName to it.author }.mapValues { (_, rows) -> rows.sumOf { it.readTime } }
+            val metrics = selected.filter { it.hour in start until end }
+                .groupBy { it.bookName to it.author }
+                .mapValues { (_, rows) ->
+                    rows.sumOf { it.readTime } to rows.sumOf { it.readWords }
+                }
             val books = summary.books.mapNotNull { record ->
-                times[record.bookName to record.author]?.takeIf { it > 0 }?.let { record.copy(readTime = it) }
+                metrics[record.bookName to record.author]?.let { (time, words) ->
+                    time.takeIf { it > 0 }?.let {
+                        record.copy(readTime = it, readWords = words)
+                    }
+                }
             }.sortedWith(compareByDescending<ReadRecordShow> { it.readTime }.thenBy { it.bookName }.thenBy { it.author })
             ReadHourBucket(start, end, books)
         }

@@ -985,6 +985,7 @@ object ReadBook : CoroutineScope by MainScope() {
                 durChapterIndex,
                 durChapterPos,
                 readWordChapterCache.snapshot(curTextChapter),
+                elapsed,
             )
             readRecord.readTime += elapsed
             readRecord.readWords += readWords
@@ -1063,12 +1064,14 @@ object ReadBook : CoroutineScope by MainScope() {
     fun moveToNextChapter(
         upContent: Boolean,
         upContentInPlace: Boolean = true,
-        syncReadAloudFollow: Boolean = false
+        syncReadAloudFollow: Boolean = false,
+        countRemaining: Boolean = true,
     ): Boolean {
         if (syncReadAloudFollow && !BaseReadAloudService.shouldSyncSpeechNavigation()) {
             return false
         }
         if (durChapterIndex < simulatedChapterSize - 1) {
+            if (!countRemaining) readWordTracker.markSeek()
             val restartReadAloud = prepareReadAloudPageNavigation(syncReadAloudFollow)
             durChapterPos = 0
             durChapterIndex++
@@ -1103,7 +1106,8 @@ object ReadBook : CoroutineScope by MainScope() {
     suspend fun moveToNextChapterAwait(
         upContent: Boolean,
         upContentInPlace: Boolean = true,
-        syncReadAloudFollow: Boolean = false
+        syncReadAloudFollow: Boolean = false,
+        countRemaining: Boolean = true,
     ): Boolean {
         if (BaseReadAloudService.isRun && !syncReadAloudFollow) {
             ReadAloud.detachReadAloudFollow()
@@ -1112,6 +1116,7 @@ object ReadBook : CoroutineScope by MainScope() {
             return false
         }
         if (durChapterIndex < simulatedChapterSize - 1) {
+            if (!countRemaining) readWordTracker.markSeek()
             durChapterPos = 0
             durChapterIndex++
             clearExpiredChapterLoadingJob()

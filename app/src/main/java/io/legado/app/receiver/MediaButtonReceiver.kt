@@ -64,7 +64,7 @@ class MediaButtonReceiver : BroadcastReceiver() {
                                 if (BaseReadAloudService.isRun) {
                                     ReadAloud.nextChapter(context)
                                 } else {
-                                    ReadBook.moveToNextChapter(true)
+                                    ReadBook.moveToNextChapter(true, countRemaining = false)
                                 }
                             } else {
                                 ReadAloud.nextParagraph(context)

@@ -581,7 +581,9 @@ class ReadMenu @JvmOverloads constructor(
         tvPre.setOnClickListener { ReadBook.moveToPrevChapter(upContent = true, toLast = false) }
 
         //下一章
-        tvNext.setOnClickListener { ReadBook.moveToNextChapter(true) }
+        tvNext.setOnClickListener {
+            ReadBook.moveToNextChapter(true, countRemaining = false)
+        }
 
         //目录
         llCatalog.setOnClickListener {

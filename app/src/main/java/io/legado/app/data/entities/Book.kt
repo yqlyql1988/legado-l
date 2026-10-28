@@ -419,6 +419,8 @@ data class Book(
     ).apply {
         this.infoHtml = this@Book.infoHtml
         this.tocHtml = this@Book.tocHtml
+        this.sourceTagNames = this@Book.sourceTags()
+        this.userTagNames = this@Book.userTags()
     }
 
     fun toReplaceBook() = ReplaceBook(
