@@ -1673,6 +1673,12 @@
     <string name="review_icon_color_title">段评图标颜色</string>
     <string name="review_icon_color_reset">段评图标颜色已恢复跟随主题</string>
     <string name="review_resize_handle">调整段评窗口高度</string>
+    <string name="review_send_hint">写段评…</string>
+    <string name="review_send_success">段评已发送</string>
+    <string name="review_send_failed">发送段评失败</string>
+    <string name="review_paragraph_unavailable">未找到选中文字所在段落</string>
+    <string name="review_not_supported">当前书源不支持在这一段发段评</string>
+    <string name="review_web_failed">打开段评网页失败</string>
     <string name="bottom_bar_skin">底栏图集</string>
     <string name="bottom_bar_skin_summary">导入 zip 自定义底栏图标</string>
     <string name="bottom_bar_skin_assign">分配图集</string>

@@ -16,7 +16,7 @@ class TextSelectMenuConfigTest {
             config.bar
         )
         assertEquals(
-            listOf("dict", "search", "browser", "share", "processText"),
+            listOf("dict", "search", "browser", "share", "review", "processText"),
             config.more
         )
     }
@@ -57,7 +57,7 @@ class TextSelectMenuConfigTest {
         ).normalized()
 
         assertEquals(listOf("copy", "dict"), config.bar)
-        assertEquals(listOf("highlight", "aloudFromHere"), config.more.takeLast(2))
+        assertEquals(listOf("aloudFromHere", "review"), config.more.takeLast(2))
     }
 
     @Test
@@ -66,7 +66,7 @@ class TextSelectMenuConfigTest {
             listOf("highlight", "bookmark", "replace", "dict", "search", "browser", "share", "processText"))
         val migrated = TextSelectMenuConfig.fromJson(original.toJson()).normalized()
         assertEquals(original.bar, migrated.bar)
-        assertEquals(original.more + "aloudFromHere", migrated.more)
+        assertEquals(original.more + listOf("aloudFromHere", "review"), migrated.more)
         assertEquals(migrated, TextSelectMenuConfig.fromJson(migrated.toJson()).normalized())
     }
 

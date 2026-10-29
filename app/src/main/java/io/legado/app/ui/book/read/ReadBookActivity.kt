@@ -52,6 +52,7 @@ import io.legado.app.help.HighlightStyle
 import io.legado.app.help.HighlightStyles
 import io.legado.app.help.IntentData
 import io.legado.app.help.TTS
+import io.legado.app.help.TextSelectMenuConfig
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.isAudio
@@ -113,7 +114,10 @@ import io.legado.app.ui.book.read.page.ContentTextView
 import io.legado.app.ui.book.read.page.ReadView
 import io.legado.app.ui.book.read.page.delegate.ScrollPageDelegate
 import io.legado.app.ui.book.read.page.entities.PageDirection
+import io.legado.app.ui.book.read.page.entities.TextChapter
 import io.legado.app.ui.book.read.page.entities.TextPage
+import io.legado.app.ui.book.read.page.entities.TextParagraph
+import io.legado.app.ui.book.read.page.entities.column.ImageColumn
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.ui.book.read.page.provider.LayoutProgressListener
 import io.legado.app.ui.book.searchContent.SearchContentActivity
@@ -134,6 +138,7 @@ import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.replace.ReplaceRuleActivity
 import io.legado.app.ui.replace.edit.ReplaceEditActivity
 import io.legado.app.ui.widget.PopupAction
+import io.legado.app.ui.widget.dialog.BottomWebViewDialog
 import io.legado.app.ui.widget.dialog.PhotoDialog
 import io.legado.app.ui.widget.popupActionMenu
 import io.legado.app.utils.applyNavigationBarPadding
@@ -1588,6 +1593,16 @@ class ReadBookActivity : BaseReadBookActivity(),
                 showDialogFragment(DictDialog(selectedText))
                 return true
             }
+
+            R.id.menu_review -> {
+                val paragraph = binding.readView.getSelectParagraph()
+                if (paragraph == null) {
+                    toastOnUi(R.string.review_paragraph_unavailable)
+                } else {
+                    openParagraphReview(paragraph)
+                }
+                return true
+            }
         }
         return false
     }
@@ -1602,6 +1617,11 @@ class ReadBookActivity : BaseReadBookActivity(),
 
     override fun onEditTextActionMenu() {
         showTextSelectMenuConfig()
+    }
+
+    override fun isMenuItemAvailable(key: String): Boolean {
+        if (key != TextSelectMenuConfig.KEY_REVIEW) return true
+        return isParagraphReviewAvailable()
     }
 
     fun showTextSelectMenuConfig() {
@@ -2284,10 +2304,14 @@ class ReadBookActivity : BaseReadBookActivity(),
             toastOnUi(R.string.review_empty)
             return
         }
+        showReviewDialog(paragraphNum, count, chapterIndex)
+    }
+
+    private fun showReviewDialog(paragraphNum: Int, count: Int, chapterIndex: Int) {
         val source = ReadBook.bookSource ?: return
         val reviewDialogTag = ReviewDetailDialog::class.simpleName
         val fragmentManager = supportFragmentManager
-        fun showReviewDialog(dialog: ReviewDetailDialog) {
+        fun showDialog(dialog: ReviewDetailDialog) {
             val now = SystemClock.uptimeMillis()
             val taggedDialog = fragmentManager.findFragmentByTag(reviewDialogTag)
             val existingDialog = taggedDialog != null || fragmentManager.fragments.any {
@@ -2301,7 +2325,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
         if (source.isJsSource()) {
             val book = ReadBook.book ?: return
-            showReviewDialog(
+            showDialog(
                 ReviewDetailDialog(
                     paragraphNum = paragraphNum,
                     totalCount = count,
@@ -2331,7 +2355,7 @@ class ReadBookActivity : BaseReadBookActivity(),
             return
         }
         val book = ReadBook.book ?: return
-        showReviewDialog(
+        showDialog(
             ReviewDetailDialog(
                 paragraphNum = paragraphNum,
                 totalCount = count,
@@ -2513,6 +2537,105 @@ class ReadBookActivity : BaseReadBookActivity(),
             ) return@onError
             ChapterProvider.clearReviewProviders()
             AppLog.put("加载 JavaScript 段评统计出错\n${it.localizedMessage}", it)
+        }
+    }
+
+    /**
+     * 文本选择菜单的段评入口：任意段落都可以打开该书源的段评。
+     */
+    private fun openParagraphReview(paragraph: TextParagraph) {
+        val source = ReadBook.bookSource ?: return
+        if (canOpenReviewDetail(source)) {
+            showReviewDialog(paragraph.reviewId(), 0, ReadBook.durChapterIndex)
+            return
+        }
+        if (openParagraphReviewWeb(paragraph, source)) return
+        toastOnUi(R.string.review_not_supported)
+    }
+
+    /**
+     * 与正文段评图标使用同一套段落号：标题模式会改变 reviewTitleOffset。
+     */
+    private fun TextParagraph.reviewId(): Int = realNum - firstLine.reviewTitleOffset
+
+    private fun canOpenReviewDetail(source: BookSource): Boolean {
+        if (source.isJsSource()) return JsSourceReview.hasReviewCapability(source)
+        val rule = source.ruleReview ?: return false
+        return rule.enabled &&
+                !rule.reviewDetailUrl.isNullOrBlank() &&
+                !rule.detailListRule.isNullOrBlank() &&
+                !rule.detailContentRule.isNullOrBlank()
+    }
+
+    private fun isParagraphReviewAvailable(): Boolean {
+        val source = ReadBook.bookSource ?: return false
+        if (source.isJsSource() && JsSourceReview.hasReviewCapability(source)) return true
+        if (source.ruleReview?.enabled == true) return true
+        val chapter = ReadBook.curTextChapter ?: return false
+        if (ParagraphReviewEntry.buildCommentUrl(chapter.chapter.url, 1) != null) return true
+        return findParagraphReviewClick(chapter, 2) != null
+    }
+
+    private fun findParagraphReviewClick(
+        chapter: TextChapter,
+        targetParagraphNum: Int
+    ): String? {
+        val candidates = chapter.pages.asSequence().flatMap { page ->
+            page.lines.asSequence().flatMap { line ->
+                line.columns.asSequence()
+                    .filterIsInstance<ImageColumn>()
+                    .mapNotNull { column ->
+                        column.click
+                            ?.takeIf(ParagraphReviewEntry::isReviewClick)
+                            ?.let { line.paragraphNum to it }
+                    }
+            }
+        }
+        return ParagraphReviewEntry.findClickTemplate(candidates, targetParagraphNum)
+    }
+
+    /**
+     * 网页段评书源：优先复用正文里的段评图标脚本，其次读取章节数据里的整章段评地址。
+     */
+    private fun openParagraphReviewWeb(paragraph: TextParagraph, source: BookSource): Boolean {
+        val chapter = ReadBook.curTextChapter ?: return false
+        val script = findParagraphReviewClick(chapter, paragraph.realNum)
+        if (script != null) {
+            executeParagraphReviewClick(source, script)
+            return true
+        }
+        val commentUrl = ParagraphReviewEntry.buildCommentUrl(
+            chapter.chapter.url,
+            (paragraph.realNum - 1).coerceAtLeast(0)
+        ) ?: return false
+        showDialogFragment(
+            BottomWebViewDialog(
+                source.getKey(),
+                BookType.text,
+                commentUrl,
+                null,
+                "window.java=java;"
+            )
+        )
+        return true
+    }
+
+    private fun executeParagraphReviewClick(source: BookSource, script: String) {
+        Coroutine.async(lifecycleScope, IO) {
+            val java = SourceLoginJsExtensions(this@ReadBookActivity, source, BookType.text)
+            val book = ReadBook.book ?: return@async
+            val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, ReadBook.durChapterIndex)
+                ?: return@async
+            runScriptWithContext {
+                source.evalJS(script) {
+                    put("java", java)
+                    put("book", book)
+                    put("chapter", chapter)
+                }
+            }
+        }.onError {
+            AppLog.put("打开段落评论失败\n${it.localizedMessage}", it, true)
+            toastOnUi(R.string.review_web_failed)
         }
     }
 

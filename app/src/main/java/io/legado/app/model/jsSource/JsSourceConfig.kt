@@ -32,6 +32,7 @@ object JsSourceConfig {
     private const val LEGACY_CONFIG_PROPERTY = "source"
     private val reviewFunctionNames = setOf("getReviewSummary", "getReviewDetail")
     private val reviewReplyFunctionNames = setOf("getReviewReplies")
+    private val postReviewFunctionNames = setOf("postReview")
 
     val requiredFunctions = listOf("search", "getChapters", "getContent")
     private val fileSourceRequiredFunctions = listOf("search", "getBookInfo")
@@ -64,6 +65,10 @@ object JsSourceConfig {
 
     fun declaresReviewRepliesFunction(text: String): Boolean {
         return declaresTopLevelFunctions(text, reviewReplyFunctionNames)
+    }
+
+    fun declaresPostReviewFunction(text: String): Boolean {
+        return declaresTopLevelFunctions(text, postReviewFunctionNames)
     }
 
     private fun declaresTopLevelFunctions(text: String, names: Set<String>): Boolean {
@@ -152,9 +157,11 @@ object JsSourceConfig {
         val reviewSummary = ScriptableObject.getProperty(scope, "getReviewSummary")
         val reviewDetail = ScriptableObject.getProperty(scope, "getReviewDetail")
         val reviewReplies = ScriptableObject.getProperty(scope, "getReviewReplies")
+        val postReview = ScriptableObject.getProperty(scope, "postReview")
         val declaresReviewSummary = reviewSummary !== Scriptable.NOT_FOUND
         val declaresReviewDetail = reviewDetail !== Scriptable.NOT_FOUND
         val declaresReviewReplies = reviewReplies !== Scriptable.NOT_FOUND
+        val declaresPostReview = postReview !== Scriptable.NOT_FOUND
         if (declaresReviewSummary && reviewSummary !is Function) {
             throw NoStackTraceException("JS源 getReviewSummary 必须是函数")
         }
@@ -163,6 +170,9 @@ object JsSourceConfig {
         }
         if (declaresReviewReplies && reviewReplies !is Function) {
             throw NoStackTraceException("JS源 getReviewReplies 必须是函数")
+        }
+        if (declaresPostReview && postReview !is Function) {
+            throw NoStackTraceException("JS源 postReview 必须是函数")
         }
         if (declaresReviewSummary && !declaresReviewDetail) {
             throw NoStackTraceException("JS源声明了 getReviewSummary,缺少配对的 getReviewDetail 函数")
@@ -190,6 +200,9 @@ object JsSourceConfig {
         }
         if (declaresReviewReplies) {
             JsSourceReview.rememberReviewRepliesCapability(source, enabled = true)
+        }
+        if (declaresPostReview) {
+            JsSourceReview.rememberPostReviewCapability(source, enabled = true)
         }
         return source
     }

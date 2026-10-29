@@ -17,6 +17,7 @@ internal object JsSourceReview {
 
     private val capabilityCache = LruCache<String, Boolean>(64)
     private val replyCapabilityCache = LruCache<String, Boolean>(64)
+    private val postCapabilityCache = LruCache<String, Boolean>(64)
 
     fun rememberReviewCapability(source: BookSource, enabled: Boolean) {
         capabilityCache.put(capabilityKey(source), enabled)
@@ -39,6 +40,18 @@ internal object JsSourceReview {
         replyCapabilityCache[key]?.let { return it }
         return JsSourceConfig.declaresReviewRepliesFunction(source.mainJs.orEmpty()).also {
             replyCapabilityCache.put(key, it)
+        }
+    }
+
+    fun rememberPostReviewCapability(source: BookSource, enabled: Boolean) {
+        postCapabilityCache.put(capabilityKey(source), enabled)
+    }
+
+    fun hasPostReviewCapability(source: BookSource): Boolean {
+        val key = capabilityKey(source)
+        postCapabilityCache[key]?.let { return it }
+        return JsSourceConfig.declaresPostReviewFunction(source.mainJs.orEmpty()).also {
+            postCapabilityCache.put(key, it)
         }
     }
 
@@ -99,6 +112,34 @@ internal object JsSourceReview {
         return parseDetailObject(result, chapter.url)
     }
 
+    suspend fun postReviewAwait(
+        source: BookSource,
+        book: Book,
+        chapter: BookChapter,
+        paragraphIndex: Int,
+        paragraphData: String,
+        content: String,
+    ): Boolean {
+        val call = JsSourceEngine(source, coroutineContext).callOptionalFunction(
+            "postReview",
+            listOf(
+                "chapter" to chapter,
+                "book" to book,
+                "paraIndex" to paragraphIndex,
+                "paraData" to paragraphData,
+                "content" to content,
+            ),
+        )
+        rememberPostReviewCapability(source, call.exists)
+        if (!call.exists) return false
+        val value = call.value?.trim().orEmpty().lowercase()
+        return value.isNotEmpty() &&
+                value != "false" &&
+                value != "0" &&
+                value != "null" &&
+                value != "undefined"
+    }
+
     suspend fun getReviewRepliesAwait(
         source: BookSource,
         book: Book,
@@ -107,8 +148,7 @@ internal object JsSourceReview {
         paragraphData: String,
         reviewId: String,
         page: Int,
-    ): List<ReviewRuleParser.DetailItem>? {
-        val call = JsSourceEngine(source, coroutineContext).callOptionalFunction(
+    ): List<ReviewRuleParser.DetailItem>? {        val call = JsSourceEngine(source, coroutineContext).callOptionalFunction(
             "getReviewReplies",
             listOf(
                 "chapter" to chapter,

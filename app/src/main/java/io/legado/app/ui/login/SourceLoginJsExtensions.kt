@@ -69,16 +69,19 @@ class SourceLoginJsExtensions(
     ) {
         val activity = activityRef.get() ?: return
         val source = getSource() ?: return
-        activity.showDialogFragment(
-            BottomWebViewDialog(
-                source.getKey(),
-                bookType,
-                url,
-                html,
-                preloadJs,
-                config
-            ).apply { customButtonKey = this@SourceLoginJsExtensions.customButtonKey }
-        )
+        activity.runOnUiThread {
+            if (activity.isFinishing || activity.isDestroyed) return@runOnUiThread
+            activity.showDialogFragment(
+                BottomWebViewDialog(
+                    source.getKey(),
+                    bookType,
+                    url,
+                    html,
+                    preloadJs,
+                    config
+                ).apply { customButtonKey = this@SourceLoginJsExtensions.customButtonKey }
+            )
+        }
     }
 
 }
