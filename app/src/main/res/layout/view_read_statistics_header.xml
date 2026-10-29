@@ -348,7 +348,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:paddingStart="16dp"
+            android:paddingTop="16dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="8dp">
 
             <LinearLayout
                 android:id="@+id/graph_tabs"
@@ -454,7 +457,11 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center_vertical"
-                    android:orientation="horizontal">
+                    android:orientation="horizontal"
+                    android:paddingStart="4dp"
+                    android:paddingTop="8dp"
+                    android:paddingEnd="4dp"
+                    android:paddingBottom="8dp">
 
                     <androidx.appcompat.widget.AppCompatImageButton
                         android:id="@+id/previous_hour"
@@ -475,7 +482,7 @@
                         android:accessibilityLiveRegion="polite"
                         android:gravity="center"
                         android:textColor="@color/primaryText"
-                        android:textSize="13sp" />
+                        android:textSize="15sp" />
 
                     <androidx.appcompat.widget.AppCompatImageButton
                         android:id="@+id/next_hour"
@@ -488,20 +495,29 @@
                         app:tint="@color/read_statistics_nav_tint" />
                 </LinearLayout>
 
+                <View
+                    android:id="@+id/hour_divider"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="10dp"
+                    android:alpha="0.12"
+                    android:background="@color/secondaryText"
+                    android:importantForAccessibility="no" />
+
                 <FrameLayout
                     android:id="@+id/toggle_hour_books"
                     android:layout_width="match_parent"
-                    android:layout_height="28dp"
+                    android:layout_height="24dp"
                     android:clickable="true"
                     android:contentDescription="@string/read_statistics_expand_hour_books"
                     android:focusable="true"
                     android:foreground="?attr/selectableItemBackgroundBorderless">
 
                     <View
-                        android:layout_width="18px"
+                        android:layout_width="44dp"
                         android:layout_height="4dp"
                         android:layout_gravity="center"
-                        android:alpha="0.45"
+                        android:alpha="0.5"
                         android:background="@drawable/bg_review_drag_handle" />
                 </FrameLayout>
 

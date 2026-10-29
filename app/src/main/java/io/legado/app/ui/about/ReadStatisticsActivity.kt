@@ -147,7 +147,8 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
         val controlSurface = ColorUtils.blendColors(backgroundColor, contentPrimary, .05f)
         header.periodTabs.background = rounded(controlSurface, radius = 13)
         header.dateNav.background = rounded(controlSurface, radius = 13)
-        header.selectedHourPanel.background = rounded(controlSurface, radius = 10)
+        // 时段摘要沿用上方统计分组的表面色，保持同一套层次
+        header.selectedHourPanel.background = rounded(groupSurface, radius = 10)
     }
 
     override fun onResume() {
@@ -720,13 +721,21 @@ class ReadStatisticsActivity : BaseActivity<ActivityReadStatisticsBinding>() {
             tvPeak.text = if (peak.duration > 0) getString(R.string.read_statistics_peak,
                 hourLabel(peak.startHour, peak.endHour), duration(peak.duration)) else getString(R.string.read_statistics_hour_empty)
             val selectedWordDuration = selected.books.filter { it.readWords > 0 }.sumOf { it.readTime }
-            tvSelectedHour.text = getString(
-                R.string.read_statistics_hour_metrics,
-                hourLabel(selected.startHour, selected.endHour),
-                duration(selected.duration),
+            val hourRange = hourLabel(selected.startHour, selected.endHour)
+            val hourDetails = getString(
+                R.string.read_statistics_hour_detail,
                 wordCount(selected.words),
                 speed(readWordsSpeed(selected.words, selectedWordDuration)),
             )
+            tvSelectedHour.text = SpannableStringBuilder(
+                getString(R.string.read_statistics_hour_detail, hourRange, duration(selected.duration))
+            ).apply {
+                append("\n")
+                val detailsStart = length
+                append(hourDetails)
+                setSpan(RelativeSizeSpan(.86f), detailsStart, length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                setSpan(ForegroundColorSpan(contentSecondary), detailsStart, length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
             previousHour.isEnabled = index > 0
             nextHour.isEnabled = index < buckets.lastIndex
             toggleHourBooks.contentDescription = getString(
