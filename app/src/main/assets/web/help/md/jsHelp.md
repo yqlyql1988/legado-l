@@ -1009,6 +1009,12 @@ function getReviewReplies(chapter, book, paraIndex, paraData, reviewId, page) {
 - `id` 和 `reviewId` 是不透明字符串。超过 JavaScript 安全整数范围的数字 ID 必须在 `JSON.parse` 前保留为字符串；
   一旦被 `JSON.parse` 舍入，应用无法恢复原值。
 - 段评函数异常会记录到日志，详情加载错误同时显示在弹窗中；返回空数组表示没有内容。
+- 可选声明 `postReview(chapter, book, paraIndex, paraData, content)` 后，段评弹窗底部会显示输入框，
+  点击发送会以用户输入作为 `content` 调用该函数；返回真值表示成功，应用会清空输入并重新加载当前段落，
+  返回空值、`false` 或抛出异常表示失败。普通书源仍使用书源自带的网页段评，不使用该函数。
+- 在正文选中文字后，文本选择菜单的“段评”可以对任意段落打开段评，不再要求该段原本已有段评。
+  原生段评规则和上述 JavaScript 段评函数会打开阅读内的段评弹窗；网页段评书源会复用正文中的段评图标脚本，
+  或从章节 URL 数据里的 `commentUrl` 补上段落号后打开书源网页。
 
 ### 运行环境与并发
 

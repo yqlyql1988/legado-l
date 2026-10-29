@@ -38,6 +38,7 @@ import io.legado.app.ui.book.read.page.entities.PageDirection
 import io.legado.app.ui.book.read.page.entities.TextChapter
 import io.legado.app.ui.book.read.page.entities.TextLine
 import io.legado.app.ui.book.read.page.entities.TextPage
+import io.legado.app.ui.book.read.page.entities.TextParagraph
 import io.legado.app.ui.book.read.page.entities.TextPos
 import io.legado.app.ui.book.read.page.entities.column.TextBaseColumn
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
@@ -1271,6 +1272,19 @@ class ReadView(context: Context, attrs: AttributeSet) :
      */
     fun getSelectText(): String {
         return curPage.selectedText
+    }
+
+    /**
+     * @return 选择起点所在的正文段落，标题和未选择时返回 null
+     */
+    fun getSelectParagraph(): TextParagraph? {
+        val startPos = curPage.selectStartPos
+        if (!startPos.isSelected()) return null
+        val line = curPage.relativePage(startPos.relativePagePos).getLine(startPos.lineIndex)
+        if (line.paragraphNum <= 0 || line.isTitle) return null
+        val chapter = ReadBook.curTextChapter ?: return null
+        return chapter.getParagraphs(pageSplit = false)
+            .firstOrNull { it.realNum == line.paragraphNum }
     }
 
     fun getCurVisiblePage(): TextPage {

@@ -19,6 +19,7 @@ enum class TextSelectMenuItem(val key: String, val menuId: Int?, val titleRes: I
     Search(TextSelectMenuConfig.KEY_SEARCH, R.id.menu_search_content, R.string.search_content),
     Browser(TextSelectMenuConfig.KEY_BROWSER, R.id.menu_browser, R.string.browser),
     Share(TextSelectMenuConfig.KEY_SHARE, R.id.menu_share_str, R.string.share),
+    Review(TextSelectMenuConfig.KEY_REVIEW, R.id.menu_review, R.string.review),
     ProcessText(TextSelectMenuConfig.KEY_PROCESS_TEXT, null, R.string.process_text_actions);
 
     companion object {

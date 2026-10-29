@@ -45,4 +45,9 @@
         android:id="@+id/menu_share_str"
         android:title="@string/share"
         app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_review"
+        android:title="@string/review"
+        app:showAsAction="never" />
 </menu>

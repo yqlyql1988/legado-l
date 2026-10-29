@@ -101,19 +101,25 @@ class TextActionMenu(private val context: Context, private val callBack: CallBac
     }
 
     private fun buildPartition() {
-        val itemsById = menuItems
+        val availableMenuItems = menuItems.filter { item ->
+            val key = TextSelectMenuItem.entries
+                .firstOrNull { it.menuId == item.itemId }
+                ?.key
+            key == null || callBack.isMenuItemAvailable(key)
+        }
+        val itemsById = availableMenuItems
             .filter { it.itemId != Menu.NONE }
             .associateBy { it.itemId }
         val builtInItems = TextSelectMenuItem.entries.mapNotNull { item ->
             item.menuId?.let { id -> itemsById[id]?.let { item.key to it } }
         }.toMap()
-        val processTextItems = menuItems.filter {
+        val processTextItems = availableMenuItems.filter {
             it.itemId == Menu.NONE && it.intent?.action == Intent.ACTION_PROCESS_TEXT
         }
         val partition = loadTextSelectMenuConfig(context).partitionItems(
             builtInItems = builtInItems,
             processTextItems = processTextItems,
-            allItems = menuItems
+            allItems = availableMenuItems
         )
         visibleMenuItems.clear()
         visibleMenuItems.addAll(partition.bar)
@@ -278,5 +284,7 @@ class TextActionMenu(private val context: Context, private val callBack: CallBac
         fun onMenuActionFinally()
 
         fun onEditTextActionMenu()
+
+        fun isMenuItemAvailable(key: String): Boolean = true
     }
 }

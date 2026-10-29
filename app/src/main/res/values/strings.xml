@@ -1790,6 +1790,12 @@
     <string name="review_icon_color_title">Icon color</string>
     <string name="review_icon_color_reset">Icon color reset to follow theme</string>
     <string name="review_resize_handle">Resize paragraph reviews</string>
+    <string name="review_send_hint">Write a paragraph comment…</string>
+    <string name="review_send_success">Paragraph comment sent</string>
+    <string name="review_send_failed">Could not send the paragraph comment</string>
+    <string name="review_paragraph_unavailable">Could not find the selected paragraph</string>
+    <string name="review_not_supported">This source does not support paragraph comments on this paragraph</string>
+    <string name="review_web_failed">Could not open the paragraph comment page</string>
     <string name="bottom_bar_skin">Bottom Bar Skin</string>
     <string name="bottom_bar_skin_summary">Customize bottom bar icons from a zip</string>
     <string name="bottom_bar_skin_assign">Assign Icons</string>

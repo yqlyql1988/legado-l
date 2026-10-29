@@ -2,6 +2,7 @@
  * JavaScript 单文件书源模板。
  * search、getChapters、getContent 为必需函数，getBookInfo 和 explore 为可选函数。
  * getReviewSummary 与 getReviewDetail 成对声明即可启用段评，getReviewReplies 可选用于回复分页。
+ * postReview 可选，声明后段评弹窗可以直接写段评；返回真值表示发送成功。
  * loginUi 与 loginAction 成对声明即可启用动态登录界面。
  * config 保存脚本配置；source 是运行时书源实体，sourceApi 是兼容旧脚本的别名。
  * 可使用 java、source、sourceApi、cookie、cache、baseUrl 等现有书源脚本绑定。
@@ -77,6 +78,7 @@ function getContent(chapter, book, nextChapterUrl) {
  * getReviewSummary 返回 [{ paraIndex: 1, count: 5, paraData: "token" }]，paraIndex 为 -1 时表示章节标题；
  * getReviewDetail 返回 { items: [{ id: "comment-1", content: { text: "评论内容", replyCount: 3 } }], nextPageUrl: null }。
  * 可选的 getReviewReplies 返回 { items: [{ id: "reply-1", content: "回复内容" }] }，用于按评论 ID 和 page 加载更多回复。
+ * 可选的 postReview 返回真值表示段评发送成功，发送后会重新加载当前段落详情；异常信息会显示在弹窗中。
  * id/reviewId 是不透明字符串；超过 JavaScript 安全整数范围的 ID 必须在 JSON.parse 前保留为字符串。
  * content 也可返回 { text, replyToName, img, audio, time, likeCount, replyCount }。
  * nextPageUrl 只是“是否还有下一页”的信号，翻页时应用会递增 page 参数再次调用。
@@ -95,5 +97,12 @@ function getReviewDetail(chapter, book, paraIndex, paraData, page) {
 function getReviewReplies(chapter, book, paraIndex, paraData, reviewId, page) {
     var html = java.ajax(config.bookSourceUrl + "/review/replies?id=" + reviewId + "&page=" + page);
     return { items: [] };
+}
+
+// 可选。content 是用户输入的段评正文，返回真值表示发送成功。
+function postReview(chapter, book, paraIndex, paraData, content) {
+    var body = JSON.stringify({ para: paraIndex, content: content });
+    java.ajax(config.bookSourceUrl + "/review/post", { method: "POST", body: body });
+    return true;
 }
 */

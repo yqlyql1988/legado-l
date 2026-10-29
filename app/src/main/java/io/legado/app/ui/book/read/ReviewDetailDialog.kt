@@ -58,7 +58,7 @@ import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.visible
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import io.legado.app.utils.windowSize
-import io.legado.app.databinding.DialogRecyclerViewBinding
+import io.legado.app.databinding.DialogReviewDetailBinding
 import io.legado.app.databinding.ItemReviewCommentBinding
 import io.legado.app.ui.widget.dialog.PhotoDialog
 import kotlinx.coroutines.CoroutineStart
@@ -69,7 +69,7 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
+class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_review_detail) {
 
     constructor(
         paragraphNum: Int,
@@ -91,7 +91,7 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
         }
     }
 
-    private val binding by viewBinding(DialogRecyclerViewBinding::bind)
+    private val binding by viewBinding(DialogReviewDetailBinding::bind)
     private val adapter by lazy { ReviewAdapter(requireContext()) }
     private var paragraphNum: Int = 0
     private var totalCount: Int = 0
@@ -101,6 +101,7 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
     private var sourceKey: String = ""
     private var ruleHash: Int = 0
     private var isLoading = false
+    private var isSending = false
     private var hasMore = true
     private var currentPage = 1
     private var nextPageUrl: String? = null
@@ -248,6 +249,7 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
         binding.toolBar.setNavigationContentDescription(R.string.close)
         binding.toolBar.navigationIcon?.setTint(getCompatColor(R.color.secondaryText))
         binding.toolBar.setNavigationOnClickListener { dismiss() }
+        setupReviewComposer()
         setupHeightDrag()
         val layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.layoutManager = layoutManager
@@ -270,6 +272,59 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
             }
         })
         loadDetailPage(paragraphNum, 1, append = false)
+    }
+
+    private fun setupReviewComposer() {
+        val source = ReadBook.bookSource
+        val canPost = source != null && source.isJsSource() &&
+                JsSourceReview.hasPostReviewCapability(source)
+        binding.llReviewComposer.visibility = if (canPost) View.VISIBLE else View.GONE
+        if (!canPost) return
+        binding.tvReviewSend.setOnClickListener { sendReview() }
+    }
+
+    private fun sendReview() {
+        if (isSending) return
+        val content = binding.etReviewContent.text?.toString()?.trim().orEmpty()
+        if (content.isEmpty()) return
+        val source = ReadBook.bookSource ?: return
+        if (!source.isJsSource()) return
+        isSending = true
+        binding.tvReviewSend.isEnabled = false
+        binding.etReviewContent.isEnabled = false
+        Coroutine.async(lifecycleScope, IO, start = CoroutineStart.LAZY) {
+            val book = ReadBook.book ?: return@async false
+            if (book.bookUrl != bookUrl) return@async false
+            if (source.getKey() != sourceKey) return@async false
+            val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex)
+                ?: return@async false
+            JsSourceReview.postReviewAwait(
+                source = source,
+                book = book,
+                chapter = chapter,
+                paragraphIndex = paragraphNum,
+                paragraphData = paragraphData,
+                content = content,
+            )
+        }.onSuccess(Main) { success ->
+            if (view == null) return@onSuccess
+            isSending = false
+            binding.tvReviewSend.isEnabled = true
+            binding.etReviewContent.isEnabled = true
+            if (success) {
+                binding.etReviewContent.setText("")
+                context?.toastOnUi(R.string.review_send_success)
+                loadDetailPage(paragraphNum, 1, append = false)
+            } else {
+                context?.toastOnUi(R.string.review_send_failed)
+            }
+        }.onError {
+            if (view == null) return@onError
+            isSending = false
+            binding.tvReviewSend.isEnabled = true
+            binding.etReviewContent.isEnabled = true
+            context?.toastOnUi(it.localizedMessage ?: getString(R.string.review_send_failed))
+        }.start()
     }
 
     private fun setupHeightDrag() {
@@ -532,7 +587,7 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
             }
             if (items.isEmpty() && !append) {
                 hasMore = false
-                binding.tvMsg.text = getString(R.string.content_empty)
+                binding.tvMsg.text = getString(R.string.review_empty)
                 binding.tvMsg.visible()
                 isLoading = false
                 return@onSuccess

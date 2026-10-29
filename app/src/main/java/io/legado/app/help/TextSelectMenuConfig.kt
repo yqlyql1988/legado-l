@@ -59,6 +59,7 @@ data class TextSelectMenuConfig(
         const val KEY_SEARCH = "search"
         const val KEY_BROWSER = "browser"
         const val KEY_SHARE = "share"
+        const val KEY_REVIEW = "review"
         const val KEY_PROCESS_TEXT = "processText"
 
         val ALL_KEYS = listOf(
@@ -72,11 +73,12 @@ data class TextSelectMenuConfig(
             KEY_SEARCH,
             KEY_BROWSER,
             KEY_SHARE,
+            KEY_REVIEW,
             KEY_PROCESS_TEXT
         )
 
         val DEFAULT_BAR = listOf(KEY_REPLACE, KEY_COPY, KEY_BOOKMARK, KEY_HIGHLIGHT, KEY_ALOUD, KEY_ALOUD_FROM_HERE)
-        val DEFAULT_MORE = listOf(KEY_DICT, KEY_SEARCH, KEY_BROWSER, KEY_SHARE, KEY_PROCESS_TEXT)
+        val DEFAULT_MORE = listOf(KEY_DICT, KEY_SEARCH, KEY_BROWSER, KEY_SHARE, KEY_REVIEW, KEY_PROCESS_TEXT)
 
         private val gson = Gson()
 
