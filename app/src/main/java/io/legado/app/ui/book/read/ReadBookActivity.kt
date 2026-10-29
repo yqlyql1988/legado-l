@@ -2546,12 +2546,17 @@ class ReadBookActivity : BaseReadBookActivity(),
     private fun openParagraphReview(paragraph: TextParagraph) {
         val source = ReadBook.bookSource ?: return
         if (canOpenReviewDetail(source)) {
-            showReviewDialog(paragraph.realNum - 1, 0, ReadBook.durChapterIndex)
+            showReviewDialog(paragraph.reviewId(), 0, ReadBook.durChapterIndex)
             return
         }
         if (openParagraphReviewWeb(paragraph, source)) return
         toastOnUi(R.string.review_not_supported)
     }
+
+    /**
+     * 与正文段评图标使用同一套段落号：标题模式会改变 reviewTitleOffset。
+     */
+    private fun TextParagraph.reviewId(): Int = realNum - firstLine.reviewTitleOffset
 
     private fun canOpenReviewDetail(source: BookSource): Boolean {
         if (source.isJsSource()) return JsSourceReview.hasReviewCapability(source)
