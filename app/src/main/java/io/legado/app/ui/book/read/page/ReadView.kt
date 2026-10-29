@@ -1287,6 +1287,25 @@ class ReadView(context: Context, attrs: AttributeSet) :
             .firstOrNull { it.realNum == line.paragraphNum }
     }
 
+    /**
+     * 选择起点所在段落和段评使用的段落号。
+     *
+     * 段评图标可能作为独立行插入正文，不能再用重新分组的段落对象反推段落号，
+     * 否则下一段有图标时会把当前段识别成下一段。
+     */
+    fun getSelectReviewTarget(): SelectReviewTarget? {
+        val startPos = curPage.selectStartPos
+        if (!startPos.isSelected()) return null
+        val line = curPage.relativePage(startPos.relativePagePos).getLine(startPos.lineIndex)
+        if (line.paragraphNum <= 0 || line.isTitle) return null
+        return SelectReviewTarget(
+            paragraphNum = line.paragraphNum,
+            reviewId = line.paragraphNum - 1,
+        )
+    }
+
+    data class SelectReviewTarget(val paragraphNum: Int, val reviewId: Int)
+
     fun getCurVisiblePage(): TextPage {
         return curPage.getCurVisiblePage()
     }

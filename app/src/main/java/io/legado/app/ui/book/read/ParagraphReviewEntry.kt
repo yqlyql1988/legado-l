@@ -18,6 +18,12 @@ object ParagraphReviewEntry {
 
     private val clickNumberPattern = Regex("""(["'])(\d{1,6})\1""")
 
+    private val clickCallPattern = Regex(
+        """(?i)\b(?:show\w*(?:cmt|comment|review)|showreadingbrowser|showdp|getdp)\s*\(([^)]*)\)"""
+    )
+
+    private val clickArgumentPattern = Regex("""("[^"]*"|'[^']*'|[^,]+)""")
+
     private val paragraphIdPattern = Regex("""([?&])paragraph_id=[^&]*""")
     private val paraPattern = Regex("""([?&])para=[^&]*""")
     private val chapterTypePattern = Regex("""([?&])type=chapter(&?)""")
@@ -45,6 +51,7 @@ object ParagraphReviewEntry {
         targetParagraphNum: Int
     ): String? {
         if (!isReviewClick(click)) return null
+        retargetPositionArgument(click, sourceParagraphNum, targetParagraphNum)?.let { return it }
         val matches = clickNumberPattern.findAll(click).toList()
         val match = matches.asReversed().firstOrNull {
             val value = it.groupValues[2].toIntOrNull()
@@ -56,6 +63,30 @@ object ParagraphReviewEntry {
         return click.substring(0, match.range.first) +
                 "\"$targetValue\"" +
                 click.substring(match.range.last + 1)
+    }
+
+    /**
+     * 网页段评的点击脚本通常为 `showXxxCmt(bid, cid, para, date)`，第三个参数是书源段落号。
+     * 书源段落号与阅读段落号的偏移会随标题、空行变化，按实际参数计算，不能固定减一。
+     */
+    private fun retargetPositionArgument(
+        click: String,
+        sourceParagraphNum: Int,
+        targetParagraphNum: Int
+    ): String? {
+        val call = clickCallPattern.find(click) ?: return null
+        val arguments = clickArgumentPattern.findAll(call.groupValues[1]).toList()
+        if (arguments.size < 3) return null
+        val paragraphArgument = arguments[2]
+        val sourceValue = paragraphArgument.value.trim().trim('"', '\'').toIntOrNull()
+            ?: return null
+        val targetValue = targetParagraphNum + (sourceValue - sourceParagraphNum)
+        if (targetValue < 0) return null
+        val argumentStart = call.groups[1]!!.range.first + paragraphArgument.range.first
+        val argumentEnd = call.groups[1]!!.range.first + paragraphArgument.range.last
+        return click.substring(0, argumentStart) +
+                "\"$targetValue\"" +
+                click.substring(argumentEnd + 1)
     }
 
     /**
