@@ -7,7 +7,7 @@ import kotlinx.parcelize.Parcelize
 
 @Parcelize
 data class ReviewRule(
-    var reviewUrl: String? = null,          // 段评URL
+    var reviewUrl: String? = null,          // 网页段评地址或规则
     var avatarRule: String? = null,         // 段评发布者头像
     var contentRule: String? = null,        // 段评内容
     var postTimeRule: String? = null,       // 段评发布时间
@@ -40,6 +40,10 @@ data class ReviewRule(
     var replyBadgeRule: String? = null,
     var replyContentRule: String? = null,
 ) : Parcelable {
+
+    fun configuredWebUrl(): String? {
+        return reviewUrl?.trim()?.takeIf { it.isNotEmpty() }
+    }
 
     fun configuredSummaryUrl(): String? {
         if (!enabled || summaryListRule.isNullOrBlank() ||
