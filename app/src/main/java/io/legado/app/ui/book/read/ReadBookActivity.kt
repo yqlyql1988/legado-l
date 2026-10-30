@@ -1595,11 +1595,11 @@ class ReadBookActivity : BaseReadBookActivity(),
             }
 
             R.id.menu_review -> {
-                val paragraph = binding.readView.getSelectParagraph()
-                if (paragraph == null) {
+                val target = binding.readView.getSelectReviewTarget()
+                if (target == null) {
                     toastOnUi(R.string.review_paragraph_unavailable)
                 } else {
-                    openParagraphReview(paragraph)
+                    openParagraphReview(target)
                 }
                 return true
             }
@@ -2543,20 +2543,15 @@ class ReadBookActivity : BaseReadBookActivity(),
     /**
      * 文本选择菜单的段评入口：任意段落都可以打开该书源的段评。
      */
-    private fun openParagraphReview(paragraph: TextParagraph) {
+    private fun openParagraphReview(target: ReadView.SelectReviewTarget) {
         val source = ReadBook.bookSource ?: return
         if (canOpenReviewDetail(source)) {
-            showReviewDialog(paragraph.reviewId(), 0, ReadBook.durChapterIndex)
+            showReviewDialog(target.reviewId, 0, ReadBook.durChapterIndex)
             return
         }
-        if (openParagraphReviewWeb(paragraph, source)) return
+        if (openParagraphReviewWeb(target, source)) return
         toastOnUi(R.string.review_not_supported)
     }
-
-    /**
-     * 与正文段评图标使用同一套段落号：标题模式会改变 reviewTitleOffset。
-     */
-    private fun TextParagraph.reviewId(): Int = realNum - firstLine.reviewTitleOffset
 
     private fun canOpenReviewDetail(source: BookSource): Boolean {
         if (source.isJsSource()) return JsSourceReview.hasReviewCapability(source)
@@ -2597,16 +2592,19 @@ class ReadBookActivity : BaseReadBookActivity(),
     /**
      * 网页段评书源：优先复用正文里的段评图标脚本，其次读取章节数据里的整章段评地址。
      */
-    private fun openParagraphReviewWeb(paragraph: TextParagraph, source: BookSource): Boolean {
+    private fun openParagraphReviewWeb(
+        target: ReadView.SelectReviewTarget,
+        source: BookSource
+    ): Boolean {
         val chapter = ReadBook.curTextChapter ?: return false
-        val script = findParagraphReviewClick(chapter, paragraph.realNum)
+        val script = findParagraphReviewClick(chapter, target.paragraphNum)
         if (script != null) {
             executeParagraphReviewClick(source, script)
             return true
         }
         val commentUrl = ParagraphReviewEntry.buildCommentUrl(
             chapter.chapter.url,
-            (paragraph.realNum - 1).coerceAtLeast(0)
+            target.reviewId.coerceAtLeast(0)
         ) ?: return false
         showDialogFragment(
             BottomWebViewDialog(

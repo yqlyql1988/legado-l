@@ -51,12 +51,25 @@ class ParagraphReviewEntryTest {
     }
 
     @Test
-    fun retargetClickRejectsUnknownParagraph() {
-        assertNull(
+    fun retargetClickUsesPositionParagraphOffset() {
+        assertEquals(
+            """showCmt("123456789","654321","12","123456")""",
             ParagraphReviewEntry.retargetClick(
                 """showCmt("123456789","654321","8","123456")""",
                 sourceParagraphNum = 3,
                 targetParagraphNum = 7
+            )
+        )
+    }
+
+    @Test
+    fun retargetClickSupportsTwoStepParagraphOffset() {
+        assertEquals(
+            """showCmt("123456789","654321","0","123456")""",
+            ParagraphReviewEntry.retargetClick(
+                """showCmt("123456789","654321","1","123456")""",
+                sourceParagraphNum = 3,
+                targetParagraphNum = 2
             )
         )
     }
