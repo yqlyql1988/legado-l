@@ -598,6 +598,7 @@ class BookSourceEditActivity :
         val rr = bs.ruleReview ?: ReviewRule()
         reviewEntities.clear()
         reviewEntities.apply {
+            add(EditEntity("reviewUrl", rr.reviewUrl, R.string.rule_review_url))
             add(EditEntity("reviewSummaryUrl", rr.reviewSummaryUrl, R.string.rule_review_summary_url))
             add(EditEntity("summaryListRule", rr.summaryListRule, R.string.rule_review_summary_list))
             add(EditEntity("summaryParagraphIndexRule", rr.summaryParagraphIndexRule, R.string.rule_review_summary_id))
@@ -826,6 +827,7 @@ class BookSourceEditActivity :
         reviewEntities.forEach {
             it.value = it.value?.takeIf { value -> value.isNotBlank() }
             when (it.key) {
+                "reviewUrl" -> reviewRule.reviewUrl = it.value
                 "reviewSummaryUrl" -> reviewRule.reviewSummaryUrl = it.value
                 "summaryListRule" -> reviewRule.summaryListRule = it.value
                 "summaryParagraphIndexRule" -> reviewRule.summaryParagraphIndexRule = it.value

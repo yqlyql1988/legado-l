@@ -2565,7 +2565,8 @@ class ReadBookActivity : BaseReadBookActivity(),
     private fun isParagraphReviewAvailable(): Boolean {
         val source = ReadBook.bookSource ?: return false
         if (source.isJsSource() && JsSourceReview.hasReviewCapability(source)) return true
-        if (source.ruleReview?.enabled == true) return true
+        if (canOpenReviewDetail(source)) return true
+        if (source.ruleReview?.configuredWebUrl() != null) return true
         val chapter = ReadBook.curTextChapter ?: return false
         if (ParagraphReviewEntry.buildCommentUrl(chapter.chapter.url, 1) != null) return true
         return findParagraphReviewClick(chapter, 2) != null
@@ -2590,7 +2591,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 网页段评书源：优先复用正文里的段评图标脚本，其次读取章节数据里的整章段评地址。
+     * 网页段评书源：优先复用正文点击脚本，其次读取章节数据或书源规则中的网页地址。
      */
     private fun openParagraphReviewWeb(
         target: ReadView.SelectReviewTarget,
@@ -2605,16 +2606,75 @@ class ReadBookActivity : BaseReadBookActivity(),
         val commentUrl = ParagraphReviewEntry.buildCommentUrl(
             chapter.chapter.url,
             target.reviewId.coerceAtLeast(0)
-        ) ?: return false
-        showDialogFragment(
-            BottomWebViewDialog(
-                source.getKey(),
-                BookType.text,
-                commentUrl,
-                null,
-                "window.java=java;"
-            )
         )
+        if (commentUrl != null) {
+            showDialogFragment(
+                BottomWebViewDialog(
+                    source.getKey(),
+                    BookType.text,
+                    commentUrl,
+                    null,
+                    "window.java=java;"
+                )
+            )
+            return true
+        }
+        return openConfiguredParagraphReviewWeb(target, source)
+    }
+
+    private fun openConfiguredParagraphReviewWeb(
+        target: ReadView.SelectReviewTarget,
+        source: BookSource,
+    ): Boolean {
+        val reviewUrlRule = source.ruleReview?.configuredWebUrl() ?: return false
+        val book = ReadBook.book ?: return false
+        val chapterIndex = ReadBook.durChapterIndex
+        val paragraphData = ChapterProvider.getReviewKeyById(target.reviewId, chapterIndex).orEmpty()
+        Coroutine.async(lifecycleScope, IO) {
+            val currentChapter = appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex)
+                ?: return@async null
+            val analyzeUrl = AnalyzeUrl(
+                reviewUrlRule,
+                baseUrl = currentChapter.url,
+                source = source,
+                ruleData = book,
+                chapter = currentChapter,
+                coroutineContext = coroutineContext,
+                extraParams = mapOf(
+                    "paraIndex" to target.reviewId.toString(),
+                    "paraData" to paragraphData,
+                    "paragraphNum" to target.paragraphNum.toString(),
+                    "reviewId" to target.reviewId.toString(),
+                    "page" to "1",
+                ),
+            )
+            analyzeUrl.url.takeIf { it.isAbsUrl() }
+        }.onSuccess(Main) { url ->
+            val currentBook = ReadBook.book ?: return@onSuccess
+            val currentSource = ReadBook.bookSource ?: return@onSuccess
+            if (currentBook.bookUrl != book.bookUrl ||
+                currentSource.getKey() != source.getKey() ||
+                ReadBook.durChapterIndex != chapterIndex
+            ) {
+                return@onSuccess
+            }
+            if (url.isNullOrBlank()) {
+                toastOnUi(R.string.review_web_failed)
+                return@onSuccess
+            }
+            showDialogFragment(
+                BottomWebViewDialog(
+                    source.getKey(),
+                    BookType.text,
+                    url,
+                    null,
+                    "window.java=java;",
+                )
+            )
+        }.onError {
+            AppLog.put("解析段评网页地址失败\n${it.localizedMessage}", it, true)
+            toastOnUi(R.string.review_web_failed)
+        }
         return true
     }
 

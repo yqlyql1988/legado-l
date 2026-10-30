@@ -40,6 +40,17 @@ class ReviewRuleParserTest {
     }
 
     @Test
+    fun `web review URL is available without native review rules`() {
+        val rule = ReviewRule(reviewUrl = "  @js:'https://example.com/review/' + paraIndex  ")
+
+        assertEquals(
+            "@js:'https://example.com/review/' + paraIndex",
+            rule.configuredWebUrl(),
+        )
+        assertEquals(null, ReviewRule(reviewUrl = " \n\t").configuredWebUrl())
+    }
+
+    @Test
     fun `parses JSON summary returned as a native array`() {
         val result = ReviewRuleParser.parseSummary(
             body = """
@@ -461,6 +472,24 @@ class ReviewRuleParserTest {
                 "[paraIndex, paraData, reviewId, typeof page + ':' + page, " +
                     "infoMap['token']].join('|')",
             ),
+        )
+    }
+
+    @Test
+    fun `web review URL resolves paragraph variables against chapter`() {
+        val reviewUrl = AnalyzeUrl(
+            "@js:'https://example.com/review/' + paraIndex + '/' + paraData + '/' + page",
+            baseUrl = chapter.url,
+            extraParams = mapOf(
+                "paraIndex" to "8",
+                "paraData" to "chapter-key",
+                "page" to "1",
+            ),
+        )
+
+        assertEquals(
+            "https://example.com/review/8/chapter-key/1",
+            reviewUrl.url,
         )
     }
 }
