@@ -11,6 +11,7 @@ import io.legado.app.base.BaseViewModel
 import io.legado.app.constant.AppLog
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
+import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.update
 import io.legado.app.help.book.isPdf
 import io.legado.app.help.book.isEpub
@@ -49,8 +50,10 @@ class TocViewModel(application: Application) : BaseViewModel(application) {
         execute {
             book.update()
             LocalBook.getChapterList(book).let {
+                val oldCacheKeys = BookHelp.captureChapterCacheKeys(book)
                 appDb.bookChapterDao.delByBook(book.bookUrl)
                 appDb.bookChapterDao.insert(*it.toTypedArray())
+                BookHelp.migrateChapterCache(book, oldCacheKeys, it)
                 book.update()
                 ReadBook.onChapterListUpdated(book)
                 bookData.postValue(book)

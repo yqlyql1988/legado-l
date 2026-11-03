@@ -13,6 +13,7 @@ import io.legado.app.constant.EventBus
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.ChapterCacheKey
 import io.legado.app.data.entities.saveReadRecordSnapshot
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.DefaultData
@@ -244,7 +245,8 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
                     runPerJs = refreshBookInfo,
                     isFromBookInfo = refreshBookInfo,
                 ).getOrThrow()
-                var replacedBook: Book? = null
+                var oldBook: Book? = null
+                var oldCacheKeys: List<ChapterCacheKey> = emptyList()
                 var persisted = false
                 appDb.runInTransaction {
                     val currentBook = appDb.bookDao.getBook(bookUrl)
@@ -252,14 +254,16 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
                     if (currentBook.origin != source.bookSourceUrl) {
                         return@runInTransaction
                     }
+                    oldBook = currentBook
                     if (refreshBookInfo) {
                         book.name = currentBook.name.ifBlank { book.name }
                         book.author = currentBook.author.ifBlank { book.author }
                     }
                     book.sync(currentBook, toc)
                     book.removeType(BookType.updateError)
+                    // replace 会级联删除旧章节，必须在更新书籍前捕获缓存键。
+                    oldCacheKeys = BookHelp.captureChapterCacheKeys(currentBook)
                     if (book.bookUrl != bookUrl) {
-                        replacedBook = currentBook
                         appDb.bookDao.replace(currentBook, book)
                     } else {
                         book.update()
@@ -270,9 +274,8 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
                 }
                 if (!persisted) return@runCatching
                 persistedBookUrl = book.bookUrl
-                replacedBook?.let {
-                    BookHelp.updateCacheFolder(it, book)
-                }
+                oldBook?.let { BookHelp.updateCacheFolder(it, book) }
+                BookHelp.migrateChapterCache(book, oldCacheKeys, toc)
                 ReadBook.onChapterListUpdated(book)
                 val policy = tocUpdateRequests.close(request)
                 if (policy == TocUpdatePolicy.ALLOW_PRE_DOWNLOAD) {

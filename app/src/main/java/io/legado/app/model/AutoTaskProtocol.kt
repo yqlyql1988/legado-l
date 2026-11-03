@@ -217,6 +217,7 @@ object AutoTaskProtocol {
     private suspend fun refreshBookToc(book: Book): List<BookChapter> {
         val coroutineContext = currentCoroutineContext()
         coroutineContext.ensureActive()
+        val oldBook = book.copy()
         val chapters = if (book.isLocal) {
             LocalBook.getChapterList(book)
         } else {
@@ -230,11 +231,14 @@ object AutoTaskProtocol {
             WebBook.getChapterListAwait(bookSource, book).getOrThrow()
         }
         coroutineContext.ensureActive()
+        val oldCacheKeys = BookHelp.captureChapterCacheKeys(oldBook)
         appDb.runInTransaction {
             appDb.bookChapterDao.delByBook(book.bookUrl)
             appDb.bookChapterDao.insert(*chapters.toTypedArray())
             book.update()
         }
+        BookHelp.updateCacheFolder(oldBook, book)
+        BookHelp.migrateChapterCache(book, oldCacheKeys, chapters)
         coroutineContext.ensureActive()
         return chapters
     }

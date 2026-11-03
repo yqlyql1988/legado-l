@@ -11,6 +11,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.ChapterCacheKey
 import io.legado.app.data.entities.getFolderName
 import io.legado.app.data.entities.isEpub
 import io.legado.app.help.config.AppConfig
@@ -56,7 +57,7 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
-internal data class ContentSaveKey(val bookUrl: String, val chapterIndex: Int)
+internal data class ContentSaveKey(val bookUrl: String, val chapterUrl: String)
 internal data class ContentSaveState(val version: Long = 0L, val fileName: String? = null)
 internal sealed interface ChapterSourceMatch {
     data class Unique(val targetPosition: Int) : ChapterSourceMatch
@@ -151,18 +152,96 @@ object BookHelp {
     fun updateCacheFolder(oldBook: Book, newBook: Book) {
         val oldFolderName = oldBook.getFolderNameNoCache()
         val newFolderName = newBook.getFolderNameNoCache()
-        if (oldFolderName == newFolderName) return
-        val oldFolderPath = FileUtils.getPath(
-            downloadDir,
-            cacheFolderName,
-            oldFolderName
-        )
-        val newFolderPath = FileUtils.getPath(
-            downloadDir,
-            cacheFolderName,
-            newFolderName
-        )
-        FileUtils.move(oldFolderPath, newFolderPath)
+        if (oldFolderName != newFolderName) {
+            val oldFolder = downloadDir.getFile(cacheFolderName, oldFolderName)
+            if (oldFolder.isDirectory) {
+                val newFolder = downloadDir.getFile(cacheFolderName, newFolderName)
+                if (newFolder.exists()) {
+                    mergeCacheFolder(oldFolder, newFolder)
+                } else {
+                    FileUtils.move(oldFolder.absolutePath, newFolder.absolutePath)
+                }
+            }
+        }
+        newBook.resetFolderNameCache()
+    }
+
+    private fun mergeCacheFolder(src: File, dst: File) {
+        src.listFiles()?.forEach { file ->
+            val target = File(dst, file.name)
+            if (file.isDirectory) {
+                target.mkdirs()
+                mergeCacheFolder(file, target)
+            } else if (!target.exists()) {
+                file.renameTo(target)
+            }
+        }
+        FileUtils.delete(src.absolutePath)
+    }
+
+    fun captureChapterCacheKeys(book: Book): List<ChapterCacheKey> {
+        return captureChapterCacheKeys(book.bookUrl, book.getFolderName())
+    }
+
+    /**
+     * 用旧书对象捕获已有缓存章节，避免书名刚变化时误用新目录名。
+     */
+    private fun captureChapterCacheKeys(bookUrl: String, folderName: String): List<ChapterCacheKey> {
+        if (!downloadDir.getFile(cacheFolderName, folderName).isDirectory) return emptyList()
+        return appDb.bookChapterDao.getChapterCacheKeys(bookUrl)
+    }
+
+    /**
+     * 只按主键插入/替换章节时同步迁移已下载正文。
+     * 书名或书籍地址变化时，应先调用 updateCacheFolder。
+     */
+    fun saveChapterList(book: Book, chapters: List<BookChapter>) {
+        val oldKeys = captureChapterCacheKeys(book)
+        appDb.bookChapterDao.insert(*chapters.toTypedArray())
+        migrateChapterCache(book, oldKeys, chapters)
+    }
+
+    /**
+     * 目录更新后，把已下载正文迁移到新标题/序号对应的文件名。
+     * 只迁移能按章节地址对应到新目录的章节；目标文件已存在时不覆盖，失败时保留旧文件退化为重新下载。
+     */
+    internal fun migrateChapterCache(
+        book: Book,
+        oldChapters: List<ChapterCacheKey>,
+        newChapters: List<BookChapter>,
+    ) {
+        if (oldChapters.isEmpty() || newChapters.isEmpty()) return
+        val newByUrl = HashMap<String, BookChapter>(newChapters.size)
+        newChapters.forEach {
+            if (!it.isVolume) newByUrl[it.url] = it
+        }
+        if (newByUrl.isEmpty()) return
+        val folderName = book.getFolderName()
+        contentSaveFence.exclusive {
+            oldChapters.forEach { old ->
+                val new = newByUrl[old.url] ?: return@forEach
+                if (new.index == old.index && new.title == old.title) return@forEach
+                // 旧文件名不再对应本章，进行中的保存令牌必须失效。
+                contentSaveFence.replace(ContentSaveKey(book.bookUrl, old.url), new.getFileName()) {}
+                val oldName = BookChapter.fileName(old.index, MD5Utils.md5Encode16(old.title))
+                val newName = new.getFileName()
+                if (oldName == newName) return@forEach
+                val dir = downloadDir.getFile(cacheFolderName, folderName)
+                val oldFile = File(dir, oldName)
+                if (!oldFile.isFile) return@forEach
+                val newFile = File(dir, newName)
+                if (newFile.exists() || !oldFile.renameTo(newFile)) return@forEach
+                moveChapterSideFile(dir, oldName, newName, ".reversed")
+                moveChapterSideFile(dir, oldName, newName, ".resources")
+            }
+        }
+    }
+
+    private fun moveChapterSideFile(dir: File, oldName: String, newName: String, suffix: String) {
+        val oldFile = File(dir, oldName + suffix)
+        if (!oldFile.isFile) return
+        val newFile = File(dir, newName + suffix)
+        if (!newFile.exists()) oldFile.renameTo(newFile)
     }
 
     /**
@@ -245,7 +324,7 @@ object BookHelp {
     ): Boolean {
         return try {
             if (token.key.bookUrl != book.bookUrl ||
-                token.key.chapterIndex != bookChapter.index ||
+                token.key.chapterUrl != bookChapter.url ||
                 token.folderName != book.getFolderName()
             ) {
                 return false
@@ -394,7 +473,7 @@ object BookHelp {
         generation: Long? = null,
     ) = contentSaveFence.exclusive { synchronized(this) {
         if (chapters.any { !isContentSaveCurrent(it.token) || it.token.folderName != book.getFolderName() ||
-                it.token.key.bookUrl != book.bookUrl || it.token.key.chapterIndex != it.chapter.index } ||
+                it.token.key.bookUrl != book.bookUrl || it.token.key.chapterUrl != it.chapter.url } ||
             imageTokens.any { (src, version) -> imageSaveVersion(book, src) != version }) {
             throw IOException("资源已被其他操作更新，请重试刷新")
         }
@@ -446,7 +525,7 @@ object BookHelp {
     }
 
     private fun contentSaveKey(book: Book, bookChapter: BookChapter) =
-        ContentSaveKey(book.bookUrl, bookChapter.index)
+        ContentSaveKey(book.bookUrl, bookChapter.url)
 
     private fun writeText(
         book: Book,
@@ -693,7 +772,7 @@ object BookHelp {
         token: ContentSaveToken,
     ): String? {
         if (token.key.bookUrl != book.bookUrl ||
-            token.key.chapterIndex != bookChapter.index ||
+            token.key.chapterUrl != bookChapter.url ||
             token.folderName != book.getFolderName()
         ) {
             return null

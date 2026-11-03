@@ -294,8 +294,10 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             execute(scope) {
                 LocalBook.getChapterList(book).let {
                     book.update()
+                    val oldCacheKeys = BookHelp.captureChapterCacheKeys(book)
                     appDb.bookChapterDao.delByBook(book.bookUrl)
                     appDb.bookChapterDao.insert(*it.toTypedArray())
+                    BookHelp.migrateChapterCache(book, oldCacheKeys, it)
                     ReadBook.onChapterListUpdated(book)
                     bookData.postValue(book)
                     chapterListData.postValue(it)
@@ -320,15 +322,16 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 .onSuccess(IO) {
                     if (inBookshelf) {
                         book.removeType(BookType.updateError)
-                        appDb.bookDao.replace(oldBook, book)
                         /**
-                         * runPreUpdateJs 有可能会修改 book 的 bookUrl
+                         * runPreUpdateJs 有可能会修改 book 的 bookUrl；
+                         * replace 会级联删除旧章节，必须先捕获缓存键再更新书籍。
                          */
-                        if (oldBook.bookUrl != book.bookUrl) {
-                            BookHelp.updateCacheFolder(oldBook, book)
-                        }
+                        val oldCacheKeys = BookHelp.captureChapterCacheKeys(oldBook)
+                        appDb.bookDao.replace(oldBook, book)
+                        BookHelp.updateCacheFolder(oldBook, book)
                         appDb.bookChapterDao.delByBook(oldBook.bookUrl)
                         appDb.bookChapterDao.insert(*it.toTypedArray())
+                        BookHelp.migrateChapterCache(book, oldCacheKeys, it)
                         ReadBook.onChapterListUpdated(book)
                     }
                     bookData.postValue(book)
@@ -526,8 +529,10 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
 
     fun saveChapterList(success: (() -> Unit)?) {
         execute {
-            chapterListData.value?.let {
-                appDb.bookChapterDao.insert(*it.toTypedArray())
+            chapterListData.value?.let { chapters ->
+                bookData.value?.let { book ->
+                    BookHelp.saveChapterList(book, chapters)
+                } ?: appDb.bookChapterDao.insert(*chapters.toTypedArray())
             }
         }.onSuccess {
             success?.invoke()
@@ -554,8 +559,10 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 book.save()
                 SourceCallBack.callBackBook(SourceCallBack.ADD_BOOK_SHELF, bookSource, book)
             }
-            chapterListData.value?.let {
-                appDb.bookChapterDao.insert(*it.toTypedArray())
+            chapterListData.value?.let { chapters ->
+                bookData.value?.let { book ->
+                    BookHelp.saveChapterList(book, chapters)
+                } ?: appDb.bookChapterDao.insert(*chapters.toTypedArray())
             }
             inBookshelf = true
         }.onSuccess {
