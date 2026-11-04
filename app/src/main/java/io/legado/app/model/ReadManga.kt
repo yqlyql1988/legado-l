@@ -509,14 +509,16 @@ object ReadManga : CoroutineScope by MainScope() {
         WebBook.getChapterList(this, bookSource, book).onSuccess(IO) { cList ->
             ensureActive()
             if (cList.size > chapterSize) {
+                val oldCacheKeys = BookHelp.captureChapterCacheKeys(oldBook)
                 if (oldBook.bookUrl == book.bookUrl) {
                     book.update()
                 } else {
                     appDb.bookDao.replace(oldBook, book)
-                    BookHelp.updateCacheFolder(oldBook, book)
                 }
+                BookHelp.updateCacheFolder(oldBook, book)
                 appDb.bookChapterDao.delByBook(oldBook.bookUrl)
                 appDb.bookChapterDao.insert(*cList.toTypedArray())
+                BookHelp.migrateChapterCache(book, oldCacheKeys, cList)
                 onChapterListUpdated(book, false)
                 nextMangaChapter ?: loadContent(durChapterIndex + 1)
             }

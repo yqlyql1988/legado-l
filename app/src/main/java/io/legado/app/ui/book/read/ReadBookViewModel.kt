@@ -243,8 +243,10 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
         if (book.isLocal) {
             kotlin.runCatching {
                 LocalBook.getChapterList(book).let {
+                    val oldCacheKeys = BookHelp.captureChapterCacheKeys(book)
                     appDb.bookChapterDao.delByBook(book.bookUrl)
                     appDb.bookChapterDao.insert(*it.toTypedArray())
+                    BookHelp.migrateChapterCache(book, oldCacheKeys, it)
                     book.update()
                     ReadBook.onChapterListUpdated(book)
                 }
@@ -267,14 +269,16 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
                 val oldBook = book.copy()
                 WebBook.getChapterListAwait(it, book, true)
                     .onSuccess { cList ->
+                        val oldCacheKeys = BookHelp.captureChapterCacheKeys(oldBook)
                         if (oldBook.bookUrl == book.bookUrl) {
                             book.update()
                         } else {
                             appDb.bookDao.replace(oldBook, book)
-                            BookHelp.updateCacheFolder(oldBook, book)
                         }
+                        BookHelp.updateCacheFolder(oldBook, book)
                         appDb.bookChapterDao.delByBook(oldBook.bookUrl)
                         appDb.bookChapterDao.insert(*cList.toTypedArray())
+                        BookHelp.migrateChapterCache(book, oldCacheKeys, cList)
                         ReadBook.onChapterListUpdated(book)
                         return true
                     }.onFailure {

@@ -153,21 +153,27 @@ object BookController {
                 ?: return returnData.setErrorMsg("未在数据库找到对应书籍，请先添加")
             if (book.isLocal) {
                 val toc = LocalBook.getChapterList(book)
+                val oldCacheKeys = BookHelp.captureChapterCacheKeys(book)
                 appDb.bookChapterDao.delByBook(book.bookUrl)
                 appDb.bookChapterDao.insert(*toc.toTypedArray())
+                BookHelp.migrateChapterCache(book, oldCacheKeys, toc)
                 book.update()
                 return returnData.setData(toc)
             } else {
                 val bookSource = appDb.bookSourceDao.getBookSource(book.origin)
                     ?: return returnData.setErrorMsg("未找到对应书源,请换源")
+                val oldBook = book.copy()
                 val toc = runBlocking {
                     if (book.tocUrl.isBlank()) {
                         WebBook.getBookInfoAwait(bookSource, book)
                     }
                     WebBook.getChapterListAwait(bookSource, book).getOrThrow()
                 }
+                val oldCacheKeys = BookHelp.captureChapterCacheKeys(oldBook)
+                BookHelp.updateCacheFolder(oldBook, book)
                 appDb.bookChapterDao.delByBook(book.bookUrl)
                 appDb.bookChapterDao.insert(*toc.toTypedArray())
+                BookHelp.migrateChapterCache(book, oldCacheKeys, toc)
                 book.update()
                 return returnData.setData(toc)
             }

@@ -401,6 +401,11 @@ data class Book(
         return folderName!!
     }
 
+    /** 书名或书籍地址变化并迁移缓存目录后，清除进程内缓存，避免继续读写旧目录。 */
+    internal fun resetFolderNameCache() {
+        folderName = null
+    }
+
     fun toSearchBook() = SearchBook(
         name = name,
         author = author,

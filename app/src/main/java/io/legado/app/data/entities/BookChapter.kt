@@ -196,14 +196,22 @@ data class BookChapter(
     @Suppress("unused")
     fun getFileName(suffix: String = "nb"): String {
         ensureTitleMD5Init()
-        return String.format("%05d-%s.%s", index, titleMD5, suffix)
+        return fileName(index, titleMD5!!, suffix)
     }
 
     @SuppressLint("DefaultLocale")
     @Suppress("unused")
     fun getFontName(): String {
         ensureTitleMD5Init()
-        return String.format("%05d-%s.ttf", index, titleMD5)
+        return fileName(index, titleMD5!!, "ttf")
+    }
+
+    companion object {
+        /** 正文缓存文件名由章节序号和标题摘要组成，目录更新后需按新值迁移旧文件。 */
+        @SuppressLint("DefaultLocale")
+        fun fileName(index: Int, titleMD5: String, suffix: String = "nb"): String {
+            return String.format("%05d-%s.%s", index, titleMD5, suffix)
+        }
     }
 }
 

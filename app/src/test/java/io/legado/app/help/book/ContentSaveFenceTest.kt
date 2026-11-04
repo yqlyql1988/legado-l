@@ -12,7 +12,7 @@ class ContentSaveFenceTest {
     @Test
     fun `authoritative replacement rejects an older network write`() {
         val fence = ContentSaveFence()
-        val key = ContentSaveKey("book", 3)
+        val key = ContentSaveKey("book", "chapter-url")
         val requestVersion = fence.state(key).version
         var content = ""
 
@@ -30,7 +30,7 @@ class ContentSaveFenceTest {
     @Test
     fun `failed authoritative replacement still rejects an older network write`() {
         val fence = ContentSaveFence()
-        val key = ContentSaveKey("book", 3)
+        val key = ContentSaveKey("book", "chapter-url")
         val requestVersion = fence.state(key).version
         var content = ""
 
@@ -54,7 +54,7 @@ class ContentSaveFenceTest {
     @Test
     fun `initial network write does not retain fence state`() {
         val fence = ContentSaveFence()
-        val key = ContentSaveKey("book", 3)
+        val key = ContentSaveKey("book", "chapter-url")
         var content = ""
 
         assertTrue(
@@ -69,7 +69,7 @@ class ContentSaveFenceTest {
     @Test
     fun `authoritative replacement restores metadata after an earlier network write`() {
         val fence = ContentSaveFence()
-        val key = ContentSaveKey("book", 3)
+        val key = ContentSaveKey("book", "chapter-url")
         var title = "original"
 
         fence.writeIfCurrent(key, 0L, "network.nb") { title = "network" }

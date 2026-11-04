@@ -345,8 +345,10 @@ class ExportBookService : BaseService() {
         kotlin.runCatching {
             LocalBook.getChapterList(book)
         }.onSuccess {
+            val oldCacheKeys = BookHelp.captureChapterCacheKeys(book)
             appDb.bookChapterDao.delByBook(book.bookUrl)
             appDb.bookChapterDao.insert(*it.toTypedArray())
+            BookHelp.migrateChapterCache(book, oldCacheKeys, it)
             book.update()
             ReadBook.onChapterListUpdated(book)
         }

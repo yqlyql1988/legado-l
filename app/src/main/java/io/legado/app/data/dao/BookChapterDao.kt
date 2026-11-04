@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import io.legado.app.data.entities.BookChapter
+import io.legado.app.data.entities.ChapterCacheKey
 
 @Dao
 interface BookChapterDao {
@@ -21,6 +22,9 @@ interface BookChapterDao {
 
     @Query("select * from chapters where bookUrl = :bookUrl order by `index`")
     fun getChapterList(bookUrl: String): List<BookChapter>
+
+    @Query("select url, title, `index` from chapters where bookUrl = :bookUrl")
+    fun getChapterCacheKeys(bookUrl: String): List<ChapterCacheKey>
 
     @Query("select * from chapters where bookUrl = :bookUrl and `index` >= :start and `index` <= :end order by `index`")
     fun getChapterList(bookUrl: String, start: Int, end: Int): List<BookChapter>
