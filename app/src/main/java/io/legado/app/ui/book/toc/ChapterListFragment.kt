@@ -23,12 +23,14 @@ import io.legado.app.help.book.isEpub
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isPdf
 import io.legado.app.help.book.isVideo
+import io.legado.app.help.book.naturalChapterProgressPosition
 import io.legado.app.help.book.simulatedTotalChapterNum
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.lib.theme.getPrimaryTextColor
 import io.legado.app.model.AudioCacheKey
 import io.legado.app.model.AudioCacheStateChanged
+import io.legado.app.model.ReadBook
 import io.legado.app.model.localBook.PdfFile
 import io.legado.app.model.localBook.EpubFile
 import io.legado.app.model.localBook.EpubTocNode
@@ -492,6 +494,15 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
     override val book: Book?
         get() = viewModel.bookData.value
 
+    override val progressBook: Book?
+        get() = ReadBook.book?.takeIf { active ->
+            active.bookUrl == viewModel.bookData.value?.bookUrl
+        } ?: viewModel.bookData.value
+
+    override fun chapterIndexesInVolume(volumeIndex: Int): List<Int> {
+        return tocListState.chapterIndexesInVolume(volumeIndex)
+    }
+
     override val isLocalBook: Boolean
         get() = viewModel.bookData.value?.isLocal == true
 
@@ -530,6 +541,10 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
                     RESULT_OK,
                     Intent()
                         .putExtra("index", bookChapter.index)
+                        .putExtra(
+                            "chapterPos",
+                            progressBook?.naturalChapterProgressPosition(bookChapter.index) ?: 0,
+                        )
                         .putExtra("chapterChanged", bookChapter.index != durChapterIndex)
                         .putExtra("durVolumeIndex", durVolumeIndex)
                         .putExtra("chapterInVolumeIndex", chapterInVolumeIndex),
@@ -541,6 +556,10 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
                 RESULT_OK,
                 Intent()
                     .putExtra("index", bookChapter.index)
+                    .putExtra(
+                        "chapterPos",
+                        progressBook?.naturalChapterProgressPosition(bookChapter.index) ?: 0,
+                    )
                     .putExtra("chapterChanged", bookChapter.index != durChapterIndex),
             )
             finish()
