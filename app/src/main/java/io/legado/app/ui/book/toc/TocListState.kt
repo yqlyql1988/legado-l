@@ -16,6 +16,7 @@ class TocListState {
     private var nodes: List<Node> = emptyList()
     private var byIndex: Map<Int, Node> = emptyMap()
     private var descendantCounts: Map<Int, Int> = emptyMap()
+    private var volumeChapterIndexes: Map<Int, List<Int>> = emptyMap()
     private val collapsedVolumeIndexes = mutableSetOf<Int>()
     private var reverseOrder = false
     private var reverseDisplay = false
@@ -30,6 +31,7 @@ class TocListState {
         nodes = emptyList()
         byIndex = emptyMap()
         descendantCounts = emptyMap()
+        volumeChapterIndexes = emptyMap()
         collapsedVolumeIndexes.clear()
         reverseOrder = false
         reverseDisplay = false
@@ -69,6 +71,16 @@ class TocListState {
             nodes.asReversed().forEach { node ->
                 node.parentIndex?.let { parent ->
                     this[parent] = (this[parent] ?: 0) + 1 + (this[node.chapter.index] ?: 0)
+                }
+            }
+        }
+        volumeChapterIndexes = mutableMapOf<Int, MutableList<Int>>().apply {
+            nodes.forEach { node ->
+                if (node.chapter.isVolume) return@forEach
+                val chapterIndex = node.readingChapter?.index ?: node.chapter.index
+                if (chapterIndex < 0) return@forEach
+                ancestorPath(node.chapter.index).drop(1).forEach { volumeIndex ->
+                    getOrPut(volumeIndex) { mutableListOf() }.add(chapterIndex)
                 }
             }
         }
@@ -134,6 +146,9 @@ class TocListState {
         collapsedVolumeIndexes.removeAll(currentPath(chapterIndex))
 
     fun isVolumeCollapsed(volumeIndex: Int): Boolean = volumeIndex in collapsedVolumeIndexes
+
+    fun chapterIndexesInVolume(volumeIndex: Int): List<Int> =
+        volumeChapterIndexes[volumeIndex].orEmpty()
 
     fun parentVolumeIndexOf(chapterIndex: Int): Int? =
         (byIndex[chapterIndex] ?: nodes.firstOrNull { it.readingChapter?.index == chapterIndex })?.parentIndex

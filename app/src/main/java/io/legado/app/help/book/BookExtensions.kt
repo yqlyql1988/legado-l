@@ -408,6 +408,24 @@ fun Book.readProgress(): Float? {
     return (durChapterIndex.toFloat() / lastChapterIndex).coerceIn(0f, 1f)
 }
 
+/** 目录使用的自然阅读比例；目录点击、搜索、书签等跳转不会修改它。 */
+internal fun Book.naturalChapterProgress(chapterIndex: Int): Float {
+    return naturalProgressSnapshot()?.chapterProgress(chapterIndex) ?: 0f
+}
+
+internal fun Book.naturalChapterProgressPosition(chapterIndex: Int): Int? {
+    return naturalProgressSnapshot()?.chapterPosition(chapterIndex)
+}
+
+internal fun Book.naturalProgressSnapshot(): NaturalProgressSnapshot? {
+    val config = readConfig ?: return null
+    if (!config.naturalProgressInitialized) return null
+    return NaturalProgressSnapshot(
+        completedRanges = NaturalProgressRanges.parse(config.naturalProgressCompletedRanges),
+        readingChapters = NaturalProgressChapters.parse(config.naturalProgressPartialChapters),
+    )
+}
+
 fun tryParesExportFileName(jsStr: String): Boolean {
     val bindings = buildScriptBindings { bindings ->
         bindings["name"] = "name"

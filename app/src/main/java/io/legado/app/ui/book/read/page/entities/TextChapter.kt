@@ -55,6 +55,13 @@ data class TextChapter(
     @Volatile
     var layoutTitleLength: Int = UNKNOWN_LAYOUT_TITLE_LENGTH
 
+    @Volatile
+    var layoutContentLength: Int = UNKNOWN_CONTENT_LENGTH
+
+    /** Uses the completed layout length when available and avoids rebuilding the chapter text. */
+    val contentLength: Int
+        get() = layoutContentLength.takeIf { it >= 0 } ?: pages.sumOf { it.text.length }
+
     val layoutChannel get() = layout!!.channel
 
     fun getPage(index: Int): TextPage? {
@@ -353,6 +360,7 @@ data class TextChapter(
 
     override fun onLayoutCompleted() {
         isCompleted = true
+        layoutContentLength = pages.sumOf { it.text.length }
         listener?.onLayoutCompleted()
         listener = null
     }
@@ -371,6 +379,7 @@ data class TextChapter(
 
     companion object {
         const val UNKNOWN_LAYOUT_TITLE_LENGTH = -1
+        const val UNKNOWN_CONTENT_LENGTH = -1
 
         val emptyTextChapter = TextChapter(
             BookChapter(), -1, "emptyTextChapter", -1,

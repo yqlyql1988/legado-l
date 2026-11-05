@@ -17,6 +17,8 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.ReplaceBook
 import io.legado.app.databinding.ItemChapterListBinding
 import io.legado.app.help.book.ContentProcessor
+import io.legado.app.help.book.NaturalProgressSnapshot
+import io.legado.app.help.book.naturalProgressSnapshot
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.lib.theme.ThemeUtils
@@ -44,6 +46,11 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
     private val baseStartPadding = 12.dpToPx()
     private val depthIndent = 10.dpToPx()
     private var released = false
+    private var naturalProgressBookUrl: String? = null
+    private var naturalProgressRanges: String? = null
+    private var naturalProgressChapters: String? = null
+    private var naturalProgressInitialized = false
+    private var naturalProgressSnapshot: NaturalProgressSnapshot? = null
 
     override val diffItemCallback: DiffUtil.ItemCallback<TocListItem>
         get() = object : DiffUtil.ItemCallback<TocListItem>() {
@@ -179,6 +186,36 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
         return displayTitleMap[item.key] ?: item.chapter.title
     }
 
+    private fun naturalProgress(book: Book?): NaturalProgressSnapshot? {
+        val config = book?.readConfig
+        if (book == null || config == null) return null
+        if (book.bookUrl != naturalProgressBookUrl ||
+            config.naturalProgressCompletedRanges !== naturalProgressRanges ||
+            config.naturalProgressPartialChapters !== naturalProgressChapters ||
+            config.naturalProgressInitialized != naturalProgressInitialized
+        ) {
+            naturalProgressBookUrl = book.bookUrl
+            naturalProgressRanges = config.naturalProgressCompletedRanges
+            naturalProgressChapters = config.naturalProgressPartialChapters
+            naturalProgressInitialized = config.naturalProgressInitialized
+            naturalProgressSnapshot = book.naturalProgressSnapshot()
+        }
+        return naturalProgressSnapshot
+    }
+
+    private fun chapterProgress(book: Book?, chapterIndex: Int): Float {
+        return naturalProgress(book)?.chapterProgress(chapterIndex) ?: 0f
+    }
+
+    private fun volumeProgress(book: Book?, volumeIndex: Int): Float {
+        val snapshot = naturalProgress(book) ?: return 0f
+        val chapterIndexes = callback.chapterIndexesInVolume(volumeIndex)
+        if (chapterIndexes.isEmpty()) return 0f
+        var total = 0f
+        chapterIndexes.forEach { total += snapshot.chapterProgress(it) }
+        return (total / chapterIndexes.size).coerceIn(0f, 1f)
+    }
+
     override fun getViewBinding(parent: ViewGroup): ItemChapterListBinding {
         return ItemChapterListBinding.inflate(inflater, parent, false)
     }
@@ -201,6 +238,17 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
                         cacheFileNames.contains(chapter.getFileName())
                     }
             tvChapterName.text = getDisplayTitle(item)
+            val progress = if (isVolume) {
+                volumeProgress(callback.progressBook, chapter.index)
+            } else {
+                item.readingChapter?.index
+                    ?.takeUnless { it < 0 }
+                    ?.let { chapterProgress(callback.progressBook, it) }
+                    ?: 0f
+            }
+            progressBar.pivotX = 0f
+            progressBar.scaleX = progress
+            progressBar.visible(progress > 0f)
 
             if (payloads.isEmpty()) {
                 val isCurrentGroup = isCurrentChapter ||
@@ -359,6 +407,9 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
     interface Callback {
         val scope: CoroutineScope
         val book: Book?
+        /** 含最近一次自然翻页数据的书籍；阅读器打开目录时用它渲染进度线。 */
+        val progressBook: Book?
+            get() = book
         val isLocalBook: Boolean
         val isAudioBook: Boolean
         val isAudioCacheStateReady: Boolean
@@ -367,5 +418,6 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
         fun onListChanged()
         fun onVolumeToggled(volumeIndex: Int)
         fun onItemsUpdated()
+        fun chapterIndexesInVolume(volumeIndex: Int): List<Int>
     }
 }

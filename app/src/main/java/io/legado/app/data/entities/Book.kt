@@ -525,7 +525,11 @@ data class Book(
         var playSpeed: Float = 1.0f,     //音频播放速度
         var useGlobalAudioSkip: Boolean = false,
         // 阅读页手动选择的替换规则；旧书籍配置缺失时保持空集合。
-        var manualReplaceRuleIds: List<Long> = emptyList()
+        var manualReplaceRuleIds: List<Long> = emptyList(),
+        // 自然阅读进度与最后导航位置分开保存：已读完章节区间和未读完章节的章内比例。
+        var naturalProgressCompletedRanges: String = "",
+        var naturalProgressPartialChapters: String = "",
+        var naturalProgressInitialized: Boolean = false,
     ) : Parcelable
 
     class Converters {

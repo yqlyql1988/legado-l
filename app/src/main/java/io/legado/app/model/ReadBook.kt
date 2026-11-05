@@ -40,6 +40,9 @@ import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.isImage
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isPdf
+import io.legado.app.help.book.NaturalChapterReading
+import io.legado.app.help.book.NaturalProgressChapters
+import io.legado.app.help.book.NaturalProgressRanges
 import io.legado.app.model.localBook.PdfFile
 import io.legado.app.ui.book.read.page.findPdfPagePosition
 import io.legado.app.help.book.isSameNameAuthor
@@ -215,6 +218,70 @@ object ReadBook : CoroutineScope by MainScope() {
     private val readWordTracker = TextReadProgressTracker()
     private val readWordChapterCache = TextReadChapterSnapshotCache()
 
+    private fun initializeNaturalProgress(book: Book) {
+        val config = book.config
+        if (config.naturalProgressInitialized) return
+        // 老书籍没有自然进度记录时，按当前阅读位置补一次已读区间；只补这一次。
+        config.naturalProgressCompletedRanges = if (book.durChapterIndex > 0) {
+            "0-${book.durChapterIndex - 1}"
+        } else {
+            ""
+        }
+        config.naturalProgressPartialChapters = ""
+        config.naturalProgressInitialized = true
+    }
+
+    /**
+     * 记录自然翻页到达的章节位置。跳章、搜索、书签、朗读定位等路径不会调用这里，
+     * 因此不会改动目录里的自然阅读进度。
+     */
+    private fun recordNaturalProgress(completedChapterIndex: Int? = null) {
+        val currentBook = book ?: return
+        val config = currentBook.config
+        val completedRanges = NaturalProgressRanges.parse(config.naturalProgressCompletedRanges)
+        val readingChapters = NaturalProgressChapters.parse(config.naturalProgressPartialChapters)
+        if (completedChapterIndex != null) {
+            NaturalProgressRanges.add(completedRanges, completedChapterIndex)
+            readingChapters.remove(completedChapterIndex)
+        }
+        val chapterIndex = durChapterIndex.coerceAtLeast(0)
+        val position = durChapterPos.takeUnless { it == Int.MAX_VALUE }
+        val chapter = curTextChapter?.takeIf { it.chapter.index == chapterIndex && it.isCompleted }
+        if (chapter != null && position != null) {
+            val contentLength = chapter.contentLength
+            val titleLength = chapter.layoutTitleLength.coerceIn(0, contentLength)
+            val bodyLength = contentLength - titleLength
+            val perMille = if (bodyLength <= 0) {
+                1000
+            } else {
+                ((position - titleLength).coerceIn(0, bodyLength).toLong() * 1000 / bodyLength).toInt()
+            }
+            when {
+                perMille >= 1000 -> {
+                    NaturalProgressRanges.add(completedRanges, chapterIndex)
+                    readingChapters.remove(chapterIndex)
+                }
+
+                perMille <= 0 -> {
+                    NaturalProgressRanges.remove(completedRanges, chapterIndex)
+                    readingChapters.remove(chapterIndex)
+                }
+
+                else -> {
+                    NaturalProgressRanges.remove(completedRanges, chapterIndex)
+                    readingChapters[chapterIndex] = NaturalChapterReading(perMille, position)
+                }
+            }
+        } else if (completedChapterIndex != null) {
+            // 自然翻到下一章时新章从开头开始；排版完成前也先清掉它原有的记录。
+            NaturalProgressRanges.remove(completedRanges, chapterIndex)
+            readingChapters.remove(chapterIndex)
+        }
+        config.naturalProgressCompletedRanges = NaturalProgressRanges.encode(completedRanges)
+        config.naturalProgressPartialChapters = NaturalProgressChapters.encode(readingChapters)
+        config.naturalProgressInitialized = true
+    }
+
     /* 跳转进度前进度记录 */
     var lastBookProgress: BookProgress? = null
 
@@ -247,6 +314,7 @@ object ReadBook : CoroutineScope by MainScope() {
         contentProcessor = ContentProcessor.get(book)
         durChapterIndex = book.durChapterIndex
         durChapterPos = book.durChapterPos
+        initializeNaturalProgress(book)
         readWordTracker.reset()
         isLocalBook = book.isLocal
         upWebBook(book)
@@ -757,6 +825,7 @@ object ReadBook : CoroutineScope by MainScope() {
             durChapterPos = book.durChapterPos
             clearTextChapter()
         }
+        initializeNaturalProgress(book)
         if (curTextChapter?.isCompleted == false) {
             curTextChapter = null
         }
@@ -1066,11 +1135,13 @@ object ReadBook : CoroutineScope by MainScope() {
         upContentInPlace: Boolean = true,
         syncReadAloudFollow: Boolean = false,
         countRemaining: Boolean = true,
+        natural: Boolean = false,
     ): Boolean {
         if (syncReadAloudFollow && !BaseReadAloudService.shouldSyncSpeechNavigation()) {
             return false
         }
         if (durChapterIndex < simulatedChapterSize - 1) {
+            val completedChapterIndex = durChapterIndex
             if (!countRemaining) readWordTracker.markSeek()
             val restartReadAloud = prepareReadAloudPageNavigation(syncReadAloudFollow)
             durChapterPos = 0
@@ -1080,6 +1151,9 @@ object ReadBook : CoroutineScope by MainScope() {
             prevTextChapter = curTextChapter
             curTextChapter = nextTextChapter
             nextTextChapter = null
+            if (natural) {
+                recordNaturalProgress(completedChapterIndex)
+            }
             if (curTextChapter == null) {
                 AppLog.putDebug("moveToNextChapter-章节未加载,开始加载")
                 if (upContentInPlace) callBack?.upContent()
@@ -1108,6 +1182,7 @@ object ReadBook : CoroutineScope by MainScope() {
         upContentInPlace: Boolean = true,
         syncReadAloudFollow: Boolean = false,
         countRemaining: Boolean = true,
+        natural: Boolean = false,
     ): Boolean {
         if (BaseReadAloudService.isRun && !syncReadAloudFollow) {
             ReadAloud.detachReadAloudFollow()
@@ -1116,6 +1191,7 @@ object ReadBook : CoroutineScope by MainScope() {
             return false
         }
         if (durChapterIndex < simulatedChapterSize - 1) {
+            val completedChapterIndex = durChapterIndex
             if (!countRemaining) readWordTracker.markSeek()
             durChapterPos = 0
             durChapterIndex++
@@ -1124,6 +1200,9 @@ object ReadBook : CoroutineScope by MainScope() {
             prevTextChapter = curTextChapter
             curTextChapter = nextTextChapter
             nextTextChapter = null
+            if (natural) {
+                recordNaturalProgress(completedChapterIndex)
+            }
             if (curTextChapter == null) {
                 AppLog.putDebug("moveToNextChapter-章节未加载,开始加载")
                 if (upContentInPlace) callBack?.upContentAwait()
@@ -1148,7 +1227,8 @@ object ReadBook : CoroutineScope by MainScope() {
         upContent: Boolean,
         toLast: Boolean = true,
         upContentInPlace: Boolean = true,
-        syncReadAloudFollow: Boolean = false
+        syncReadAloudFollow: Boolean = false,
+        natural: Boolean = false,
     ): Boolean {
         if (syncReadAloudFollow && !BaseReadAloudService.shouldSyncSpeechNavigation()) {
             return false
@@ -1162,6 +1242,7 @@ object ReadBook : CoroutineScope by MainScope() {
             nextTextChapter = curTextChapter
             curTextChapter = prevTextChapter
             prevTextChapter = null
+            if (natural) recordNaturalProgress()
             if (curTextChapter == null) {
                 if (upContentInPlace) callBack?.upContent()
                 loadContent(durChapterIndex, upContent, resetPageOffset = false)
@@ -1194,13 +1275,18 @@ object ReadBook : CoroutineScope by MainScope() {
         saveRead(true)
     }
 
-    fun setPageIndex(index: Int, syncReadAloudFollow: Boolean = false) {
+    fun setPageIndex(
+        index: Int,
+        syncReadAloudFollow: Boolean = false,
+        natural: Boolean = false,
+    ) {
         if (syncReadAloudFollow && !BaseReadAloudService.shouldSyncSpeechNavigation()) {
             return
         }
         val restartReadAloud = prepareReadAloudPageNavigation(syncReadAloudFollow)
         recycleRecorders(durPageIndex, index)
         durChapterPos = curTextChapter?.getReadLength(index) ?: index
+        if (natural) recordNaturalProgress()
         saveRead(true)
         curPageChanged(
             pageChanged = true,

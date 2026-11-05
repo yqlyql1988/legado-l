@@ -51,12 +51,12 @@ class TextPageFactory(dataSource: DataSource) : PageFactory<TextPage>(dataSource
                 if ((currentChapter == null || isScroll) && nextChapter == null) {
                     return@with false
                 }
-                ReadBook.moveToNextChapter(upContent, false)
+                ReadBook.moveToNextChapter(upContent, false, natural = true)
             } else {
                 if (pageIndex < 0 || currentChapter?.isLastIndexCurrent(pageIndex) == true) {
                     return@with false
                 }
-                ReadBook.setPageIndex(pageIndex.plus(1))
+                ReadBook.setPageIndex(pageIndex.plus(1), natural = true)
             }
             if (upContent) upContent(resetPageOffset = false)
             true
@@ -74,12 +74,12 @@ class TextPageFactory(dataSource: DataSource) : PageFactory<TextPage>(dataSource
                 if (prevChapter != null && prevChapter?.isCompleted == false) {
                     return@with false
                 }
-                ReadBook.moveToPrevChapter(upContent, upContentInPlace = false)
+                ReadBook.moveToPrevChapter(upContent, upContentInPlace = false, natural = true)
             } else {
                 if (currentChapter == null) {
                     return@with false
                 }
-                ReadBook.setPageIndex(pageIndex.minus(1))
+                ReadBook.setPageIndex(pageIndex.minus(1), natural = true)
             }
             if (upContent) upContent(resetPageOffset = false)
             true
