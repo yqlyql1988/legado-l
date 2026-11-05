@@ -76,7 +76,6 @@ class ChangeChapterTocAdapter(context: Context, val callback: Callback) :
             } else {
                 tvTag.gone()
             }
-            progressBar.gone()
             ivChecked.setImageResource(R.drawable.ic_check)
             ivChecked.isVisible = !batchMode && isDur
             cbSelected.isVisible = batchMode && !item.isVolume

@@ -43,7 +43,6 @@ internal class PdfOutlineAdapter(
         tvTag.text = node.pageIndex?.let { context.getString(R.string.pdf_outline_page, it + 1) }
         tvTag.visible(node.pageIndex != null)
         tvWordCount.gone()
-        progressBar.gone()
         ivLocked.gone()
         ivChecked.gone()
         cbSelected.gone()

@@ -34,6 +34,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.roundToInt
 
 class ChapterListAdapter(context: Context, val callback: Callback) :
     DiffRecyclerAdapter<TocListItem, ItemChapterListBinding>(context) {
@@ -208,16 +209,21 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
     }
 
     private fun volumeProgress(book: Book?, volumeIndex: Int): Float {
-        val snapshot = naturalProgress(book) ?: return 0f
         val chapterIndexes = callback.chapterIndexesInVolume(volumeIndex)
         if (chapterIndexes.isEmpty()) return 0f
         var total = 0f
-        chapterIndexes.forEach { total += snapshot.chapterProgress(it) }
+        chapterIndexes.forEach { total += chapterProgress(book, it) }
         return (total / chapterIndexes.size).coerceIn(0f, 1f)
     }
 
     override fun getViewBinding(parent: ViewGroup): ItemChapterListBinding {
-        return ItemChapterListBinding.inflate(inflater, parent, false)
+        return ItemChapterListBinding.inflate(inflater, parent, false).apply {
+            tvChapterItem.foreground = ChapterProgressDrawable(
+                color = context.accentColor,
+                horizontalInset = 12.dpToPx(),
+                lineHeight = 2.dpToPx(),
+            )
+        }
     }
 
     override fun convert(
@@ -246,9 +252,18 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
                     ?.let { chapterProgress(callback.progressBook, it) }
                     ?: 0f
             }
-            progressBar.pivotX = 0f
-            progressBar.scaleX = progress
-            progressBar.visible(progress > 0f)
+            (tvChapterItem.foreground as? ChapterProgressDrawable)?.setFraction(progress)
+            val progressText = if (isVolume || progress <= 0f) {
+                null
+            } else {
+                "${(progress * 100).roundToInt().coerceAtLeast(1)}%"
+            }
+            if (progressText != null) {
+                tvNaturalProgress.text = progressText
+                tvNaturalProgress.visible()
+            } else {
+                tvNaturalProgress.gone()
+            }
 
             if (payloads.isEmpty()) {
                 val isCurrentGroup = isCurrentChapter ||

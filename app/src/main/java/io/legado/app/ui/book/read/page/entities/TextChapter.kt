@@ -62,6 +62,16 @@ data class TextChapter(
     val contentLength: Int
         get() = layoutContentLength.takeIf { it >= 0 } ?: pages.sumOf { it.text.length }
 
+    /** 自然阅读比例：按正文字符位置计算，不含章节标题。 */
+    fun readProgress(position: Int): Float {
+        val contentLength = contentLength
+        val titleLength = layoutTitleLength.coerceIn(0, contentLength)
+        val bodyLength = contentLength - titleLength
+        if (bodyLength <= 0) return 1f
+        return ((position - titleLength).coerceIn(0, bodyLength).toFloat() / bodyLength)
+            .coerceIn(0f, 1f)
+    }
+
     val layoutChannel get() = layout!!.channel
 
     fun getPage(index: Int): TextPage? {

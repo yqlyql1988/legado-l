@@ -219,16 +219,8 @@ object ReadBook : CoroutineScope by MainScope() {
     private val readWordChapterCache = TextReadChapterSnapshotCache()
 
     private fun initializeNaturalProgress(book: Book) {
-        val config = book.config
-        if (config.naturalProgressInitialized) return
-        // 老书籍没有自然进度记录时，按当前阅读位置补一次已读区间；只补这一次。
-        config.naturalProgressCompletedRanges = if (book.durChapterIndex > 0) {
-            "0-${book.durChapterIndex - 1}"
-        } else {
-            ""
-        }
-        config.naturalProgressPartialChapters = ""
-        config.naturalProgressInitialized = true
+        // 目录只显示自然翻页记录过的章节，不按当前阅读位置估算。
+        book.config.naturalProgressInitialized = true
     }
 
     /**
@@ -248,14 +240,7 @@ object ReadBook : CoroutineScope by MainScope() {
         val position = durChapterPos.takeUnless { it == Int.MAX_VALUE }
         val chapter = curTextChapter?.takeIf { it.chapter.index == chapterIndex && it.isCompleted }
         if (chapter != null && position != null) {
-            val contentLength = chapter.contentLength
-            val titleLength = chapter.layoutTitleLength.coerceIn(0, contentLength)
-            val bodyLength = contentLength - titleLength
-            val perMille = if (bodyLength <= 0) {
-                1000
-            } else {
-                ((position - titleLength).coerceIn(0, bodyLength).toLong() * 1000 / bodyLength).toInt()
-            }
+            val perMille = (chapter.readProgress(position) * 1000).toInt().coerceIn(0, 1000)
             when {
                 perMille >= 1000 -> {
                     NaturalProgressRanges.add(completedRanges, chapterIndex)
