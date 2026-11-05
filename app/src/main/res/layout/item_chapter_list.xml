@@ -73,6 +73,21 @@
         tools:visibility="visible"
         tools:text="10字" />
 
+    <TextView
+        android:id="@+id/tv_natural_progress"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:singleLine="true"
+        android:textSize="12sp"
+        android:textColor="@color/secondaryText"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/end_actions"
+        app:layout_constraintTop_toBottomOf="@+id/barrier"
+        tools:visibility="visible"
+        tools:text="63%" />
+
     <androidx.constraintlayout.widget.Barrier
         android:id="@+id/barrier"
         android:layout_width="wrap_content"
@@ -124,21 +139,5 @@
             tools:visibility="visible" />
 
     </FrameLayout>
-
-    <!-- 覆盖在行底边，不参与高度计算；负外边距抵消根布局的 12dp 底部内边距。 -->
-    <View
-        android:id="@+id/progress_bar"
-        android:layout_width="0dp"
-        android:layout_height="2dp"
-        android:layout_marginStart="12dp"
-        android:layout_marginEnd="12dp"
-        android:layout_marginBottom="-12dp"
-        android:alpha="0.72"
-        android:background="?attr/colorAccent"
-        android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        tools:visibility="visible" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
