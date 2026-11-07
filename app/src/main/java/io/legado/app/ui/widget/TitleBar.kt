@@ -10,6 +10,7 @@ import android.graphics.drawable.Drawable
 import android.util.AttributeSet
 import android.view.Menu
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.annotation.ColorInt
@@ -303,6 +304,45 @@ class TitleBar @JvmOverloads constructor(
         if (!subtitleTextColorFromAttrs) {
             setSubTitleTextColor(color)
         }
+        // 有图时给顶部操作栏所有文字和图标加阴影：白字黑阴影、黑字白阴影
+        val density = context.resources.displayMetrics.density
+        val shadowColor = when {
+            !hasImage -> 0
+            AppConfig.isNightTheme -> 0xCC000000.toInt()
+            else -> 0xCCFFFFFF.toInt()
+        }
+        val shadowRadius = 2f * density
+        val shadowDy = density
+        // 菜单项和 Toolbar 自己持有的图标先包一层，菜单刷新后仍能保留阴影
+        if (hasImage) {
+            toolbar.navigationIcon?.let { icon ->
+                if (icon !is ShadowDrawable) {
+                    toolbar.navigationIcon = ShadowDrawable(icon, shadowColor, shadowRadius, shadowDy)
+                }
+            }
+            toolbar.overflowIcon?.let { icon ->
+                if (icon !is ShadowDrawable) {
+                    toolbar.overflowIcon = ShadowDrawable(icon, shadowColor, shadowRadius, shadowDy)
+                }
+            }
+            toolbar.menu.forEach { item ->
+                val icon = item.icon
+                if (icon != null && icon !is ShadowDrawable) {
+                    item.icon = ShadowDrawable(icon, shadowColor, shadowRadius, shadowDy)
+                }
+            }
+        } else {
+            (toolbar.navigationIcon as? ShadowDrawable)?.let {
+                toolbar.navigationIcon = it.source
+            }
+            (toolbar.overflowIcon as? ShadowDrawable)?.let {
+                toolbar.overflowIcon = it.source
+            }
+            toolbar.menu.forEach { item ->
+                (item.icon as? ShadowDrawable)?.let { item.icon = it.source }
+            }
+        }
+        applyShadowToBar(hasImage, shadowColor, shadowRadius, shadowDy)
         val colorFilter = PorterDuffColorFilter(color, PorterDuff.Mode.SRC_ATOP)
         toolbar.navigationIcon?.colorFilter = colorFilter
         toolbar.overflowIcon?.colorFilter = colorFilter
@@ -324,6 +364,33 @@ class TitleBar @JvmOverloads constructor(
                 action.setTextColor(color)
             }
         }
+    }
+
+    private fun applyShadowToBar(hasImage: Boolean, color: Int, radius: Float, dy: Float) {
+        val shadowRadius = if (hasImage) radius else 0f
+        val shadowDy = if (hasImage) dy else 0f
+        fun visit(view: View) {
+            when (view) {
+                is TextView -> view.setShadowLayer(shadowRadius, 0f, shadowDy, color)
+                is ImageView -> {
+                    val drawable = view.drawable
+                    if (hasImage) {
+                        if (drawable != null && drawable !is ShadowDrawable) {
+                            view.setImageDrawable(ShadowDrawable(drawable, color, radius, dy))
+                        }
+                    } else if (drawable is ShadowDrawable) {
+                        view.setImageDrawable(drawable.source)
+                    }
+                }
+
+                is ViewGroup -> {
+                    for (i in 0 until view.childCount) {
+                        visit(view.getChildAt(i))
+                    }
+                }
+            }
+        }
+        visit(toolbar)
     }
 
     fun setNavigationOnClickListener(clickListener: ((View) -> Unit)) {
