@@ -236,9 +236,10 @@ class TitleBar @JvmOverloads constructor(
         } else {
             context.transparentNavBar
         }) &&
-            !AppConfig.isEInkMode && (mainTopBar || background?.alpha == 0 ||
+            !AppConfig.isEInkMode && (background?.alpha == 0 ||
                 (background as? MaterialShapeDrawable)?.fillColor
-                    ?.getColorForState(drawableState, Color.TRANSPARENT)?.alpha == 0)
+                    ?.getColorForState(drawableState, Color.TRANSPARENT)?.alpha == 0 ||
+                mainTopBar)
 
     private fun applyMainTopBarStyle() {
         if (AppConfig.isEInkMode) {
