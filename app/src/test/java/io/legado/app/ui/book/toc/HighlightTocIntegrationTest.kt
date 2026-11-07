@@ -188,17 +188,41 @@ class HighlightTocIntegrationTest {
     fun `highlight item keeps card styling and bindings`() {
         val root = parseLayout("item_highlight.xml")
 
-        assertEquals("androidx.cardview.widget.CardView", root.tagName)
-        assertEquals("8dp", root.appAttribute("cardCornerRadius"))
+        assertEquals("LinearLayout", root.tagName)
+        val cards = root.getElementsByTagName("androidx.cardview.widget.CardView")
+        assertEquals(1, cards.length)
+        assertEquals("8dp", (cards.item(0) as Element).appAttribute("cardCornerRadius"))
+        assertEquals(
+            setOf("@+id/tv_book_text", "@+id/tv_tags", "@+id/tv_note", "@+id/tv_date"),
+            textViewIds(root)
+        )
+        assertEquals(
+            setOf("@+id/tv_chapter_name", "@+id/tv_chapter_count"),
+            textViewIds(parseLayout("item_note_chapter_header.xml"))
+        )
+    }
+
+    @Test
+    fun `bookmark item shares the chapter header and keeps a date`() {
+        val root = parseLayout("item_bookmark.xml")
+
+        assertEquals("LinearLayout", root.tagName)
+        val cards = root.getElementsByTagName("androidx.cardview.widget.CardView")
+        assertEquals(1, cards.length)
+        assertEquals("8dp", (cards.item(0) as Element).appAttribute("cardCornerRadius"))
+        assertEquals(
+            setOf("@+id/tv_book_text", "@+id/tv_content", "@+id/tv_date"),
+            textViewIds(root)
+        )
+        assertEquals(1, root.getElementsByTagName("include").length)
+    }
+
+    private fun textViewIds(root: Element): Set<String> {
         val fields = root.getElementsByTagName("TextView")
-        val ids = (0 until fields.length)
+        return (0 until fields.length)
             .map { fields.item(it) as Element }
             .map { it.androidAttribute("id") }
             .toSet()
-        assertEquals(
-            setOf("@+id/tv_chapter_name", "@+id/tv_book_text", "@+id/tv_tags", "@+id/tv_note"),
-            ids
-        )
     }
 
     private fun parseLayout(name: String): Element =
