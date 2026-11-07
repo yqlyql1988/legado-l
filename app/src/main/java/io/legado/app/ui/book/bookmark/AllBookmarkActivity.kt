@@ -45,6 +45,9 @@ import io.legado.app.ui.book.review.bindBookReviewRating
 import io.legado.app.ui.book.toc.TocActivityResult
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.highlight.highlightTagChip
+import io.legado.app.ui.highlight.HighlightTagManageActivity
+import io.legado.app.ui.highlight.NoteTagFilterSheet
+import io.legado.app.ui.highlight.noteTagFilterLabel
 import io.legado.app.ui.highlight.NoteTagPickerDialog
 import io.legado.app.ui.widget.popupActionMenu
 import io.legado.app.utils.applyNavigationBarPadding
@@ -298,6 +301,8 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
             binding.noteTabs.getTabAt(1)?.text = getString(R.string.book_notes_tab_bookmark, book?.bookmarkCount ?: 0)
             binding.noteTabs.getTabAt(2)?.text = getString(R.string.book_notes_tab_highlight, book?.highlightCount ?: 0)
             binding.noteTabs.getTabAt(3)?.text = getString(R.string.book_notes_tab_review, book?.reviews?.size ?: 0)
+            val noteTags = book?.notes.orEmpty().flatMap { it.tags }.distinctBy { it.id }
+            if (!tagId.isNullOrEmpty() && noteTags.none { it.id == tagId }) tagId = null
             visibleNotes = filterBookNotes(book?.notes.orEmpty(), type, tagId, query, recent, chapterIndexes)
             reviewsAdapter.reviews = book?.matchingReviews(query).orEmpty()
             showReviewSummary = type == NoteType.ALL && !managing && tagId == null &&
@@ -308,10 +313,7 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
             bindBookReviewRating(binding.reviewRatingStars, binding.tvReviewRating, book?.rating)
             binding.tvWriteReview.setText(if (book?.reviews.isNullOrEmpty()) R.string.book_review_write
                 else R.string.book_review_follow_up)
-            binding.tvTagFilter.text = tagId?.let { id ->
-                if (id.isEmpty()) getString(R.string.highlight_filter_untagged)
-                else book?.notes?.flatMap { it.tags }?.firstOrNull { it.id == id }?.name
-            } ?: getString(R.string.book_notes_tags)
+            binding.tvTagFilter.text = noteTagFilterLabel(this, tagId, noteTags)
             binding.tvSort.setText(if (recent) R.string.book_notes_recent else R.string.book_notes_chapter_order)
             val detailAdapter = if (reviewing) reviewsAdapter else allAdapter
             if (binding.recyclerView.adapter !== detailAdapter) {
@@ -353,17 +355,22 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
     private fun showTagFilter() {
         val tags = archive?.notes.orEmpty().filter { type == NoteType.ALL || it.type == type }
             .flatMap { it.tags }.distinctBy { it.id }
-        val ids = listOf(null, "") + tags.map { it.id }
-        val names = listOf(getString(R.string.highlight_filter_all),
-            getString(R.string.highlight_filter_untagged)) + tags.map { it.name }
-        AlertDialog.Builder(this).setTitle(R.string.book_notes_tag_filter)
-            .setSingleChoiceItems(names.toTypedArray(), ids.indexOf(tagId)) { dialog, index ->
-                tagId = ids[index]
+        NoteTagFilterSheet(
+            context = this,
+            tags = tags,
+            selectedId = tagId,
+            onSelect = { id ->
+                tagId = id
                 selected.clear()
                 render()
                 binding.recyclerView.scrollToPosition(0)
-                dialog.dismiss()
-            }.setNegativeButton(R.string.cancel, null).show()
+            },
+            onManage = {
+                startActivity(Intent(this, HighlightTagManageActivity::class.java)
+                    .putExtra("bookUrl", archive?.bookUrl)
+                    .putExtra("bookmarkMode", type == NoteType.BOOKMARK))
+            },
+        ).show()
     }
 
     private fun openReading(note: BookNote?) = runTask {

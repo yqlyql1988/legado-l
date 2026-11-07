@@ -193,8 +193,12 @@ class HighlightTocIntegrationTest {
         assertEquals(1, cards.length)
         assertEquals("8dp", (cards.item(0) as Element).appAttribute("cardCornerRadius"))
         assertEquals(
-            setOf("@+id/tv_book_text", "@+id/tv_tags", "@+id/tv_note", "@+id/tv_date"),
+            setOf("@+id/tv_book_text", "@+id/tv_note", "@+id/tv_date"),
             textViewIds(root)
+        )
+        assertEquals(
+            1,
+            root.getElementsByTagName("com.google.android.flexbox.FlexboxLayout").length
         )
         assertEquals(
             setOf("@+id/tv_chapter_name", "@+id/tv_chapter_count"),
