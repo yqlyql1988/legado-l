@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.view.View
 import androidx.fragment.app.activityViewModels
 import androidx.appcompat.app.AlertDialog
+import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
 import io.legado.app.base.VMBaseFragment
@@ -19,6 +20,8 @@ import io.legado.app.data.entities.HighlightTag
 import io.legado.app.help.HighlightTags
 import io.legado.app.help.ReadingNoteChapter
 import io.legado.app.ui.highlight.HighlightTagManageActivity
+import io.legado.app.ui.highlight.NoteTagFilterSheet
+import io.legado.app.ui.highlight.noteTagFilterLabel
 import io.legado.app.databinding.FragmentBookmarkBinding
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.book.bookmark.BookmarkDialog
@@ -47,18 +50,14 @@ class BookmarkFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmark
     private var bookmarkJob: Job? = null
     private var durChapterIndex = 0
     private var selectedTag: String? = null
+    private var scrollToTop = false
     private var attached = emptyMap<Long, List<HighlightTag>>()
     private var noteChapterIndex: ReadingNoteChapter.ChapterIndex? = null
     private var noteChapterBookUrl: String? = null
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         selectedTag = savedInstanceState?.getString("tagFilter")
-        binding.tagFilter.setOnClickListener { showTagFilter() }
-        binding.tagManage.setOnClickListener {
-            startActivity(Intent(requireContext(), HighlightTagManageActivity::class.java)
-                .putExtra("bookUrl", viewModel.bookData.value?.bookUrl)
-                .putExtra("bookmarkMode", true))
-        }
+        binding.tagFilterBar.tagFilter.setOnClickListener { showTagFilter() }
         viewModel.bookMarkCallBack = this
         initRecyclerView()
         viewModel.bookData.observe(viewLifecycleOwner) {
@@ -75,6 +74,7 @@ class BookmarkFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmark
         layoutManager = null
         noteChapterIndex = null
         noteChapterBookUrl = null
+        scrollToTop = false
         viewModel.bookMarkCallBack = clearCallbackIfOwned(
             viewModel.bookMarkCallBack,
             this
@@ -129,16 +129,23 @@ class BookmarkFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmark
             }.flowOn(IO).collect { (all, labels) ->
                 attached = labels
                 adapter?.tags = labels
+                val availableTags = labels.values.flatten().distinctBy { it.id }
+                if (!selectedTag.isNullOrEmpty() && availableTags.none { it.id == selectedTag }) {
+                    selectedTag = null
+                }
                 val bookmarks = all.filter { bookmark ->
                     HighlightTags.matchesFilter(selectedTag, labels[bookmark.time].orEmpty().map { it.id }) &&
                         (searchKey.isNullOrBlank() || listOf(bookmark.chapterName, bookmark.content,
                             bookmark.bookText).any { it.contains(searchKey, true) } ||
                             labels[bookmark.time].orEmpty().any { it.name.contains(searchKey, true) })
                 }
-                binding.tagFilter.text = selectedTag?.let { id ->
-                    if (id.isEmpty()) getString(R.string.highlight_filter_untagged)
-                    else labels.values.flatten().firstOrNull { it.id == id }?.name
-                } ?: getString(R.string.book_notes_tags)
+                binding.tagFilterBar.tagFilter.text =
+                    noteTagFilterLabel(requireContext(), selectedTag, availableTags)
+                binding.tvEmpty.setText(
+                    if (searchKey.isNullOrBlank() && selectedTag == null) R.string.bookmark_empty
+                    else R.string.bookmark_filter_empty
+                )
+                binding.tvEmpty.isVisible = bookmarks.isEmpty()
                 val orderByTime = bookmarks.associate { bookmark ->
                     bookmark.time to resolvedChapterIndex(
                         chapterIndex,
@@ -159,30 +166,42 @@ class BookmarkFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmark
                     { it.time },
                 )
                 adapter?.setItems(ordered)
-                val scrollPosition = ordered
-                    .indexOfLast { (orderByTime[it.time] ?: it.chapterIndex) < durChapterIndex }
-                    .coerceAtLeast(0)
-                layoutManager?.scrollToPositionWithOffset(scrollPosition, 0)
+                if (scrollToTop) {
+                    layoutManager?.scrollToPositionWithOffset(0, 0)
+                    scrollToTop = false
+                } else {
+                    val scrollPosition = ordered
+                        .indexOfLast { (orderByTime[it.time] ?: it.chapterIndex) < durChapterIndex }
+                        .coerceAtLeast(0)
+                    layoutManager?.scrollToPositionWithOffset(scrollPosition, 0)
+                }
             }
         }
     }
 
     private fun showTagFilter() {
-        val tags = attached.values.flatten().distinctBy { it.id }
-        val ids = listOf(null, "") + tags.map { it.id }
-        val names = listOf(getString(R.string.highlight_filter_all),
-            getString(R.string.highlight_filter_untagged)) + tags.map { it.name }
-        AlertDialog.Builder(requireContext()).setTitle(R.string.book_notes_tag_filter)
-            .setSingleChoiceItems(names.toTypedArray(), ids.indexOf(selectedTag)) { dialog, index ->
-                selectedTag = ids[index]
-                upBookmark(viewModel.searchKey)
-                dialog.dismiss()
-            }.setNegativeButton(R.string.cancel, null).show()
+        NoteTagFilterSheet(
+            context = requireContext(),
+            tags = attached.values.flatten().distinctBy { it.id },
+            selectedId = selectedTag,
+            onSelect = ::selectTag,
+            onManage = {
+                startActivity(Intent(requireContext(), HighlightTagManageActivity::class.java)
+                    .putExtra("bookUrl", viewModel.bookData.value?.bookUrl)
+                    .putExtra("bookmarkMode", true))
+            },
+        ).show()
+    }
+
+    private fun selectTag(id: String?) {
+        if (view == null) return
+        selectedTag = id
+        scrollToTop = true
+        upBookmark(viewModel.searchKey)
     }
 
     override fun onTagClick(id: String) {
-        selectedTag = id
-        upBookmark(viewModel.searchKey)
+        selectTag(id)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

@@ -21,7 +21,9 @@ import io.legado.app.databinding.FragmentHighlightBinding
 import io.legado.app.data.entities.HighlightTag
 import io.legado.app.data.entities.HighlightTagLink
 import io.legado.app.help.HighlightTags
-import io.legado.app.ui.highlight.highlightTagChip
+import io.legado.app.ui.highlight.HighlightTagManageActivity
+import io.legado.app.ui.highlight.NoteTagFilterSheet
+import io.legado.app.ui.highlight.noteTagFilterLabel
 import io.legado.app.help.book.isAudio
 import io.legado.app.help.book.isImage
 import io.legado.app.help.book.isLocal
@@ -81,7 +83,7 @@ class HighlightFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_highlig
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         selectedTag = savedInstanceState?.getString("tagFilter")
-        binding.filterAll.setOnClickListener { selectFilter(null) }
+        binding.tagFilterBar.tagFilter.setOnClickListener { showTagFilter() }
         viewModel.highlightCallBack = this
         initRecyclerView()
         viewModel.bookData.observe(viewLifecycleOwner) {
@@ -141,6 +143,8 @@ class HighlightFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_highlig
         if (!supportsHighlightPosition(book)) {
             chapterIndexes = emptyMap()
             adapter?.setItems(emptyList())
+            updateTagFilter()
+            binding.tvEmpty.isVisible = true
             return
         }
         highlightJob = viewLifecycleOwner.lifecycleScope.launch {
@@ -185,7 +189,7 @@ class HighlightFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_highlig
                     )
                 )
                 currentHighlights = orderedHighlights
-                renderFilters()
+                updateTagFilter()
                 val displayed = renderHighlights()
                 val scrollPosition = displayed
                     .indexOfLast {
@@ -204,8 +208,9 @@ class HighlightFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_highlig
     )
 
     private fun selectFilter(id: String?) {
+        if (view == null) return
         selectedTag = id
-        renderFilters()
+        updateTagFilter()
         renderHighlights()
         layoutManager?.scrollToPositionWithOffset(0, 0)
     }
@@ -224,23 +229,27 @@ class HighlightFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_highlig
         return result
     }
 
-    private fun renderFilters() {
-        val oldScroll = binding.filterScroll.scrollX
-        binding.filterTags.removeAllViews()
-        binding.filterAll.isSelected = selectedTag == null
-        binding.filterAll.background = requireContext().highlightTagChip(
-            HighlightTag(name = getString(R.string.highlight_filter_all)), selectedTag == null, compact = true
-        ) {}.background
-        currentTags.filter { it.id in usedTags }.forEach { tag ->
-            binding.filterTags.addView(requireContext().highlightTagChip(tag, selectedTag == tag.id, compact = true) {
-                selectFilter(tag.id)
-            })
-        }
-        binding.filterTags.addView(requireContext().highlightTagChip(
-            HighlightTag(id = "", name = getString(R.string.highlight_filter_untagged)),
-            selectedTag == "", compact = true
-        ) { selectFilter("") })
-        binding.filterScroll.post { binding.filterScroll.scrollTo(oldScroll, 0) }
+    private fun usedTagsList(): List<HighlightTag> = currentTags.filter { it.id in usedTags }
+
+    private fun updateTagFilter() {
+        binding.tagFilterBar.tagFilter.text = noteTagFilterLabel(requireContext(), selectedTag, usedTagsList())
+    }
+
+    private fun showTagFilter() {
+        NoteTagFilterSheet(
+            context = requireContext(),
+            tags = usedTagsList(),
+            selectedId = selectedTag,
+            onSelect = ::selectFilter,
+            onManage = {
+                startActivity(Intent(requireContext(), HighlightTagManageActivity::class.java)
+                    .putExtra("bookUrl", viewModel.bookData.value?.bookUrl))
+            },
+        ).show()
+    }
+
+    override fun onTagClick(id: String) {
+        selectFilter(id)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

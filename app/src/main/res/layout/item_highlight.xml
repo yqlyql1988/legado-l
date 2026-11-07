@@ -61,14 +61,13 @@
                     android:textColor="@color/secondaryText"
                     android:textSize="12sp" />
 
-                <TextView
-                    android:id="@+id/tv_tags"
+                <com.google.android.flexbox.FlexboxLayout
+                    android:id="@+id/tag_labels"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:textColor="@color/secondaryText"
-                    android:textSize="12sp"
-                    android:visibility="gone" />
+                    android:layout_marginTop="8dp"
+                    android:visibility="gone"
+                    app:flexWrap="wrap" />
 
                 <TextView
                     android:id="@+id/tv_date"

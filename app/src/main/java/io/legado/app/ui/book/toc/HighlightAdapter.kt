@@ -11,6 +11,7 @@ import io.legado.app.data.entities.HighlightTag
 import io.legado.app.data.entities.HighlightTagLink
 import io.legado.app.databinding.ItemHighlightBinding
 import io.legado.app.help.HighlightTags
+import io.legado.app.ui.highlight.highlightTagChip
 import io.legado.app.utils.gone
 import splitties.views.onLongClick
 import java.text.SimpleDateFormat
@@ -50,10 +51,15 @@ class HighlightAdapter(context: Context, private val callback: Callback) :
         binding.tvNote.gone(item.note.isEmpty())
         binding.tvNote.text = item.note
         binding.tvDate.text = dateFormat.format(Date(item.time))
-        val ids = tagLinks[item.time].orEmpty().map { it.tagId }
-        val names = tags.filter { it.id in ids }.joinToString("、") { it.name }
-        binding.tvTags.gone(names.isEmpty())
-        binding.tvTags.text = context.getString(R.string.highlight_tag_details, names)
+        val ids = tagLinks[item.time].orEmpty().mapTo(hashSetOf()) { it.tagId }
+        val attached = tags.filter { it.id in ids }
+        binding.tagLabels.removeAllViews()
+        binding.tagLabels.gone(attached.isEmpty())
+        attached.forEach { tag ->
+            binding.tagLabels.addView(context.highlightTagChip(tag, true, compact = true) {
+                callback.onTagClick(tag.id)
+            })
+        }
         val style = HighlightTags.effectiveStyle(item, tags, ids)
         val color = style.fill.takeIf { it != 0 }
             ?: style.textColor.takeIf { it != 0 }
@@ -77,5 +83,6 @@ class HighlightAdapter(context: Context, private val callback: Callback) :
     interface Callback {
         fun onClick(highlight: BookHighlight)
         fun onLongClick(highlight: BookHighlight)
+        fun onTagClick(id: String)
     }
 }
