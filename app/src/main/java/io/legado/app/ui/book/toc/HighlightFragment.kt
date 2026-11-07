@@ -189,6 +189,14 @@ class HighlightFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_highlig
         val result = currentHighlights.filter { highlight ->
             HighlightTags.matchesFilter(selectedTag, currentLinks[highlight.time].orEmpty().map { it.tagId })
         }
+        adapter?.sections = buildChapterSections(
+            result,
+            { highlight ->
+                (resolveHighlightChapterIndex(highlight, chapterIndexes) ?: -1) to
+                    highlight.chapterUrl.ifBlank { highlight.chapterName }
+            },
+            { it.time },
+        )
         adapter?.setItems(result)
         binding.tvEmpty.isVisible = result.isEmpty()
         return result

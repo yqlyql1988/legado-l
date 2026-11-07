@@ -119,8 +119,16 @@ class BookmarkFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmark
                     if (id.isEmpty()) getString(R.string.highlight_filter_untagged)
                     else labels.values.flatten().firstOrNull { it.id == id }?.name
                 } ?: getString(R.string.book_notes_tags)
-                adapter?.setItems(bookmarks)
-                val scrollPosition = bookmarks
+                val ordered = bookmarks.sortedWith(
+                    compareBy<Bookmark>({ it.chapterIndex }, { it.chapterPos }, { it.time })
+                )
+                adapter?.sections = buildChapterSections(
+                    ordered,
+                    { it.chapterIndex to it.chapterName },
+                    { it.time },
+                )
+                adapter?.setItems(ordered)
+                val scrollPosition = ordered
                     .indexOfLast { it.chapterIndex < durChapterIndex }
                     .coerceAtLeast(0)
                 layoutManager?.scrollToPositionWithOffset(scrollPosition, 0)

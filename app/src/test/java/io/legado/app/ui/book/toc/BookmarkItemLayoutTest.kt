@@ -10,41 +10,76 @@ class BookmarkItemLayoutTest {
 
     @Test
     fun `bookmark item keeps bindings and card presentation`() {
-        val root = DocumentBuilderFactory.newInstance().apply {
-            isNamespaceAware = true
-        }.newDocumentBuilder()
-            .parse(projectFile("src/main/res/layout/item_bookmark.xml"))
-            .documentElement
+        val root = parse("item_bookmark.xml")
 
-        assertEquals("androidx.cardview.widget.CardView", root.tagName)
-        assertEquals("10dp", root.androidAttribute("layout_marginStart"))
-        assertEquals("3dp", root.androidAttribute("layout_marginTop"))
-        assertEquals("10dp", root.androidAttribute("layout_marginEnd"))
-        assertEquals("3dp", root.androidAttribute("layout_marginBottom"))
-        assertEquals("?android:attr/selectableItemBackground", root.androidAttribute("foreground"))
-        assertEquals("@color/background_card", root.appAttribute("cardBackgroundColor"))
-        assertEquals("8dp", root.appAttribute("cardCornerRadius"))
-        assertEquals("0dp", root.appAttribute("cardElevation"))
+        assertEquals("LinearLayout", root.tagName)
+        assertEquals("10dp", root.androidAttribute("paddingStart"))
+        assertEquals("10dp", root.androidAttribute("paddingEnd"))
 
-        val content = root.firstChildElement()
+        val children = root.childElements()
+        assertEquals(2, children.size)
+        val header = children[0]
+        assertEquals("include", header.tagName)
+        assertEquals("@layout/item_note_chapter_header", header.getAttribute("layout"))
+        assertEquals("@+id/chapter_header", header.androidAttribute("id"))
+
+        val card = children[1]
+        assertEquals("androidx.cardview.widget.CardView", card.tagName)
+        assertEquals("@+id/card", card.androidAttribute("id"))
+        assertEquals("3dp", card.androidAttribute("layout_marginTop"))
+        assertEquals("3dp", card.androidAttribute("layout_marginBottom"))
+        assertEquals("?android:attr/selectableItemBackground", card.androidAttribute("foreground"))
+        assertEquals("@color/background_card", card.appAttribute("cardBackgroundColor"))
+        assertEquals("8dp", card.appAttribute("cardCornerRadius"))
+        assertEquals("0dp", card.appAttribute("cardElevation"))
+
+        val content = card.firstChildElement()
         assertEquals("LinearLayout", content.tagName)
         assertEquals("12dp", content.androidAttribute("padding"))
 
         val fields = content.childElements().associateBy { it.androidAttribute("id") }
         assertEquals(
-            setOf("@+id/tv_chapter_name", "@+id/tv_book_text", "@+id/tv_content", "@+id/tag_labels"),
+            setOf("@+id/tv_book_text", "@+id/tv_content", "@+id/tag_labels", "@+id/tv_date"),
             fields.keys
         )
-        assertEquals("14sp", fields.getValue("@+id/tv_chapter_name").androidAttribute("textSize"))
-        assertEquals("@color/primaryText", fields.getValue("@+id/tv_chapter_name").androidAttribute("textColor"))
-        listOf("@+id/tv_book_text", "@+id/tv_content").forEach { id ->
-            assertEquals("12sp", fields.getValue(id).androidAttribute("textSize"))
-            assertEquals("@color/secondaryText", fields.getValue(id).androidAttribute("textColor"))
-        }
-        fields.filterKeys { it != "@+id/tag_labels" }.values.forEach { field ->
-            assertEquals("true", field.androidAttribute("singleLine"))
-        }
+        val quote = fields.getValue("@+id/tv_book_text")
+        assertEquals("14sp", quote.androidAttribute("textSize"))
+        assertEquals("@color/primaryText", quote.androidAttribute("textColor"))
+        assertEquals("2", quote.androidAttribute("maxLines"))
+        val note = fields.getValue("@+id/tv_content")
+        assertEquals("12sp", note.androidAttribute("textSize"))
+        assertEquals("@color/secondaryText", note.androidAttribute("textColor"))
+        assertEquals("2", note.androidAttribute("maxLines"))
+        val date = fields.getValue("@+id/tv_date")
+        assertEquals("11sp", date.androidAttribute("textSize"))
+        assertEquals("@color/secondaryText", date.androidAttribute("textColor"))
     }
+
+    @Test
+    fun `chapter header keeps chapter name and count`() {
+        val root = parse("item_note_chapter_header.xml")
+
+        assertEquals("LinearLayout", root.tagName)
+        val fields = root.childElements().associateBy { it.androidAttribute("id") }
+        assertEquals(
+            setOf("@+id/tv_chapter_name", "@+id/tv_chapter_count"),
+            fields.keys
+        )
+        val name = fields.getValue("@+id/tv_chapter_name")
+        assertEquals("16sp", name.androidAttribute("textSize"))
+        assertEquals("@color/primaryText", name.androidAttribute("textColor"))
+        assertEquals("bold", name.androidAttribute("textStyle"))
+        val count = fields.getValue("@+id/tv_chapter_count")
+        assertEquals("11sp", count.androidAttribute("textSize"))
+        assertEquals("@color/secondaryText", count.androidAttribute("textColor"))
+    }
+
+    private fun parse(name: String): Element =
+        DocumentBuilderFactory.newInstance().apply {
+            isNamespaceAware = true
+        }.newDocumentBuilder()
+            .parse(projectFile("src/main/res/layout/$name"))
+            .documentElement
 
     private fun projectFile(pathInApp: String): File =
         listOf(File(pathInApp), File("app/$pathInApp"))
