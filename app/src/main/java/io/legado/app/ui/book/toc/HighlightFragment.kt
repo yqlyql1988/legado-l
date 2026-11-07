@@ -87,17 +87,19 @@ class HighlightFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_highlig
             context = requireContext(),
             anchor = binding.tagFilterBar.tagFilter,
             onSelect = ::selectFilter,
-            onManage = {
-                startActivity(Intent(requireContext(), HighlightTagManageActivity::class.java)
-                    .putExtra("bookUrl", viewModel.bookData.value?.bookUrl))
-            },
         )
+        binding.tagFilterBar.tvManage.setOnClickListener { openTagManage() }
         viewModel.highlightCallBack = this
         initRecyclerView()
         viewModel.bookData.observe(viewLifecycleOwner) {
             durChapterIndex = it.durChapterIndex
             upHighlight(viewModel.searchKey)
         }
+    }
+
+    private fun openTagManage() {
+        startActivity(Intent(requireContext(), HighlightTagManageActivity::class.java)
+            .putExtra("bookUrl", viewModel.bookData.value?.bookUrl))
     }
 
     override fun onDestroyView() {

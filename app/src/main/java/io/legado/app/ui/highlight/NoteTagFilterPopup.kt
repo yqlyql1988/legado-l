@@ -22,7 +22,6 @@ class NoteTagFilterPopup(
     private val context: Context,
     private val anchor: TextView,
     private val onSelect: (String?) -> Unit,
-    private val onManage: () -> Unit,
 ) : PopupWindow(
     ViewGroup.LayoutParams.WRAP_CONTENT,
     ViewGroup.LayoutParams.WRAP_CONTENT
@@ -38,10 +37,6 @@ class NoteTagFilterPopup(
         isTouchable = true
         isOutsideTouchable = true
         isFocusable = true
-        binding.tvManage.setOnClickListener {
-            dismiss()
-            onManage()
-        }
         anchor.setOnClickListener { showFilter() }
     }
 
@@ -55,26 +50,18 @@ class NoteTagFilterPopup(
         render()
         val frame = Rect()
         anchor.getWindowVisibleDisplayFrame(frame)
+        contentView.measure(
+            View.MeasureSpec.makeMeasureSpec(frame.width(), View.MeasureSpec.AT_MOST),
+            View.MeasureSpec.makeMeasureSpec(frame.height(), View.MeasureSpec.AT_MOST),
+        )
         val margin = 8.dpToPx()
         val popupWidth = if (anchor.width >= frame.width() * 0.8f) {
             frame.width() - margin * 2
         } else {
             minOf(frame.width() - margin * 2, 320.dpToPx())
         }
-        // 标签区最高占屏高 45%，「管理」固定在面板底部，标签再多也不会被挤出视野
-        binding.flTags.measure(
-            View.MeasureSpec.makeMeasureSpec(popupWidth - 24.dpToPx(), View.MeasureSpec.AT_MOST),
-            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
-        )
-        binding.svTags.layoutParams = binding.svTags.layoutParams.apply {
-            height = minOf(binding.flTags.measuredHeight, (frame.height() * 0.45f).toInt())
-        }
-        contentView.measure(
-            View.MeasureSpec.makeMeasureSpec(popupWidth, View.MeasureSpec.AT_MOST),
-            View.MeasureSpec.makeMeasureSpec(frame.height(), View.MeasureSpec.AT_MOST),
-        )
         width = popupWidth
-        height = contentView.measuredHeight
+        height = minOf(contentView.measuredHeight, (frame.height() * 0.6f).toInt())
         val location = IntArray(2)
         anchor.getLocationOnScreen(location)
         val yOffset = resolveDropDownYOffset(

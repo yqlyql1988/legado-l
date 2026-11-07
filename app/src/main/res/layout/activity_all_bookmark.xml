@@ -71,7 +71,13 @@
             android:layout_height="wrap_content" android:minHeight="44dp"
             android:paddingHorizontal="8dp" android:gravity="center"
             android:text="@string/book_notes_tags" android:textSize="12sp"
-            android:maxWidth="160dp" android:maxLines="1" android:ellipsize="end"
+            android:maxWidth="140dp" android:maxLines="1" android:ellipsize="end"
+            android:textColor="@color/secondaryText" android:background="?attr/selectableItemBackground"
+            android:visibility="gone" />
+        <TextView android:id="@+id/tv_tag_manage" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:minHeight="44dp"
+            android:paddingHorizontal="8dp" android:gravity="center"
+            android:text="@string/book_notes_manage" android:textSize="12sp"
             android:textColor="@color/secondaryText" android:background="?attr/selectableItemBackground"
             android:visibility="gone" />
         <TextView android:id="@+id/tv_sort" android:layout_width="wrap_content"

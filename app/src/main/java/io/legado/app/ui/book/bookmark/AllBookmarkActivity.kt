@@ -186,12 +186,12 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
                 render()
                 binding.recyclerView.scrollToPosition(0)
             },
-            onManage = {
-                startActivity(Intent(this, HighlightTagManageActivity::class.java)
-                    .putExtra("bookUrl", archive?.bookUrl)
-                    .putExtra("bookmarkMode", type == NoteType.BOOKMARK))
-            },
         )
+        binding.tvTagManage.setOnClickListener {
+            startActivity(Intent(this, HighlightTagManageActivity::class.java)
+                .putExtra("bookUrl", archive?.bookUrl)
+                .putExtra("bookmarkMode", type == NoteType.BOOKMARK))
+        }
         binding.btnSelectAll.setOnClickListener {
             if (visibleNotes.all { it.id in selected }) selected.clear()
             else selected.addAll(visibleNotes.map { it.id })
@@ -294,6 +294,7 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
         binding.noteTabs.isVisible = details
         val reviewing = details && type == NoteType.REVIEW
         binding.tvTagFilter.isVisible = details && type != NoteType.REVIEW
+        binding.tvTagManage.isVisible = details && type != NoteType.REVIEW
         if (!binding.tvTagFilter.isVisible) tagFilterPopup?.dismiss()
         binding.tvSort.isVisible = !reviewing
         binding.reviewActions.isVisible = reviewing
