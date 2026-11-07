@@ -75,6 +75,9 @@ class HighlightFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_highlig
     private var currentTags = emptyList<HighlightTag>()
     private var currentLinks = emptyMap<Long, List<HighlightTagLink>>()
     private var usedTags = emptySet<String>()
+    private var noteChapterIndex: ReadingNoteChapter.ChapterIndex? = null
+    private var noteChapterBookUrl: String? = null
+    private var chapterOrderByTime = emptyMap<Long, Int>()
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         selectedTag = savedInstanceState?.getString("tagFilter")
@@ -94,6 +97,9 @@ class HighlightFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_highlig
         adapter = null
         layoutManager = null
         chapterIndexes = emptyMap()
+        noteChapterIndex = null
+        noteChapterBookUrl = null
+        chapterOrderByTime = emptyMap()
         currentHighlights = emptyList()
         currentTags = emptyList()
         currentLinks = emptyMap()
@@ -114,6 +120,19 @@ class HighlightFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_highlig
         binding.recyclerView.addItemDecoration(VerticalDivider(requireContext()))
         binding.recyclerView.adapter = adapter
         binding.recyclerView.applyNavigationBarPadding()
+    }
+
+    private suspend fun chapterIndexFor(book: Book): ReadingNoteChapter.ChapterIndex? {
+        noteChapterIndex?.takeIf { noteChapterBookUrl == book.bookUrl }?.let { return it }
+        val chapters = withContext(IO) {
+            runCatching { ReadingNoteChapter.available(book) }.getOrDefault(emptyList())
+        }
+        if (viewModel.bookData.value?.bookUrl != book.bookUrl) return null
+        chapterIndexes = chapters.associate { it.url to it.index }
+        return ReadingNoteChapter.index(chapters).also {
+            noteChapterIndex = it
+            noteChapterBookUrl = book.bookUrl
+        }
     }
 
     override fun upHighlight(searchKey: String?) {
@@ -147,13 +166,20 @@ class HighlightFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_highlig
                 val allTimes = all.mapTo(hashSetOf()) { it.time }
                 usedTags = currentLinks.filterKeys { it in allTimes }.values.flatten().mapTo(hashSetOf()) { it.tagId }
                 if (!selectedTag.isNullOrEmpty() && selectedTag !in usedTags) selectedTag = null
-                chapterIndexes = withContext(IO) {
-                    appDb.bookChapterDao.getChapterList(book.bookUrl)
-                        .associate { it.url to it.index }
+                val chapterIndex = chapterIndexFor(book)
+                chapterOrderByTime = all.associate { highlight ->
+                    highlight.time to (
+                        resolveHighlightChapterIndex(highlight, chapterIndexes)
+                            ?: resolvedChapterIndex(
+                                chapterIndex,
+                                ReadingNotes.legacy(highlight),
+                                highlight.chapterIndex,
+                            )
+                    )
                 }
                 val orderedHighlights = highlights.sortedWith(
                     compareBy(
-                        { resolveHighlightChapterIndex(it, chapterIndexes) ?: Int.MAX_VALUE },
+                        { chapterOrderByTime[it.time] ?: it.chapterIndex },
                         ::highlightBodyPosition,
                         BookHighlight::time
                     )
@@ -163,8 +189,7 @@ class HighlightFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_highlig
                 val displayed = renderHighlights()
                 val scrollPosition = displayed
                     .indexOfLast {
-                        resolveHighlightChapterIndex(it, chapterIndexes)
-                            ?.let { chapterIndex -> chapterIndex < durChapterIndex } == true
+                        (chapterOrderByTime[it.time] ?: it.chapterIndex) < durChapterIndex
                     }
                     .coerceAtLeast(0)
                 if (initial) layoutManager?.scrollToPositionWithOffset(scrollPosition, 0)
@@ -191,10 +216,7 @@ class HighlightFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_highlig
         }
         adapter?.sections = buildChapterSections(
             result,
-            { highlight ->
-                (resolveHighlightChapterIndex(highlight, chapterIndexes) ?: -1) to
-                    highlight.chapterUrl.ifBlank { highlight.chapterName }
-            },
+            { chapterOrderByTime[it.time] ?: it.chapterIndex },
             { it.time },
         )
         adapter?.setItems(result)
