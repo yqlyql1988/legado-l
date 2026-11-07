@@ -31,6 +31,7 @@ import io.legado.app.databinding.ActivityMainBinding
 import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.BottomBarSkinManager
+import io.legado.app.help.MainTopBarImageManager
 import io.legado.app.help.SourceSharePassphrase
 import io.legado.app.help.SourceSharePassphraseImportPolicy
 import io.legado.app.help.book.BookHelp
@@ -69,6 +70,7 @@ import io.legado.app.utils.navigationBarHeight
 import io.legado.app.utils.observeEvent
 import io.legado.app.utils.setEdgeEffectColor
 import io.legado.app.utils.setOnApplyWindowInsetsListenerCompat
+import io.legado.app.utils.setLightStatusBar
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
@@ -118,6 +120,15 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     private var lastPassphraseText: String? = null
     private var pendingPassphraseRead = false
     private var passphraseReadGeneration = 0
+
+    override fun setupSystemBar() {
+        super.setupSystemBar()
+        if (AppConfig.isTransparentStatusBar && AppConfig.mainTopBarImmersive &&
+            MainTopBarImageManager.hasImage()
+        ) {
+            setLightStatusBar(!MainTopBarImageManager.isLight(this))
+        }
+    }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         upBottomMenu()

@@ -13,6 +13,7 @@
         app:attachToActivity="false"
         app:contentLayout="@layout/view_search"
         app:layout_constraintTop_toTopOf="parent"
+        app:mainTopBar="true"
         app:title="@string/discovery" />
 
     <io.legado.app.ui.widget.recycler.RecyclerViewAtPager2

@@ -26,9 +26,11 @@ import com.google.android.material.tabs.TabLayout
 import com.google.android.material.shape.MaterialShapeDrawable
 import io.legado.app.R
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.MainTopBarImageManager
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.elevation
 import io.legado.app.lib.theme.getToolbarTextColor
+import io.legado.app.lib.theme.getPrimaryTextColor
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.lib.theme.transparentNavBar
 import io.legado.app.utils.ColorUtils
@@ -71,6 +73,7 @@ class TitleBar @JvmOverloads constructor(
     private val navigationIconTintMode: Int
     private val fitStatusBar: Boolean
     private val fitNavigationBar: Boolean
+    private val mainTopBar: Boolean
     private val attachToActivity: Boolean
     private val opaque: Boolean
     private val automaticForeground: Boolean
@@ -88,6 +91,7 @@ class TitleBar @JvmOverloads constructor(
         displayHomeAsUp = a.getBoolean(R.styleable.TitleBar_displayHomeAsUp, true)
         fitStatusBar = a.getBoolean(R.styleable.TitleBar_fitStatusBar, true)
         fitNavigationBar = a.getBoolean(R.styleable.TitleBar_fitNavigationBar, false)
+        mainTopBar = a.getBoolean(R.styleable.TitleBar_mainTopBar, false)
         opaque = a.getBoolean(R.styleable.TitleBar_opaque, false)
         val themeMode = a.getInt(R.styleable.TitleBar_themeMode, 0)
         automaticForeground = themeMode == 0 && !opaque
@@ -201,7 +205,9 @@ class TitleBar @JvmOverloads constructor(
                 }
             }
 
-            if (AppConfig.isEInkMode) {
+            if (mainTopBar) {
+                applyMainTopBarStyle()
+            } else if (AppConfig.isEInkMode) {
                 setBackgroundResource(R.drawable.bg_eink_border_bottom)
             } else if (!opaque && context.transparentNavBar) {
                 setBackgroundColor(Color.TRANSPARENT)
@@ -225,14 +231,39 @@ class TitleBar @JvmOverloads constructor(
 
     // AppBarLayout can wrap a transparent color in a shape whose drawable alpha is still 255.
     val usesTransparentForeground: Boolean
-        get() = automaticForeground && context.transparentNavBar &&
-            !AppConfig.isEInkMode && (background?.alpha == 0 ||
+        get() = automaticForeground && (if (mainTopBar) {
+            AppConfig.mainTopBarImmersive || MainTopBarImageManager.hasImage()
+        } else {
+            context.transparentNavBar
+        }) &&
+            !AppConfig.isEInkMode && (mainTopBar || background?.alpha == 0 ||
                 (background as? MaterialShapeDrawable)?.fillColor
                     ?.getColorForState(drawableState, Color.TRANSPARENT)?.alpha == 0)
 
+    private fun applyMainTopBarStyle() {
+        if (AppConfig.isEInkMode) {
+            setBackgroundResource(R.drawable.bg_eink_border_bottom)
+            return
+        }
+        val image = MainTopBarImageManager.loadBitmap(context)
+        if (image != null) {
+            background = CenterCropDrawable(image)
+            elevation = 0.1f
+        } else if (AppConfig.mainTopBarImmersive) {
+            setBackgroundColor(Color.TRANSPARENT)
+        } else {
+            setBackgroundColor(context.primaryColor)
+            elevation = context.elevation
+        }
+    }
+
     fun applyForegroundColor() {
         if (!usesTransparentForeground) return
-        val color = context.getToolbarTextColor(true)
+        val color = if (mainTopBar && MainTopBarImageManager.hasImage()) {
+            context.getPrimaryTextColor(!MainTopBarImageManager.isLight(context))
+        } else {
+            context.getToolbarTextColor(true)
+        }
         if (!titleTextColorFromAttrs) {
             setTitleTextColor(color)
         }

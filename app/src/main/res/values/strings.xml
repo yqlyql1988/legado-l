@@ -1716,9 +1716,9 @@
     <string name="rule_sub_content">副文规则（subContent）</string>
     <string name="system_auto">跟随系统</string>
     <string name="sys_image_picker">系统图片选择器</string>
-    <string name="immersion_nav_bar">沉浸式操作栏</string>
-    <string name="day_nav_bar_immersion">白天操作栏颜色透明</string>
-    <string name="night_nav_bar_immersion">夜间操作栏颜色透明</string>
+    <string name="immersion_nav_bar">底部操作栏沉浸式</string>
+    <string name="day_nav_bar_immersion">白天底部操作栏颜色透明</string>
+    <string name="night_nav_bar_immersion">夜间底部操作栏颜色透明</string>
     <string name="manual_input_img_src">手动输入图片链接</string>
     <string name="enter_img_src_path">请输入图片链接</string>
     <string name="empty_img_src_input">图片链接不能为空</string>
@@ -1923,4 +1923,12 @@
     <string name="reading_note_manual_hint">请选中当前正文，再点击“书签”或“标注”，采用这条笔记的新位置。</string>
     <string name="reading_note_relocated">已采用当前正文，备注、标签和样式已保留</string>
     <string name="reading_note_unresolved">尚未找到对应位置，书签和标注内容仍保留。可以手动选择原文位置。</string>
+    <string name="main_top_bar_immersive">Main screen top bar immersion</string>
+    <string name="main_top_bar_immersive_summary">Make the main screen top bar transparent</string>
+    <string name="main_top_bar_image">Main screen top bar image</string>
+    <string name="main_top_bar_image_summary">Choose one local image for the main screen top bar</string>
+    <string name="main_top_bar_image_set">Image selected</string>
+    <string name="main_top_bar_image_reset">Reset crop</string>
+    <string name="main_top_bar_image_save">Save</string>
+    <string name="main_top_bar_image_error">Unable to process this image</string>
 </resources>

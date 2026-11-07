@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/menu_reset"
+        android:icon="@drawable/ic_restore"
+        android:showAsAction="ifRoom"
+        android:title="@string/main_top_bar_image_reset" />
+    <item
+        android:id="@+id/menu_save"
+        android:icon="@drawable/ic_save"
+        android:showAsAction="ifRoom"
+        android:title="@string/main_top_bar_image_save" />
+</menu>

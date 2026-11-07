@@ -25,6 +25,21 @@
         app:iconSpaceReserved="false" />
 
     <io.legado.app.lib.prefs.SwitchPreference
+        android:defaultValue="false"
+        android:key="mainTopBarImmersive"
+        android:summary="@string/main_top_bar_immersive_summary"
+        android:title="@string/main_top_bar_immersive"
+        app:iconSpaceReserved="false" />
+
+    <io.legado.app.lib.prefs.Preference
+        android:key="mainTopBarImage"
+        android:summary="@string/main_top_bar_image_summary"
+        android:title="@string/main_top_bar_image"
+        app:allowDividerAbove="false"
+        app:allowDividerBelow="false"
+        app:iconSpaceReserved="false" />
+
+    <io.legado.app.lib.prefs.SwitchPreference
         android:defaultValue="true"
         android:key="immNavigationBar"
         android:summary="@string/imm_navigation_bar_s"
