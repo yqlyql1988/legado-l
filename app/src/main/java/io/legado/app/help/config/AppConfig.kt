@@ -8,6 +8,7 @@ import io.legado.app.constant.AppConst
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.help.book.ResourceThemeGeneration
+import io.legado.app.lib.theme.ThemeStore
 import io.legado.app.utils.GSON
 import io.legado.app.utils.canvasrecorder.CanvasRecorderFactory
 import io.legado.app.utils.defaultSharedPreferences
@@ -317,6 +318,12 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
     val isTransparentStatusBar: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.transparentStatusBar, true)
+
+    val mainTopBarImmersive: Boolean
+        get() = appCtx.getPrefBoolean(
+            PreferKey.mainTopBarImmersive,
+            ThemeStore.transparentNavBar(appCtx)
+        )
 
     val immNavigationBar: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.immNavigationBar, true)

@@ -2,6 +2,7 @@ package io.legado.app.ui.config
 
 import android.annotation.SuppressLint
 import android.content.SharedPreferences
+import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -12,6 +13,7 @@ import android.view.View
 import android.widget.SeekBar
 import androidx.core.view.MenuProvider
 import androidx.lifecycle.lifecycleScope
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.preference.Preference
 import io.legado.app.R
 import io.legado.app.base.AppContextWrapper
@@ -21,6 +23,7 @@ import io.legado.app.constant.PreferKey
 import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.databinding.DialogImageBlurringBinding
 import io.legado.app.help.LauncherIconHelp
+import io.legado.app.help.MainTopBarImageManager
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ThemeConfig
 import io.legado.app.help.http.addHeaders
@@ -67,6 +70,7 @@ class ThemeConfigFragment : PreferenceFragment(),
 
     private val requestCodeBgLight = 121
     private val requestCodeBgDark = 122
+    private val requestCodeTopBar = 123
     private val selectImage = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
             when (it.requestCode) {
@@ -77,7 +81,18 @@ class ThemeConfigFragment : PreferenceFragment(),
                 requestCodeBgDark -> setBgFromUri(uri, PreferKey.bgImageN) {
                     upTheme(true)
                 }
+
+                requestCodeTopBar -> cropTopBarImage(uri)
             }
+        }
+    }
+
+    private val cropTopBarResult = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        if (it.resultCode == android.app.Activity.RESULT_OK) {
+            upPreferenceSummary(PreferKey.mainTopBarImage)
+            requireActivity().recreate()
         }
     }
 
@@ -92,6 +107,9 @@ class ThemeConfigFragment : PreferenceFragment(),
         }
         upPreferenceSummary(PreferKey.bgImage, getPrefString(PreferKey.bgImage))
         upPreferenceSummary(PreferKey.bgImageN, getPrefString(PreferKey.bgImageN))
+        upPreferenceSummary(PreferKey.mainTopBarImage)
+        findPreference<SwitchPreference>(PreferKey.mainTopBarImmersive)?.isChecked =
+            AppConfig.mainTopBarImmersive
         upPreferenceSummary(PreferKey.barElevation, AppConfig.elevation.toString())
         upPreferenceSummary(PreferKey.fontScale)
         findPreference<ColorPreference>(PreferKey.cBackground)?.let {
@@ -183,6 +201,7 @@ class ThemeConfigFragment : PreferenceFragment(),
                 findPreference<SwitchPreference>(PreferKey.wallpaperColorFollow)?.isChecked =
                     getPrefBoolean(PreferKey.wallpaperColorFollow)
             PreferKey.transparentStatusBar,
+            PreferKey.mainTopBarImmersive,
             PreferKey.immNavigationBar,
             PreferKey.disablePredictiveBack -> recreateActivities()
             PreferKey.cPrimary,
@@ -213,6 +232,8 @@ class ThemeConfigFragment : PreferenceFragment(),
             PreferKey.bgImageN -> {
                 upPreferenceSummary(key, getPrefString(key))
             }
+
+            PreferKey.mainTopBarImage -> upPreferenceSummary(key)
         }
 
     }
@@ -254,6 +275,7 @@ class ThemeConfigFragment : PreferenceFragment(),
 
             PreferKey.bgImage -> selectBgAction(false)
             PreferKey.bgImageN -> selectBgAction(true)
+            PreferKey.mainTopBarImage -> selectTopBarImage()
             "themeList" -> ThemeListDialog().show(childFragmentManager, "themeList")
             PreferKey.bottomBarSkin -> startActivity<BottomBarSkinActivity>()
             "saveDayTheme",
@@ -268,6 +290,31 @@ class ThemeConfigFragment : PreferenceFragment(),
             }
         }
         return super.onPreferenceTreeClick(preference)
+    }
+
+    private fun selectTopBarImage() {
+        val actions = arrayListOf(getString(R.string.select_image))
+        if (MainTopBarImageManager.hasImage()) actions += getString(R.string.delete)
+        context?.selector(items = actions) { _, index ->
+            if (index == 0) {
+                selectImage.launch {
+                    requestCode = requestCodeTopBar
+                    mode = HandleFileContract.IMAGE
+                }
+            } else {
+                MainTopBarImageManager.clear()
+                upPreferenceSummary(PreferKey.mainTopBarImage)
+                requireActivity().recreate()
+            }
+        }
+    }
+
+    private fun cropTopBarImage(uri: Uri) {
+        cropTopBarResult.launch(
+            Intent(requireContext(), MainTopBarImageActivity::class.java)
+                .setData(uri)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        )
     }
 
     @SuppressLint("InflateParams")
@@ -389,6 +436,12 @@ class ThemeConfigFragment : PreferenceFragment(),
                 getString(R.string.select_image)
             } else {
                 value
+            }
+
+            PreferKey.mainTopBarImage -> preference.summary = if (MainTopBarImageManager.hasImage()) {
+                getString(R.string.main_top_bar_image_set)
+            } else {
+                getString(R.string.main_top_bar_image_summary)
             }
 
             else -> preference.summary = value
