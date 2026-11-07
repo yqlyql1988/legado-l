@@ -27,6 +27,7 @@ import io.legado.app.constant.AppLog
 import io.legado.app.constant.Theme
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ThemeConfig
+import io.legado.app.help.MainTopBarImageManager
 import io.legado.app.lib.theme.ThemeStore
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.primaryColor
@@ -261,6 +262,27 @@ abstract class BaseActivity<VB : ViewBinding>(
             setLightStatusBar(ColorUtils.isColorLight(ThemeStore.primaryColor(this)))
         }
         upNavigationBarColor()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // 顶部图片和沉浸设置对所有页面生效；从设置页返回后在这里即时更新当前页顶栏
+        val titleBar = findViewById<TitleBar>(R.id.title_bar)
+            ?: findViewById(R.id.titleBar)
+            ?: return
+        if (titleBar.isOpaqueBar) return
+        titleBar.applyTopBarStyle()
+        titleBar.applyForegroundColor()
+        // 强制沉浸的页面由页面自己控制状态栏，避免被全局设置覆盖
+        if (titleBar.isForceImmersive) return
+        if (!AppConfig.isTransparentStatusBar) return
+        when {
+            titleBar.showsTopBarImage ->
+                setLightStatusBar(MainTopBarImageManager.isLight(this))
+
+            AppConfig.mainTopBarImmersive ->
+                setLightStatusBar(ColorUtils.isColorLight(backgroundColor))
+        }
     }
 
     open fun upNavigationBarColor() {

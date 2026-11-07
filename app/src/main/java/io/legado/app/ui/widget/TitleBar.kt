@@ -30,9 +30,7 @@ import io.legado.app.help.MainTopBarImageManager
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.elevation
 import io.legado.app.lib.theme.getToolbarTextColor
-import io.legado.app.lib.theme.getPrimaryTextColor
 import io.legado.app.lib.theme.primaryColor
-import io.legado.app.lib.theme.transparentNavBar
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.activity
 import io.legado.app.utils.applyTint
@@ -74,6 +72,7 @@ class TitleBar @JvmOverloads constructor(
     private val fitStatusBar: Boolean
     private val fitNavigationBar: Boolean
     private val mainTopBar: Boolean
+    private val forceImmersive: Boolean
     private val attachToActivity: Boolean
     private val opaque: Boolean
     private val automaticForeground: Boolean
@@ -92,6 +91,7 @@ class TitleBar @JvmOverloads constructor(
         fitStatusBar = a.getBoolean(R.styleable.TitleBar_fitStatusBar, true)
         fitNavigationBar = a.getBoolean(R.styleable.TitleBar_fitNavigationBar, false)
         mainTopBar = a.getBoolean(R.styleable.TitleBar_mainTopBar, false)
+        forceImmersive = a.getBoolean(R.styleable.TitleBar_forceImmersive, false)
         opaque = a.getBoolean(R.styleable.TitleBar_opaque, false)
         val themeMode = a.getInt(R.styleable.TitleBar_themeMode, 0)
         automaticForeground = themeMode == 0 && !opaque
@@ -205,12 +205,10 @@ class TitleBar @JvmOverloads constructor(
                 }
             }
 
-            if (mainTopBar) {
-                applyMainTopBarStyle()
-            } else if (AppConfig.isEInkMode) {
+            if (AppConfig.isEInkMode) {
                 setBackgroundResource(R.drawable.bg_eink_border_bottom)
-            } else if (!opaque && context.transparentNavBar) {
-                setBackgroundColor(Color.TRANSPARENT)
+            } else if (!opaque) {
+                applyTopBarStyle()
             } else {
                 setBackgroundColor(context.primaryColor)
                 elevation = context.elevation
@@ -229,29 +227,61 @@ class TitleBar @JvmOverloads constructor(
         }
     }
 
+    /** 是否是主界面顶部操作栏（主界面刷新时用来筛选）。 */
+    val isMainTopBar: Boolean
+        get() = mainTopBar
+
+    val isOpaqueBar: Boolean
+        get() = opaque
+
+    val isForceImmersive: Boolean
+        get() = forceImmersive
+
+    /**
+     * 当前是否显示顶部图片。
+     * 沉浸式优先：打开顶部沉浸或页面强制沉浸时操作栏保持透明，图片暂时不显示。
+     */
+    val showsTopBarImage: Boolean
+        get() = !opaque && !forceImmersive && !AppConfig.isEInkMode &&
+            !AppConfig.mainTopBarImmersive && MainTopBarImageManager.hasImage()
+
     // AppBarLayout can wrap a transparent color in a shape whose drawable alpha is still 255.
     val usesTransparentForeground: Boolean
-        get() = automaticForeground && (if (mainTopBar) {
-            AppConfig.mainTopBarImmersive || MainTopBarImageManager.hasImage()
-        } else {
-            context.transparentNavBar
-        }) &&
+        get() = automaticForeground &&
+            (forceImmersive || AppConfig.mainTopBarImmersive || showsTopBarImage) &&
             !AppConfig.isEInkMode && (background?.alpha == 0 ||
                 (background as? MaterialShapeDrawable)?.fillColor
                     ?.getColorForState(drawableState, Color.TRANSPARENT)?.alpha == 0 ||
-                mainTopBar)
+                showsTopBarImage)
 
-    private fun applyMainTopBarStyle() {
+    /**
+     * 按当前日间/夜间主题重新应用顶部操作栏背景，所有非 opaque 页面共用同一张顶部图片，
+     * 设置页改图或从设置页返回时调用。
+     */
+    fun applyTopBarStyle() {
         if (AppConfig.isEInkMode) {
             setBackgroundResource(R.drawable.bg_eink_border_bottom)
+            return
+        }
+        if (forceImmersive) {
+            // 书籍信息等页面要求始终沉浸，优先级高于 opaque 和图片
+            setBackgroundColor(Color.TRANSPARENT)
+            return
+        }
+        if (opaque) {
+            setBackgroundColor(context.primaryColor)
+            elevation = context.elevation
+            return
+        }
+        if (AppConfig.mainTopBarImmersive) {
+            // 沉浸式优先，打开后操作栏透明；图片在关闭沉浸后恢复
+            setBackgroundColor(Color.TRANSPARENT)
             return
         }
         val image = MainTopBarImageManager.loadBitmap(context)
         if (image != null) {
             background = CenterCropDrawable(image)
             elevation = 0.1f
-        } else if (AppConfig.mainTopBarImmersive) {
-            setBackgroundColor(Color.TRANSPARENT)
         } else {
             setBackgroundColor(context.primaryColor)
             elevation = context.elevation
@@ -260,8 +290,10 @@ class TitleBar @JvmOverloads constructor(
 
     fun applyForegroundColor() {
         if (!usesTransparentForeground) return
-        val color = if (mainTopBar && MainTopBarImageManager.hasImage()) {
-            context.getPrimaryTextColor(!MainTopBarImageManager.isLight(context))
+        val hasImage = showsTopBarImage
+        // 有顶部图片时固定白天黑色、夜间白色，不再按图片明暗切换
+        val color = if (hasImage) {
+            if (AppConfig.isNightTheme) Color.WHITE else Color.BLACK
         } else {
             context.getToolbarTextColor(true)
         }

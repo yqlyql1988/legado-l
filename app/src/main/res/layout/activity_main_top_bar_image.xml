@@ -20,8 +20,7 @@
         <io.legado.app.ui.widget.image.PhotoView
             android:id="@+id/photo_view"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scaleType="centerCrop" />
+            android:layout_height="match_parent" />
 
         <io.legado.app.ui.widget.image.CropFrameView
             android:id="@+id/crop_frame"

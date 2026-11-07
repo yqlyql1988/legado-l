@@ -36,7 +36,6 @@ import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.primaryColor
-import io.legado.app.lib.theme.transparentNavBar
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.ui.book.source.debug.BookSourceDebugActivity
@@ -358,7 +357,7 @@ class BookSourceEditActivity :
         binding.recyclerView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
             (binding.recyclerView.findFocus() as? CodeView)?.requestSelectionVisible()
         }
-        val transparentBar = transparentNavBar && !AppConfig.isEInkMode
+        val transparentBar = AppConfig.mainTopBarImmersive && !AppConfig.isEInkMode
         listOf(binding.tabLayout, binding.fieldNav).forEach { tabs ->
             tabs.setBackgroundColor(if (transparentBar) Color.TRANSPARENT else backgroundColor)
             if (transparentBar) tabs.elevation = 0f

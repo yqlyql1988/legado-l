@@ -42,6 +42,7 @@ import io.legado.app.help.storage.Backup
 import io.legado.app.help.update.AppUpdate
 import io.legado.app.help.update.isIgnoredAppUpdate
 import io.legado.app.lib.dialogs.alert
+import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.service.BaseReadAloudService
 import io.legado.app.ui.about.CrashLogsDialog
@@ -59,15 +60,19 @@ import io.legado.app.ui.main.bookshelf.style2.BookshelfFragment2
 import io.legado.app.ui.main.explore.ExploreFragment
 import io.legado.app.ui.main.my.MyFragment
 import io.legado.app.ui.main.rss.RssFragment
+import io.legado.app.ui.widget.TitleBar
 import io.legado.app.ui.widget.dialog.TextDialog
 import io.legado.app.ui.widget.text.BadgeView
+import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.clearClip
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getClipText
+import io.legado.app.utils.getPrefInt
 import io.legado.app.utils.isCreated
 import io.legado.app.utils.imeHeight
 import io.legado.app.utils.navigationBarHeight
 import io.legado.app.utils.observeEvent
+import io.legado.app.utils.putPrefInt
 import io.legado.app.utils.setEdgeEffectColor
 import io.legado.app.utils.setOnApplyWindowInsetsListenerCompat
 import io.legado.app.utils.setLightStatusBar
@@ -123,10 +128,46 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
 
     override fun setupSystemBar() {
         super.setupSystemBar()
-        if (AppConfig.isTransparentStatusBar && AppConfig.mainTopBarImmersive &&
-            MainTopBarImageManager.hasImage()
-        ) {
-            setLightStatusBar(!MainTopBarImageManager.isLight(this))
+        if (!AppConfig.isTransparentStatusBar) return
+        if (AppConfig.mainTopBarImmersive) {
+            // 沉浸式优先：操作栏透明，状态栏盖在页面背景上
+            setLightStatusBar(ColorUtils.isColorLight(backgroundColor))
+        } else if (MainTopBarImageManager.hasImage()) {
+            // setLightStatusBar(true) 表示浅色背景配深色图标，图片亮时传 true
+            setLightStatusBar(MainTopBarImageManager.isLight(this))
+        }
+    }
+
+    /** 顶部图片保存或删除后立即刷新四个主界面 Tab 的顶栏，无需重开 Activity。 */
+    private fun refreshMainTopBars() {
+        fragmentMap.values.forEach { fragment ->
+            fragment.view?.findViewById<TitleBar>(R.id.title_bar)
+                ?.takeIf { it.isMainTopBar }
+                ?.let {
+                    it.applyTopBarStyle()
+                    it.applyForegroundColor()
+                }
+        }
+        rememberTopBarHeight()
+        setupSystemBar()
+    }
+
+    /** 记录当前 Tab 顶栏的实际高度，裁剪图片时按它计算取景框比例，避免裁剪和显示比例不一致。 */
+    private fun rememberTopBarHeight() {
+        val titleBar = fragmentMap[getFragmentId(pagePosition)]
+            ?.view?.findViewById<TitleBar>(R.id.title_bar) ?: return
+        if (titleBar.height > 0) {
+            if (getPrefInt(PreferKey.mainTopBarImageHeight, 0) != titleBar.height) {
+                putPrefInt(PreferKey.mainTopBarImageHeight, titleBar.height)
+            }
+        } else {
+            titleBar.post {
+                if (titleBar.height > 0 &&
+                    getPrefInt(PreferKey.mainTopBarImageHeight, 0) != titleBar.height
+                ) {
+                    putPrefInt(PreferKey.mainTopBarImageHeight, titleBar.height)
+                }
+            }
         }
     }
 
@@ -192,6 +233,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
 
     override fun onResume() {
         super.onResume()
+        refreshMainTopBars()
         if (SourceSharePassphraseImportPolicy.shouldScheduleOnResume(
                 privacyPolicyOk = LocalConfig.privacyPolicyOk
             )
@@ -201,6 +243,8 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     }
 
     override fun onPause() {
+        // 进入设置页前记录当前 Tab 的顶栏高度，裁剪图片时按它计算比例
+        rememberTopBarHeight()
         super.onPause()
         pendingPassphraseRead = false
         passphraseReadGeneration++
@@ -482,6 +526,9 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         observeEvent<String>(EventBus.BOTTOM_BAR_SKIN) {
             upBottomBarSkin()
         }
+        observeEvent<Boolean>(EventBus.MAIN_TOP_BAR_IMAGE) {
+            refreshMainTopBars()
+        }
         observeEvent<String>(PreferKey.threadCount) {
             viewModel.upPool()
         }
@@ -645,6 +692,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         override fun onPageSelected(position: Int) {
             pagePosition = position
             binding.bottomNavigationView.menu[realPositions[position]].isChecked = true
+            rememberTopBarHeight()
         }
 
     }

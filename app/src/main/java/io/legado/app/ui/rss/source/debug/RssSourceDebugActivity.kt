@@ -17,7 +17,6 @@ import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.primaryColor
-import io.legado.app.lib.theme.transparentNavBar
 import io.legado.app.ui.widget.dialog.TextDialog
 import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.setEdgeEffectColor
@@ -42,7 +41,7 @@ class RssSourceDebugActivity : VMBaseActivity<ActivityRssSourceDebugBinding, Rss
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         binding.help.setBackgroundColor(
-            if (transparentNavBar && !AppConfig.isEInkMode) Color.TRANSPARENT else backgroundColor
+            if (AppConfig.mainTopBarImmersive && !AppConfig.isEInkMode) Color.TRANSPARENT else backgroundColor
         )
         initRecyclerView()
         initSearchView()

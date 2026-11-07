@@ -25,6 +25,7 @@
             android:id="@+id/title_bar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            app:forceImmersive="true"
             app:layout_constraintTop_toTopOf="parent"
             app:themeMode="dark"
             app:title="@string/book_info" />
