@@ -261,6 +261,8 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
                 )
             )
         }
+        // 分组切换时才创建返回箭头，重新应用一次前景色/阴影
+        binding.titleBar.applyForegroundColor()
     }
 
     private fun switchBookGroup(offset: Int) {
