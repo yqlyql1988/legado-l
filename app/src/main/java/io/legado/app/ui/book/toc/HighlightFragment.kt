@@ -22,8 +22,7 @@ import io.legado.app.data.entities.HighlightTag
 import io.legado.app.data.entities.HighlightTagLink
 import io.legado.app.help.HighlightTags
 import io.legado.app.ui.highlight.HighlightTagManageActivity
-import io.legado.app.ui.highlight.NoteTagFilterSheet
-import io.legado.app.ui.highlight.noteTagFilterLabel
+import io.legado.app.ui.highlight.NoteTagFilterPopup
 import io.legado.app.help.book.isAudio
 import io.legado.app.help.book.isImage
 import io.legado.app.help.book.isLocal
@@ -73,6 +72,7 @@ class HighlightFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_highlig
     private var chapterIndexes = emptyMap<String, Int>()
     private var durChapterIndex = 0
     private var selectedTag: String? = null
+    private var tagFilterPopup: NoteTagFilterPopup? = null
     private var currentHighlights = emptyList<BookHighlight>()
     private var currentTags = emptyList<HighlightTag>()
     private var currentLinks = emptyMap<Long, List<HighlightTagLink>>()
@@ -83,7 +83,15 @@ class HighlightFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_highlig
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         selectedTag = savedInstanceState?.getString("tagFilter")
-        binding.tagFilterBar.tagFilter.setOnClickListener { showTagFilter() }
+        tagFilterPopup = NoteTagFilterPopup(
+            context = requireContext(),
+            anchor = binding.tagFilterBar.tagFilter,
+            onSelect = ::selectFilter,
+            onManage = {
+                startActivity(Intent(requireContext(), HighlightTagManageActivity::class.java)
+                    .putExtra("bookUrl", viewModel.bookData.value?.bookUrl))
+            },
+        )
         viewModel.highlightCallBack = this
         initRecyclerView()
         viewModel.bookData.observe(viewLifecycleOwner) {
@@ -105,6 +113,8 @@ class HighlightFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_highlig
         currentHighlights = emptyList()
         currentTags = emptyList()
         currentLinks = emptyMap()
+        tagFilterPopup?.dismiss()
+        tagFilterPopup = null
         viewModel.highlightCallBack = clearCallbackIfOwned(
             viewModel.highlightCallBack,
             this
@@ -232,20 +242,7 @@ class HighlightFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_highlig
     private fun usedTagsList(): List<HighlightTag> = currentTags.filter { it.id in usedTags }
 
     private fun updateTagFilter() {
-        binding.tagFilterBar.tagFilter.text = noteTagFilterLabel(requireContext(), selectedTag, usedTagsList())
-    }
-
-    private fun showTagFilter() {
-        NoteTagFilterSheet(
-            context = requireContext(),
-            tags = usedTagsList(),
-            selectedId = selectedTag,
-            onSelect = ::selectFilter,
-            onManage = {
-                startActivity(Intent(requireContext(), HighlightTagManageActivity::class.java)
-                    .putExtra("bookUrl", viewModel.bookData.value?.bookUrl))
-            },
-        ).show()
+        tagFilterPopup?.update(usedTagsList(), selectedTag)
     }
 
     override fun onTagClick(id: String) {
