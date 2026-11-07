@@ -64,8 +64,15 @@ class NoteTagFilterContractTest {
             (layout.getElementsByTagName("io.legado.app.ui.widget.text.AccentTextView")
                 .item(0) as Element).androidAttribute("text")
         )
+        // 「管理」必须留在滚动区外，否则书签标签较多时会被滚出视野
+        val scroller = layout.getElementsByTagName("androidx.core.widget.NestedScrollView")
+            .item(0) as Element
+        assertTrue(scroller.childElements().none { it.tagName.contains("AccentTextView") })
+        assertTrue(layout.childElements().any { it.tagName.contains("AccentTextView") })
 
         val source = sourceFile("src/main/java/io/legado/app/ui/highlight/NoteTagFilterPopup.kt")
+        assertTrue(source.contains("binding.svTags.layoutParams"))
+        assertTrue(source.contains("binding.flTags.measure("))
         assertTrue(source.contains("highlight_filter_all"))
         assertTrue(source.contains("highlight_filter_untagged"))
         assertTrue(source.contains("dismiss()"))
@@ -104,6 +111,11 @@ class NoteTagFilterContractTest {
 
     private fun Element.androidAttribute(name: String): String =
         getAttributeNS(androidNamespace, name)
+
+    private fun Element.childElements(): List<Element> =
+        (0 until childNodes.length)
+            .map { childNodes.item(it) }
+            .filterIsInstance<Element>()
 
     private companion object {
         const val androidNamespace = "http://schemas.android.com/apk/res/android"
