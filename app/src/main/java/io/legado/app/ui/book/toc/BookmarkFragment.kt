@@ -60,18 +60,20 @@ class BookmarkFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmark
             context = requireContext(),
             anchor = binding.tagFilterBar.tagFilter,
             onSelect = ::selectTag,
-            onManage = {
-                startActivity(Intent(requireContext(), HighlightTagManageActivity::class.java)
-                    .putExtra("bookUrl", viewModel.bookData.value?.bookUrl)
-                    .putExtra("bookmarkMode", true))
-            },
         )
+        binding.tagFilterBar.tvManage.setOnClickListener { openTagManage() }
         viewModel.bookMarkCallBack = this
         initRecyclerView()
         viewModel.bookData.observe(viewLifecycleOwner) {
             durChapterIndex = it.durChapterIndex
             upBookmark(viewModel.searchKey)
         }
+    }
+
+    private fun openTagManage() {
+        startActivity(Intent(requireContext(), HighlightTagManageActivity::class.java)
+            .putExtra("bookUrl", viewModel.bookData.value?.bookUrl)
+            .putExtra("bookmarkMode", true))
     }
 
     override fun onDestroyView() {
