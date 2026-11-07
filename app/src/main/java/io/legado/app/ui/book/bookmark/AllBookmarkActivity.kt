@@ -46,8 +46,7 @@ import io.legado.app.ui.book.toc.TocActivityResult
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.highlight.highlightTagChip
 import io.legado.app.ui.highlight.HighlightTagManageActivity
-import io.legado.app.ui.highlight.NoteTagFilterSheet
-import io.legado.app.ui.highlight.noteTagFilterLabel
+import io.legado.app.ui.highlight.NoteTagFilterPopup
 import io.legado.app.ui.highlight.NoteTagPickerDialog
 import io.legado.app.ui.widget.popupActionMenu
 import io.legado.app.utils.applyNavigationBarPadding
@@ -88,6 +87,7 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
     private var selectedBook: String? = null
     private var type = NoteType.ALL
     private var tagId: String? = null
+    private var tagFilterPopup: NoteTagFilterPopup? = null
     private var query = ""
     private var bookListQuery = ""
     private var bookListSearchVisible = false
@@ -177,7 +177,21 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
             render()
             binding.recyclerView.scrollToPosition(0)
         }
-        binding.tvTagFilter.setOnClickListener { showTagFilter() }
+        tagFilterPopup = NoteTagFilterPopup(
+            context = this,
+            anchor = binding.tvTagFilter,
+            onSelect = { id ->
+                tagId = id
+                selected.clear()
+                render()
+                binding.recyclerView.scrollToPosition(0)
+            },
+            onManage = {
+                startActivity(Intent(this, HighlightTagManageActivity::class.java)
+                    .putExtra("bookUrl", archive?.bookUrl)
+                    .putExtra("bookmarkMode", type == NoteType.BOOKMARK))
+            },
+        )
         binding.btnSelectAll.setOnClickListener {
             if (visibleNotes.all { it.id in selected }) selected.clear()
             else selected.addAll(visibleNotes.map { it.id })
@@ -280,6 +294,7 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
         binding.noteTabs.isVisible = details
         val reviewing = details && type == NoteType.REVIEW
         binding.tvTagFilter.isVisible = details && type != NoteType.REVIEW
+        if (!binding.tvTagFilter.isVisible) tagFilterPopup?.dismiss()
         binding.tvSort.isVisible = !reviewing
         binding.reviewActions.isVisible = reviewing
         binding.batchActions.isVisible = details && managing
@@ -301,7 +316,9 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
             binding.noteTabs.getTabAt(1)?.text = getString(R.string.book_notes_tab_bookmark, book?.bookmarkCount ?: 0)
             binding.noteTabs.getTabAt(2)?.text = getString(R.string.book_notes_tab_highlight, book?.highlightCount ?: 0)
             binding.noteTabs.getTabAt(3)?.text = getString(R.string.book_notes_tab_review, book?.reviews?.size ?: 0)
-            val noteTags = book?.notes.orEmpty().flatMap { it.tags }.distinctBy { it.id }
+            val noteTags = book?.notes.orEmpty()
+                .filter { type == NoteType.ALL || it.type == type }
+                .flatMap { it.tags }.distinctBy { it.id }
             if (!tagId.isNullOrEmpty() && noteTags.none { it.id == tagId }) tagId = null
             visibleNotes = filterBookNotes(book?.notes.orEmpty(), type, tagId, query, recent, chapterIndexes)
             reviewsAdapter.reviews = book?.matchingReviews(query).orEmpty()
@@ -313,7 +330,7 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
             bindBookReviewRating(binding.reviewRatingStars, binding.tvReviewRating, book?.rating)
             binding.tvWriteReview.setText(if (book?.reviews.isNullOrEmpty()) R.string.book_review_write
                 else R.string.book_review_follow_up)
-            binding.tvTagFilter.text = noteTagFilterLabel(this, tagId, noteTags)
+            tagFilterPopup?.update(noteTags, tagId)
             binding.tvSort.setText(if (recent) R.string.book_notes_recent else R.string.book_notes_chapter_order)
             val detailAdapter = if (reviewing) reviewsAdapter else allAdapter
             if (binding.recyclerView.adapter !== detailAdapter) {
@@ -350,27 +367,6 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
 
     private fun writeReview() {
         archive?.asBook()?.let { BookReviewEditActivity.create(this, it) }
-    }
-
-    private fun showTagFilter() {
-        val tags = archive?.notes.orEmpty().filter { type == NoteType.ALL || it.type == type }
-            .flatMap { it.tags }.distinctBy { it.id }
-        NoteTagFilterSheet(
-            context = this,
-            tags = tags,
-            selectedId = tagId,
-            onSelect = { id ->
-                tagId = id
-                selected.clear()
-                render()
-                binding.recyclerView.scrollToPosition(0)
-            },
-            onManage = {
-                startActivity(Intent(this, HighlightTagManageActivity::class.java)
-                    .putExtra("bookUrl", archive?.bookUrl)
-                    .putExtra("bookmarkMode", type == NoteType.BOOKMARK))
-            },
-        ).show()
     }
 
     private fun openReading(note: BookNote?) = runTask {

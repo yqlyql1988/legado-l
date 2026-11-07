@@ -20,8 +20,7 @@ import io.legado.app.data.entities.HighlightTag
 import io.legado.app.help.HighlightTags
 import io.legado.app.help.ReadingNoteChapter
 import io.legado.app.ui.highlight.HighlightTagManageActivity
-import io.legado.app.ui.highlight.NoteTagFilterSheet
-import io.legado.app.ui.highlight.noteTagFilterLabel
+import io.legado.app.ui.highlight.NoteTagFilterPopup
 import io.legado.app.databinding.FragmentBookmarkBinding
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.book.bookmark.BookmarkDialog
@@ -51,13 +50,22 @@ class BookmarkFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmark
     private var durChapterIndex = 0
     private var selectedTag: String? = null
     private var scrollToTop = false
-    private var attached = emptyMap<Long, List<HighlightTag>>()
+    private var tagFilterPopup: NoteTagFilterPopup? = null
     private var noteChapterIndex: ReadingNoteChapter.ChapterIndex? = null
     private var noteChapterBookUrl: String? = null
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         selectedTag = savedInstanceState?.getString("tagFilter")
-        binding.tagFilterBar.tagFilter.setOnClickListener { showTagFilter() }
+        tagFilterPopup = NoteTagFilterPopup(
+            context = requireContext(),
+            anchor = binding.tagFilterBar.tagFilter,
+            onSelect = ::selectTag,
+            onManage = {
+                startActivity(Intent(requireContext(), HighlightTagManageActivity::class.java)
+                    .putExtra("bookUrl", viewModel.bookData.value?.bookUrl)
+                    .putExtra("bookmarkMode", true))
+            },
+        )
         viewModel.bookMarkCallBack = this
         initRecyclerView()
         viewModel.bookData.observe(viewLifecycleOwner) {
@@ -75,6 +83,8 @@ class BookmarkFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmark
         noteChapterIndex = null
         noteChapterBookUrl = null
         scrollToTop = false
+        tagFilterPopup?.dismiss()
+        tagFilterPopup = null
         viewModel.bookMarkCallBack = clearCallbackIfOwned(
             viewModel.bookMarkCallBack,
             this
@@ -127,7 +137,6 @@ class BookmarkFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmark
             }.catch {
                 AppLog.put("目录界面获取书签数据失败\n${it.localizedMessage}", it)
             }.flowOn(IO).collect { (all, labels) ->
-                attached = labels
                 adapter?.tags = labels
                 val availableTags = labels.values.flatten().distinctBy { it.id }
                 if (!selectedTag.isNullOrEmpty() && availableTags.none { it.id == selectedTag }) {
@@ -139,8 +148,7 @@ class BookmarkFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmark
                             bookmark.bookText).any { it.contains(searchKey, true) } ||
                             labels[bookmark.time].orEmpty().any { it.name.contains(searchKey, true) })
                 }
-                binding.tagFilterBar.tagFilter.text =
-                    noteTagFilterLabel(requireContext(), selectedTag, availableTags)
+                tagFilterPopup?.update(availableTags, selectedTag)
                 binding.tvEmpty.setText(
                     if (searchKey.isNullOrBlank() && selectedTag == null) R.string.bookmark_empty
                     else R.string.bookmark_filter_empty
@@ -177,20 +185,6 @@ class BookmarkFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmark
                 }
             }
         }
-    }
-
-    private fun showTagFilter() {
-        NoteTagFilterSheet(
-            context = requireContext(),
-            tags = attached.values.flatten().distinctBy { it.id },
-            selectedId = selectedTag,
-            onSelect = ::selectTag,
-            onManage = {
-                startActivity(Intent(requireContext(), HighlightTagManageActivity::class.java)
-                    .putExtra("bookUrl", viewModel.bookData.value?.bookUrl)
-                    .putExtra("bookmarkMode", true))
-            },
-        ).show()
     }
 
     private fun selectTag(id: String?) {

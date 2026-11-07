@@ -27,46 +27,51 @@ class NoteTagFilterContractTest {
     }
 
     @Test
-    fun `both pages open the shared tag filter sheet`() {
+    fun `both pages open the shared tag filter popup`() {
         val bookmark = sourceFile("src/main/java/io/legado/app/ui/book/toc/BookmarkFragment.kt")
         val highlight = sourceFile("src/main/java/io/legado/app/ui/book/toc/HighlightFragment.kt")
 
         listOf(bookmark, highlight).forEach { source ->
-            assertTrue(source.contains("binding.tagFilterBar.tagFilter.setOnClickListener"))
-            assertTrue(source.contains("NoteTagFilterSheet("))
-            assertTrue(source.contains("noteTagFilterLabel("))
+            assertTrue(source.contains("NoteTagFilterPopup("))
+            assertTrue(source.contains("anchor = binding.tagFilterBar.tagFilter"))
             assertTrue(!source.contains("setSingleChoiceItems"))
             assertTrue(!source.contains("filterTags"))
+            assertTrue(!source.contains("BottomSheetDialog"))
         }
         assertTrue(bookmark.contains("putExtra(\"bookmarkMode\", true)"))
         assertTrue(highlight.contains("HighlightTagManageActivity::class.java"))
     }
 
     @Test
-    fun `all notes details page uses the same sheet`() {
+    fun `all notes details page uses the same popup`() {
         val source = sourceFile("src/main/java/io/legado/app/ui/book/bookmark/AllBookmarkActivity.kt")
 
-        assertTrue(source.contains("NoteTagFilterSheet("))
-        assertTrue(source.contains("noteTagFilterLabel("))
+        assertTrue(source.contains("NoteTagFilterPopup("))
+        assertTrue(source.contains("anchor = binding.tvTagFilter"))
+        assertTrue(source.contains("tagFilterPopup?.update(noteTags, tagId)"))
         assertTrue(!source.contains("setSingleChoiceItems"))
     }
 
     @Test
-    fun `sheet lists every state and closes on selection`() {
-        val layout = parseLayout("dialog_note_tag_filter.xml")
-        assertEquals(1, layout.getElementsByTagName("com.google.android.flexbox.FlexboxLayout").length)
-        val manage = layout.getElementsByTagName("io.legado.app.ui.widget.text.AccentTextView")
-        assertEquals(1, manage.length)
+    fun `popup opens below the anchor and lists every state`() {
+        val layout = parseLayout("popup_note_tag_filter.xml")
+        assertEquals(
+            1,
+            layout.getElementsByTagName("com.google.android.flexbox.FlexboxLayout").length
+        )
         assertEquals(
             "@string/book_notes_manage",
-            (manage.item(0) as Element).androidAttribute("text")
+            (layout.getElementsByTagName("io.legado.app.ui.widget.text.AccentTextView")
+                .item(0) as Element).androidAttribute("text")
         )
 
-        val source = sourceFile("src/main/java/io/legado/app/ui/highlight/NoteTagFilterSheet.kt")
+        val source = sourceFile("src/main/java/io/legado/app/ui/highlight/NoteTagFilterPopup.kt")
         assertTrue(source.contains("highlight_filter_all"))
         assertTrue(source.contains("highlight_filter_untagged"))
-        assertTrue(source.contains("dialog.dismiss()"))
+        assertTrue(source.contains("dismiss()"))
         assertTrue(source.contains("nextSelection"))
+        assertTrue(source.contains("resolveDropDownYOffset"))
+        assertTrue(source.contains("applyMd3PopupStyle"))
         assertTrue(source.contains("fun noteTagFilterLabel("))
     }
 
