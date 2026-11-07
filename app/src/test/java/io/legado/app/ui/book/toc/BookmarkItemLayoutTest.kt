@@ -66,9 +66,9 @@ class BookmarkItemLayoutTest {
             fields.keys
         )
         val name = fields.getValue("@+id/tv_chapter_name")
-        assertEquals("16sp", name.androidAttribute("textSize"))
+        assertEquals("14sp", name.androidAttribute("textSize"))
         assertEquals("@color/primaryText", name.androidAttribute("textColor"))
-        assertEquals("bold", name.androidAttribute("textStyle"))
+        assertEquals("", name.androidAttribute("textStyle"))
         val count = fields.getValue("@+id/tv_chapter_count")
         assertEquals("11sp", count.androidAttribute("textSize"))
         assertEquals("@color/secondaryText", count.androidAttribute("textColor"))

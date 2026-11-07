@@ -13,9 +13,11 @@ import io.legado.app.R
 import io.legado.app.base.VMBaseFragment
 import io.legado.app.constant.AppLog
 import io.legado.app.data.appDb
+import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.data.entities.HighlightTag
 import io.legado.app.help.HighlightTags
+import io.legado.app.help.ReadingNoteChapter
 import io.legado.app.ui.highlight.HighlightTagManageActivity
 import io.legado.app.databinding.FragmentBookmarkBinding
 import io.legado.app.lib.theme.primaryColor
@@ -46,6 +48,8 @@ class BookmarkFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmark
     private var durChapterIndex = 0
     private var selectedTag: String? = null
     private var attached = emptyMap<Long, List<HighlightTag>>()
+    private var noteChapterIndex: ReadingNoteChapter.ChapterIndex? = null
+    private var noteChapterBookUrl: String? = null
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         selectedTag = savedInstanceState?.getString("tagFilter")
@@ -69,6 +73,8 @@ class BookmarkFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmark
         binding.recyclerView.adapter = null
         adapter = null
         layoutManager = null
+        noteChapterIndex = null
+        noteChapterBookUrl = null
         viewModel.bookMarkCallBack = clearCallbackIfOwned(
             viewModel.bookMarkCallBack,
             this
@@ -88,10 +94,24 @@ class BookmarkFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmark
         binding.recyclerView.applyNavigationBarPadding()
     }
 
+    private suspend fun chapterIndexFor(book: Book): ReadingNoteChapter.ChapterIndex {
+        noteChapterIndex?.takeIf { noteChapterBookUrl == book.bookUrl }?.let { return it }
+        val chapters = withContext(IO) {
+            runCatching { ReadingNoteChapter.available(book) }.getOrDefault(emptyList())
+        }
+        val index = ReadingNoteChapter.index(chapters)
+        if (viewModel.bookData.value?.bookUrl == book.bookUrl) {
+            noteChapterIndex = index
+            noteChapterBookUrl = book.bookUrl
+        }
+        return index
+    }
+
     override fun upBookmark(searchKey: String?) {
         bookmarkJob?.cancel()
         val book = viewModel.bookData.value ?: return
         bookmarkJob = viewLifecycleOwner.lifecycleScope.launch {
+            val chapterIndex = chapterIndexFor(book)
             combine(appDb.bookmarkDao.flowByBook(book.name, book.author),
                 appDb.highlightTagDao.flowAll(), appDb.bookmarkTagDao.flowLinks(),
                 appDb.bookmarkTagDao.flowOrders()) { bookmarks, tags, links, orders ->
@@ -119,17 +139,28 @@ class BookmarkFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmark
                     if (id.isEmpty()) getString(R.string.highlight_filter_untagged)
                     else labels.values.flatten().firstOrNull { it.id == id }?.name
                 } ?: getString(R.string.book_notes_tags)
+                val orderByTime = bookmarks.associate { bookmark ->
+                    bookmark.time to resolvedChapterIndex(
+                        chapterIndex,
+                        ReadingNotes.legacy(bookmark, book.bookUrl),
+                        bookmark.chapterIndex,
+                    )
+                }
                 val ordered = bookmarks.sortedWith(
-                    compareBy<Bookmark>({ it.chapterIndex }, { it.chapterPos }, { it.time })
+                    compareBy<Bookmark>(
+                        { orderByTime[it.time] ?: it.chapterIndex },
+                        { it.chapterPos },
+                        { it.time },
+                    )
                 )
                 adapter?.sections = buildChapterSections(
                     ordered,
-                    { it.chapterIndex to it.chapterName },
+                    { orderByTime[it.time] ?: it.chapterIndex },
                     { it.time },
                 )
                 adapter?.setItems(ordered)
                 val scrollPosition = ordered
-                    .indexOfLast { it.chapterIndex < durChapterIndex }
+                    .indexOfLast { (orderByTime[it.time] ?: it.chapterIndex) < durChapterIndex }
                     .coerceAtLeast(0)
                 layoutManager?.scrollToPositionWithOffset(scrollPosition, 0)
             }
