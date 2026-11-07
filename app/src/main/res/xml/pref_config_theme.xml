@@ -25,21 +25,6 @@
         app:iconSpaceReserved="false" />
 
     <io.legado.app.lib.prefs.SwitchPreference
-        android:defaultValue="false"
-        android:key="mainTopBarImmersive"
-        android:summary="@string/main_top_bar_immersive_summary"
-        android:title="@string/main_top_bar_immersive"
-        app:iconSpaceReserved="false" />
-
-    <io.legado.app.lib.prefs.Preference
-        android:key="mainTopBarImage"
-        android:summary="@string/main_top_bar_image_summary"
-        android:title="@string/main_top_bar_image"
-        app:allowDividerAbove="false"
-        app:allowDividerBelow="false"
-        app:iconSpaceReserved="false" />
-
-    <io.legado.app.lib.prefs.SwitchPreference
         android:defaultValue="true"
         android:key="immNavigationBar"
         android:summary="@string/imm_navigation_bar_s"
@@ -157,6 +142,22 @@
             android:title="@string/immersion_nav_bar"
             app:iconSpaceReserved="false" />
 
+        <!-- 顶部操作栏沉浸式和底部操作栏沉浸式保持一致：日间、夜间分别设置 -->
+        <io.legado.app.lib.prefs.SwitchPreference
+            android:defaultValue="false"
+            android:key="mainTopBarImmersive"
+            android:summary="@string/main_top_bar_immersive_summary"
+            android:title="@string/main_top_bar_immersive"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
+            android:key="mainTopBarImage"
+            android:summary="@string/main_top_bar_image_summary"
+            android:title="@string/main_top_bar_image"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:iconSpaceReserved="false" />
+
         <io.legado.app.lib.prefs.Preference
             android:key="saveDayTheme"
             android:summary="@string/save_day_theme_summary"
@@ -216,6 +217,22 @@
             android:key="transparentNavBarNight"
             android:summary="@string/night_nav_bar_immersion"
             android:title="@string/immersion_nav_bar"
+            app:iconSpaceReserved="false" />
+
+        <!-- 顶部操作栏沉浸式和底部操作栏沉浸式保持一致：日间、夜间分别设置 -->
+        <io.legado.app.lib.prefs.SwitchPreference
+            android:defaultValue="false"
+            android:key="mainTopBarImmersiveNight"
+            android:summary="@string/main_top_bar_immersive_summary"
+            android:title="@string/main_top_bar_immersive"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
+            android:key="mainTopBarImageNight"
+            android:summary="@string/main_top_bar_image_summary"
+            android:title="@string/main_top_bar_image"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
             app:iconSpaceReserved="false" />
 
         <io.legado.app.lib.prefs.Preference

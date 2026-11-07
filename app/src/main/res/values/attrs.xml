@@ -29,6 +29,7 @@
         <attr name="fitStatusBar" format="boolean" />
         <attr name="fitNavigationBar" format="boolean" />
         <attr name="mainTopBar" format="boolean" />
+        <attr name="forceImmersive" format="boolean" />
         <attr name="opaque" format="boolean" />
         <attr name="navigationContentDescription" format="reference|string" />
         <attr name="navigationIconTint" format="color|reference" />

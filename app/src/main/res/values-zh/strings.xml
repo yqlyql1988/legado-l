@@ -1795,12 +1795,16 @@
     <string name="content_search_scope_up">向上</string>
     <string name="content_search_anchor_unavailable">正文处理后无法可靠定位当前阅读位置。请返回阅读页重试，或切换为全局搜索。</string>
     <string name="content_search_result_unavailable">无法在阅读正文中可靠定位此结果。请检查替换净化和标题设置后重新搜索。</string>
-    <string name="main_top_bar_immersive">主界面顶部操作栏沉浸式</string>
-    <string name="main_top_bar_immersive_summary">让主界面顶部操作栏透明并显示在内容上方</string>
+    <string name="main_top_bar_immersive">顶部操作栏沉浸式</string>
+    <string name="main_top_bar_immersive_summary">让顶部操作栏透明并显示在内容上方；打开后顶部图片暂时隐藏，与底部操作栏沉浸式一样分日间和夜间</string>
     <string name="main_top_bar_image">顶部操作栏图片</string>
-    <string name="main_top_bar_image_summary">选择一张本地图片作为主界面顶部操作栏背景</string>
+    <string name="main_top_bar_image_summary">选择一张本地图片作为顶部操作栏背景，关闭沉浸式后显示</string>
     <string name="main_top_bar_image_set">已设置图片</string>
     <string name="main_top_bar_image_reset">重置裁剪</string>
     <string name="main_top_bar_image_save">保存</string>
+    <string name="main_top_bar_image_export">保存到…</string>
+    <string name="main_top_bar_image_export_success">已保存</string>
+    <string name="main_top_bar_image_export_failed">保存失败</string>
+    <string name="main_top_bar_image_used">已直接使用（比例与顶部操作栏一致）</string>
     <string name="main_top_bar_image_error">图片处理失败</string>
 </resources>

@@ -8,7 +8,6 @@ import io.legado.app.constant.AppConst
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.help.book.ResourceThemeGeneration
-import io.legado.app.lib.theme.ThemeStore
 import io.legado.app.utils.GSON
 import io.legado.app.utils.canvasrecorder.CanvasRecorderFactory
 import io.legado.app.utils.defaultSharedPreferences
@@ -319,11 +318,23 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     val isTransparentStatusBar: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.transparentStatusBar, true)
 
+    /**
+     * 顶部操作栏沉浸式，作用于所有页面的顶部操作栏。
+     * 与底部操作栏沉浸式（[PreferKey.tNavBar] / [PreferKey.tNavBarN]）保持一致：
+     * 日间和夜间分开保存；没有单独设置时跟随对应底栏开关，兼容旧配置的默认行为。
+     */
     val mainTopBarImmersive: Boolean
-        get() = appCtx.getPrefBoolean(
-            PreferKey.mainTopBarImmersive,
-            ThemeStore.transparentNavBar(appCtx)
+        get() = mainTopBarImmersive(isNightTheme)
+
+    fun mainTopBarImmersive(night: Boolean): Boolean {
+        return appCtx.getPrefBoolean(
+            if (night) PreferKey.mainTopBarImmersiveNight else PreferKey.mainTopBarImmersive,
+            appCtx.getPrefBoolean(
+                if (night) PreferKey.tNavBarN else PreferKey.tNavBar,
+                false
+            )
         )
+    }
 
     val immNavigationBar: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.immNavigationBar, true)

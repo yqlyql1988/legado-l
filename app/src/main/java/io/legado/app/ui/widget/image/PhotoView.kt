@@ -76,6 +76,12 @@ class PhotoView @JvmOverloads constructor(
     //缩放
     var isEnable = true
 
+    /** 最小缩放倍数，1 表示不小于初始适应大小；裁剪等场景可设得更小。 */
+    var minScale = 1f
+
+    /** 允许在图片小于控件时仍自由拖动，裁剪取景时用来调整裁剪位置。 */
+    var isFreeScroll = false
+
     //旋转
     var isRotateEnable = false
     private var isInit = false
@@ -509,9 +515,9 @@ class PhotoView @JvmOverloads constructor(
             mDegrees = toDegrees
         }
         var scale = mScale
-        if (mScale < 1) {
-            scale = 1f
-            mTranslate.withScale(mScale, 1F)
+        if (mScale < minScale) {
+            scale = minScale
+            mTranslate.withScale(mScale, minScale)
         } else if (mScale > mMaxScale) {
             scale = mMaxScale
             mTranslate.withScale(mScale, mMaxScale)
@@ -520,15 +526,19 @@ class PhotoView @JvmOverloads constructor(
         val cy = mImgRect.top + mImgRect.height() / 2
         mScaleCenter[cx] = cy
         mRotateCenter[cx] = cy
-        mTranslateX = 0
-        mTranslateY = 0
+        if (!isFreeScroll) {
+            mTranslateX = 0
+            mTranslateY = 0
+        }
         mTmpMatrix.reset()
         mTmpMatrix.postTranslate(-mBaseRect.left, -mBaseRect.top)
         mTmpMatrix.postTranslate(cx - mHalfBaseRectWidth, cy - mHalfBaseRectHeight)
         mTmpMatrix.postScale(scale, scale, cx, cy)
         mTmpMatrix.postRotate(mDegrees, cx, cy)
         mTmpMatrix.mapRect(mTmpRect, mBaseRect)
-        doTranslateReset(mTmpRect)
+        if (!isFreeScroll) {
+            doTranslateReset(mTmpRect)
+        }
         mTranslate.start()
     }
 
@@ -828,21 +838,23 @@ class PhotoView @JvmOverloads constructor(
 
                 // 修复动画结束后边距有些空隙，
                 var needFix = false
-                if (imgLargeWidth) {
-                    if (mImgRect.left > 0) {
-                        mTranslateX -= mImgRect.left.toInt()
-                    } else if (mImgRect.right < mWidgetRect.width()) {
-                        mTranslateX -= (mWidgetRect.width() - mImgRect.right).toInt()
+                if (!isFreeScroll) {
+                    if (imgLargeWidth) {
+                        if (mImgRect.left > 0) {
+                            mTranslateX -= mImgRect.left.toInt()
+                        } else if (mImgRect.right < mWidgetRect.width()) {
+                            mTranslateX -= (mWidgetRect.width() - mImgRect.right).toInt()
+                        }
+                        needFix = true
                     }
-                    needFix = true
-                }
-                if (imgLargeHeight) {
-                    if (mImgRect.top > 0) {
-                        mTranslateY -= mImgRect.top.toInt()
-                    } else if (mImgRect.bottom < mWidgetRect.height()) {
-                        mTranslateY -= (mWidgetRect.height() - mImgRect.bottom).toInt()
+                    if (imgLargeHeight) {
+                        if (mImgRect.top > 0) {
+                            mTranslateY -= mImgRect.top.toInt()
+                        } else if (mImgRect.bottom < mWidgetRect.height()) {
+                            mTranslateY -= (mWidgetRect.height() - mImgRect.bottom).toInt()
+                        }
+                        needFix = true
                     }
-                    needFix = true
                 }
                 if (needFix) {
                     applyAnima()
@@ -1160,16 +1172,16 @@ class PhotoView @JvmOverloads constructor(
             if (mTranslate.isRunning) {
                 mTranslate.stop()
             }
-            if (canScrollHorizontallySelf(x)) {
+            if (!isFreeScroll && canScrollHorizontallySelf(x)) {
                 if (x < 0 && mImgRect.left - x > mWidgetRect.left)
                     x = mImgRect.left
                 if (x > 0 && mImgRect.right - x < mWidgetRect.right)
                     x = mImgRect.right - mWidgetRect.right
                 mAnimMatrix.postTranslate(-x, 0f)
                 mTranslateX -= x.toInt()
-            } else if (imgLargeWidth || hasMultiTouch || hasOverTranslate) {
-                checkRect()
-                if (!hasMultiTouch) {
+            } else if (isFreeScroll || imgLargeWidth || hasMultiTouch || hasOverTranslate) {
+                if (!hasMultiTouch && !isFreeScroll) {
+                    checkRect()
                     if (x < 0 && mImgRect.left - x > mCommonRect.left) x =
                         resistanceScrollByX(mImgRect.left - mCommonRect.left, x)
                     if (x > 0 && mImgRect.right - x < mCommonRect.right) x =
@@ -1179,16 +1191,16 @@ class PhotoView @JvmOverloads constructor(
                 mAnimMatrix.postTranslate(-x, 0f)
                 hasOverTranslate = true
             }
-            if (canScrollVerticallySelf(y)) {
+            if (!isFreeScroll && canScrollVerticallySelf(y)) {
                 if (y < 0 && mImgRect.top - y > mWidgetRect.top) y =
                     mImgRect.top
                 if (y > 0 && mImgRect.bottom - y < mWidgetRect.bottom) y =
                     mImgRect.bottom - mWidgetRect.bottom
                 mAnimMatrix.postTranslate(0f, -y)
                 mTranslateY -= y.toInt()
-            } else if (imgLargeHeight || hasOverTranslate || hasMultiTouch) {
-                checkRect()
-                if (!hasMultiTouch) {
+            } else if (isFreeScroll || imgLargeHeight || hasOverTranslate || hasMultiTouch) {
+                if (!hasMultiTouch && !isFreeScroll) {
+                    checkRect()
                     if (y < 0 && mImgRect.top - y > mCommonRect.top) y =
                         resistanceScrollByY(mImgRect.top - mCommonRect.top, y)
                     if (y > 0 && mImgRect.bottom - y < mCommonRect.bottom) y =

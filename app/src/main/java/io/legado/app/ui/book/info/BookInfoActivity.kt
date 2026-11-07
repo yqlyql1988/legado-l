@@ -3,6 +3,7 @@ package io.legado.app.ui.book.info
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -120,6 +121,7 @@ import io.legado.app.utils.requestInputMethod
 import io.legado.app.utils.sendToClip
 import io.legado.app.utils.setHtml
 import io.legado.app.utils.setMarkdown
+import io.legado.app.utils.setStatusBarColorAuto
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.startActivity
 import io.legado.app.utils.toastOnUi
@@ -265,6 +267,12 @@ class BookInfoActivity :
                 viewModel.onButtonClick(this@BookInfoActivity, "info button $name" , click)
             }
         })
+    }
+
+    /** 书籍信息页始终沉浸：状态栏透明，背景图延伸到状态栏。 */
+    override fun setupSystemBar() {
+        super.setupSystemBar()
+        setStatusBarColorAuto(Color.TRANSPARENT, true, true)
     }
 
     @SuppressLint("PrivateResource")

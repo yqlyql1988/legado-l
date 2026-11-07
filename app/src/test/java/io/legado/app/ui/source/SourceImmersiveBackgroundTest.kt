@@ -14,14 +14,14 @@ class SourceImmersiveBackgroundTest {
     fun sourceEditorsMatchTitleBarTransparency() {
         val titleBar = projectFile("src/main/java/io/legado/app/ui/widget/TitleBar.kt").readText()
         assertTrue(titleBar.contains("if (AppConfig.isEInkMode)"))
-        assertTrue(titleBar.contains("else if (!opaque && context.transparentNavBar)"))
+        assertTrue(titleBar.contains("if (AppConfig.mainTopBarImmersive)"))
 
         listOf(
             "src/main/java/io/legado/app/ui/book/source/edit/BookSourceEditActivity.kt",
             "src/main/java/io/legado/app/ui/rss/source/edit/RssSourceEditActivity.kt",
         ).forEach { path ->
             val source = projectFile(path).readText()
-            assertTrue(source.contains("transparentNavBar && !AppConfig.isEInkMode"))
+            assertTrue(source.contains("AppConfig.mainTopBarImmersive && !AppConfig.isEInkMode"))
             assertTrue(source.contains("listOf(binding.tabLayout, binding.fieldNav)"))
             assertTrue(source.contains("if (transparentBar) Color.TRANSPARENT else backgroundColor"))
             assertTrue(source.contains("if (transparentBar) tabs.elevation = 0f"))
@@ -93,7 +93,7 @@ class SourceImmersiveBackgroundTest {
             "src/main/java/io/legado/app/ui/rss/source/debug/RssSourceDebugActivity.kt",
         ).forEach { path ->
             val source = projectFile(path).readText()
-            assertTrue(source.contains("transparentNavBar && !AppConfig.isEInkMode"))
+            assertTrue(source.contains("AppConfig.mainTopBarImmersive && !AppConfig.isEInkMode"))
             assertTrue(source.contains("Color.TRANSPARENT else backgroundColor"))
             assertTrue(source.contains("binding.recyclerView.visibility = View.GONE"))
             assertTrue(source.contains("binding.recyclerView.visibility = View.VISIBLE"))

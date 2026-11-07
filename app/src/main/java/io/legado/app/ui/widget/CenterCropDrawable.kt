@@ -3,9 +3,9 @@ package io.legado.app.ui.widget
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.PixelFormat
 import android.graphics.RectF
 import android.graphics.drawable.Drawable
-import android.graphics.PixelFormat
 import kotlin.math.max
 
 class CenterCropDrawable(private val bitmap: Bitmap) : Drawable() {

@@ -10,4 +10,9 @@
         android:icon="@drawable/ic_save"
         android:showAsAction="ifRoom"
         android:title="@string/main_top_bar_image_save" />
+    <item
+        android:id="@+id/menu_export"
+        android:icon="@drawable/ic_export"
+        android:showAsAction="never"
+        android:title="@string/main_top_bar_image_export" />
 </menu>

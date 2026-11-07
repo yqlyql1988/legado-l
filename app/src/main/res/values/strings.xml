@@ -1923,12 +1923,16 @@
     <string name="reading_note_manual_hint">请选中当前正文，再点击“书签”或“标注”，采用这条笔记的新位置。</string>
     <string name="reading_note_relocated">已采用当前正文，备注、标签和样式已保留</string>
     <string name="reading_note_unresolved">尚未找到对应位置，书签和标注内容仍保留。可以手动选择原文位置。</string>
-    <string name="main_top_bar_immersive">Main screen top bar immersion</string>
-    <string name="main_top_bar_immersive_summary">Make the main screen top bar transparent</string>
-    <string name="main_top_bar_image">Main screen top bar image</string>
-    <string name="main_top_bar_image_summary">Choose one local image for the main screen top bar</string>
+    <string name="main_top_bar_immersive">Top bar immersion</string>
+    <string name="main_top_bar_immersive_summary">Make the top bar transparent over the content; the top bar image is hidden while this is on. Day and night are set separately, same as bottom bar immersion</string>
+    <string name="main_top_bar_image">Top bar image</string>
+    <string name="main_top_bar_image_summary">Choose a local image as the top bar background; it shows after top bar immersion is turned off</string>
     <string name="main_top_bar_image_set">Image selected</string>
     <string name="main_top_bar_image_reset">Reset crop</string>
     <string name="main_top_bar_image_save">Save</string>
+    <string name="main_top_bar_image_export">Save to…</string>
+    <string name="main_top_bar_image_export_success">Saved</string>
+    <string name="main_top_bar_image_export_failed">Unable to save</string>
+    <string name="main_top_bar_image_used">Applied directly, no crop needed</string>
     <string name="main_top_bar_image_error">Unable to process this image</string>
 </resources>
