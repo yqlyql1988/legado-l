@@ -25,13 +25,6 @@
         app:allowDividerBelow="false"
         app:iconSpaceReserved="false" />
 
-    <io.legado.app.lib.prefs.Preference
-        android:key="coverFontConfig"
-        android:title="@string/cover_font_config"
-        app:allowDividerAbove="false"
-        app:allowDividerBelow="false"
-        app:iconSpaceReserved="false" />
-
     <io.legado.app.lib.prefs.PreferenceCategory
         android:key="dayThemeCategory"
         android:title="@string/day"
@@ -61,6 +54,13 @@
             android:key="coverShowAuthor"
             android:title="@string/cover_show_author"
             android:summary="@string/cover_show_author_summary"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
+            android:key="coverFontConfig"
+            android:title="@string/cover_font_config_day"
             app:allowDividerAbove="false"
             app:allowDividerBelow="false"
             app:iconSpaceReserved="false" />
@@ -96,6 +96,13 @@
             android:key="coverShowAuthorN"
             android:title="@string/cover_show_author"
             android:summary="@string/cover_show_author_summary"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
+            android:key="coverFontConfigN"
+            android:title="@string/cover_font_config_night"
             app:allowDividerAbove="false"
             app:allowDividerBelow="false"
             app:iconSpaceReserved="false" />

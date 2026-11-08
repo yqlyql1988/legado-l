@@ -168,15 +168,30 @@ object BackupConfig {
         PreferKey.coverShowAuthor,
         PreferKey.coverShowNameN,
         PreferKey.coverShowAuthorN,
+        PreferKey.coverTitleCustomColor,
+        PreferKey.coverTitleCustomColorN,
+        PreferKey.coverTitleTextColor,
+        PreferKey.coverTitleShadowColor,
+        PreferKey.coverTitleTextColorN,
+        PreferKey.coverTitleShadowColorN,
         PreferKey.coverHorizontal,
+        PreferKey.coverHorizontalN,
         PreferKey.coverTitleAdaptive,
+        PreferKey.coverTitleAdaptiveN,
         PreferKey.coverKeepPunctuation,
+        PreferKey.coverKeepPunctuationN,
         PreferKey.coverFont,
+        PreferKey.coverFontN,
         PreferKey.coverCustomFontSize,
+        PreferKey.coverCustomFontSizeN,
         PreferKey.coverTitleLargeSize,
+        PreferKey.coverTitleLargeSizeN,
         PreferKey.coverTitleSmallSize,
+        PreferKey.coverTitleSmallSizeN,
         PreferKey.coverAuthorLargeSize,
-        PreferKey.coverAuthorSmallSize
+        PreferKey.coverAuthorLargeSizeN,
+        PreferKey.coverAuthorSmallSize,
+        PreferKey.coverAuthorSmallSizeN
     )
 
     fun keyIsNotIgnore(key: String): Boolean {

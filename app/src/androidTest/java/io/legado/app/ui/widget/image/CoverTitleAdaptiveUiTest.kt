@@ -65,11 +65,14 @@ class CoverTitleAdaptiveUiTest {
     @Before
     fun setUp() {
         preferences.edit()
+            .putString(PreferKey.themeMode, "1")
             .putBoolean(PreferKey.useDefaultCover, false)
             .putBoolean(PreferKey.coverShowName, true)
             .putBoolean(PreferKey.coverShowNameN, true)
             .putBoolean(PreferKey.coverShowAuthor, false)
             .putBoolean(PreferKey.coverShowAuthorN, false)
+            .putBoolean(PreferKey.coverTitleCustomColor, false)
+            .putBoolean(PreferKey.coverTitleCustomColorN, false)
             .putBoolean(PreferKey.coverHorizontal, false)
             .putBoolean(PreferKey.coverTitleAdaptive, true)
             .putBoolean(PreferKey.coverKeepPunctuation, true)
@@ -285,7 +288,7 @@ class CoverTitleAdaptiveUiTest {
                 (it.supportFragmentManager.findFragmentByTag(ConfigTag.COVER_CONFIG) as CoverConfigFragment)
                     .scrollToPreference(ConfigTag.COVER_FONT_CONFIG)
             }
-            onView(withText(R.string.cover_font_config)).perform(click())
+            onView(withText(R.string.cover_font_config_day)).perform(click())
             scrollCoverStylePreference(PreferKey.coverCustomFontSize)
             onView(withText(R.string.cover_custom_font_size)).perform(click())
             sizes.forEachIndexed { index, (key, label) ->
@@ -338,9 +341,13 @@ class CoverTitleAdaptiveUiTest {
             instrumentation.runOnMainSync {
                 val view = cover!!
                 if (view.width <= 0 || view.height <= 0) return@runOnMainSync
+                val textColor = if (BookCover.titleColorEnabled) BookCover.titleTextColor
+                else context.accentColor
+                val shadowColor = if (BookCover.titleColorEnabled) BookCover.titleShadowColor
+                else context.backgroundColor
                 val expected = coverBitmapCacheKey(title, author, view.width, view.height,
                     BookCover.drawBookNameHorizontal, BookCover.drawBookAuthor,
-                    context.backgroundColor, context.accentColor, BookCover.adaptiveTitleSize,
+                    textColor, shadowColor, BookCover.adaptiveTitleSize,
                     BookCover.fontSizes, BookCover.fontCacheKey)
                 // The text cache can be ready while Glide is still loading the cover background.
                 val ready = view.drawable != null && (field.get(view) as? Pair<*, *>)?.first == expected

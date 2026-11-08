@@ -1215,6 +1215,12 @@
     <string name="cover_title_adaptive_summary">Adjust title size to its length; when off, enlarge the first row or column</string>
     <string name="cover_keep_punctuation">Keep title and author punctuation</string>
     <string name="cover_keep_punctuation_summary">Do not remove punctuation from generated cover text</string>
+    <string name="cover_title_custom_color">Custom title colors</string>
+    <string name="cover_title_custom_color_summary">When off, follow the theme accent and background colors</string>
+    <string name="cover_title_text_color">Title text color</string>
+    <string name="cover_title_text_color_summary">Color of the title and author text on the cover</string>
+    <string name="cover_title_shadow_color">Title shadow color</string>
+    <string name="cover_title_shadow_color_summary">Color of the title and author text outline on the cover</string>
     <string name="read_aloud_prev_paragraph">Read aloud the previous paragraph</string>
     <string name="read_aloud_next_paragraph">Read aloud the next paragraph</string>
     <string name="wait_download">wait download</string>

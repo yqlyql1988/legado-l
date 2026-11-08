@@ -540,11 +540,15 @@ object Restore {
                             }
                             if (coverPath == null) edit.remove(key) else edit.putString(key, coverPath)
                         }
-                        PreferKey.coverFont -> {
-                            val fontBackup = File(path, BookCover.fontBackupFileName)
+                        PreferKey.coverFont,
+                        PreferKey.coverFontN -> {
+                            val backupFileName =
+                                if (key == PreferKey.coverFontN) BookCover.fontNightBackupFileName
+                                else BookCover.fontBackupFileName
+                            val fontBackup = File(path, backupFileName)
                             val fontPath = if (value is String && value.isNotBlank() && fontBackup.isFile) {
                                 fontBackup.inputStream().use { input ->
-                                    installFontFile(input, BookCover.fontBackupFileName,
+                                    installFontFile(input, backupFileName,
                                         File(appCtx.externalFiles, "font")) {
                                         runCatching { Typeface.createFromFile(it) }.isSuccess
                                     }.absolutePath
@@ -619,6 +623,24 @@ object Restore {
             }
             if (BackupConfig.keyIsNotIgnore(PreferKey.coverFont) && PreferKey.coverFont !in map) {
                 edit.remove(PreferKey.coverFont)
+            }
+            listOf(
+                PreferKey.coverHorizontalN,
+                PreferKey.coverTitleAdaptiveN,
+                PreferKey.coverKeepPunctuationN,
+                PreferKey.coverCustomFontSizeN,
+                PreferKey.coverFontN,
+                PreferKey.coverTitleLargeSizeN,
+                PreferKey.coverTitleSmallSizeN,
+                PreferKey.coverAuthorLargeSizeN,
+                PreferKey.coverAuthorSmallSizeN,
+                PreferKey.coverTitleCustomColorN,
+                PreferKey.coverTitleTextColorN,
+                PreferKey.coverTitleShadowColorN,
+            ).forEach { nightKey ->
+                if (BackupConfig.keyIsNotIgnore(nightKey) && nightKey !in map) {
+                    edit.remove(nightKey)
+                }
             }
             if (PreferKey.myMoreItems !in map) edit.remove(PreferKey.myMoreItems)
             if (PreferKey.autoBackup !in map) edit.putBoolean(PreferKey.autoBackup, true)

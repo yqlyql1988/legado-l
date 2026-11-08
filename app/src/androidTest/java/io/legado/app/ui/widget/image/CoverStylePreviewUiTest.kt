@@ -41,10 +41,18 @@ class CoverStylePreviewUiTest {
     private val saved = HashMap(preferences.all)
     private val savedNight = AppConfig.isNightTheme
     private val files = mutableListOf<File>()
-    private val styleKeys = listOf(PreferKey.coverHorizontal, PreferKey.coverTitleAdaptive,
+    private val dayStyleKeys = listOf(PreferKey.coverHorizontal, PreferKey.coverTitleAdaptive,
         PreferKey.coverKeepPunctuation, PreferKey.coverFont, PreferKey.coverCustomFontSize,
         PreferKey.coverTitleLargeSize, PreferKey.coverTitleSmallSize,
-        PreferKey.coverAuthorLargeSize, PreferKey.coverAuthorSmallSize)
+        PreferKey.coverAuthorLargeSize, PreferKey.coverAuthorSmallSize,
+        PreferKey.coverTitleCustomColor, PreferKey.coverTitleTextColor,
+        PreferKey.coverTitleShadowColor)
+    private val nightStyleKeys = listOf(PreferKey.coverHorizontalN, PreferKey.coverTitleAdaptiveN,
+        PreferKey.coverKeepPunctuationN, PreferKey.coverFontN, PreferKey.coverCustomFontSizeN,
+        PreferKey.coverTitleLargeSizeN, PreferKey.coverTitleSmallSizeN,
+        PreferKey.coverAuthorLargeSizeN, PreferKey.coverAuthorSmallSizeN,
+        PreferKey.coverTitleCustomColorN, PreferKey.coverTitleTextColorN,
+        PreferKey.coverTitleShadowColorN)
 
     @After
     fun tearDown() {
@@ -67,27 +75,30 @@ class CoverStylePreviewUiTest {
         files.forEach(File::delete)
     }
 
-    private fun launch(): ActivityScenario<ConfigActivity> {
+    private fun launch(night: Boolean = false): ActivityScenario<ConfigActivity> {
         preferences.edit().putBoolean(PreferKey.coverShowName, true)
             .putBoolean(PreferKey.coverShowAuthor, true)
             .putBoolean(PreferKey.coverShowNameN, true)
             .putBoolean(PreferKey.coverShowAuthorN, true).commit()
         instrumentation.runOnMainSync { BookCover.upDefaultCover() }
         return ActivityScenario.launch(Intent(context, ConfigActivity::class.java)
-            .putExtra("configTag", ConfigTag.COVER_FONT_CONFIG))
+            .putExtra("configTag", ConfigTag.COVER_FONT_CONFIG)
+            .putExtra(CoverFontConfigFragment.EXTRA_NIGHT, night))
     }
 
     @Test
     fun orderedScrollableSettingsUpdateRealPreviewsAndSurviveRecreation() {
+        instrumentation.runOnMainSync {
+            AppConfig.isNightTheme = false
+            ThemeConfig.applyDayNight(context)
+        }
         preferences.edit().putBoolean(PreferKey.coverHorizontal, false)
             .putBoolean(PreferKey.coverTitleAdaptive, true)
             .putBoolean(PreferKey.coverKeepPunctuation, false)
             .putBoolean(PreferKey.coverCustomFontSize, false).putString(PreferKey.coverFont, "").commit()
         launch().use { settings ->
             settings.onActivity { activity ->
-                val screen = fragment(activity).preferenceScreen
-                assertEquals(styleKeys + "coverPreview", (0 until screen.preferenceCount)
-                    .map { screen.getPreference(it).key })
+                assertEquals(dayStyleKeys + "coverPreview", preferenceKeys(activity))
             }
             val before = previews(settings)
             settings.onActivity { assertTrue("small screens scroll through all options",
@@ -114,6 +125,19 @@ class CoverStylePreviewUiTest {
     }
 
     @Test
+    fun nightPageOnlyShowsNightStyleSettings() {
+        instrumentation.runOnMainSync {
+            AppConfig.isNightTheme = true
+            ThemeConfig.applyDayNight(context)
+        }
+        launch(night = true).use { settings ->
+            settings.onActivity { activity ->
+                assertEquals(nightStyleKeys + "coverPreview", preferenceKeys(activity))
+            }
+        }
+    }
+
+    @Test
     fun selectedFontIsIndependentAndDayNightPreviewsUseActualCustomBackgrounds() {
         val readerFont = ReadBookConfig.textFont
         val readerTitleFont = ReadBookConfig.titleFont
@@ -125,8 +149,10 @@ class CoverStylePreviewUiTest {
         font.parentFile!!.mkdirs()
         sourceFont.copyTo(font)
         files.add(font)
-        preferences.edit().remove(PreferKey.fontFolder).putString(PreferKey.coverFont, "").commit()
+        preferences.edit().remove(PreferKey.fontFolder).commit()
         for ((night, color) in listOf(false to Color.rgb(241, 219, 184), true to Color.rgb(39, 71, 95))) {
+            val fontKey = if (night) PreferKey.coverFontN else PreferKey.coverFont
+            preferences.edit().putString(fontKey, "").commit()
             val image = File(context.cacheDir, "cover-preview-${UUID.randomUUID()}.png")
             Bitmap.createBitmap(90, 120, Bitmap.Config.ARGB_8888).apply {
                 eraseColor(color)
@@ -140,10 +166,10 @@ class CoverStylePreviewUiTest {
                 AppConfig.isNightTheme = night
                 ThemeConfig.applyDayNight(context)
             }
-            launch().use { settings ->
+            launch(night).use { settings ->
                 val background = previews(settings)
                 background.forEach { assertEquals("current custom background is rendered", color, it[0]) }
-                scroll(settings, PreferKey.coverFont)
+                scroll(settings, fontKey)
                 onView(withText(R.string.cover_font_select)).perform(click())
                 waitUntil {
                     var found = false
@@ -156,7 +182,7 @@ class CoverStylePreviewUiTest {
                     found
                 }
                 onView(withText(context.getString(R.string.font_item_private, font.name))).perform(click())
-                waitUntil { preferences.getString(PreferKey.coverFont, "") == font.path }
+                waitUntil { preferences.getString(fontKey, "") == font.path }
                 assertNotNull(BookCover.fontTypeface)
                 assertEquals(readerFont, ReadBookConfig.textFont)
                 assertEquals(readerTitleFont, ReadBookConfig.titleFont)
@@ -165,11 +191,11 @@ class CoverStylePreviewUiTest {
                 screenshot("cover-style-font-${if (night) "night" else "day"}")
                 settings.recreate()
                 previews(settings)
-                assertEquals(font.path, preferences.getString(PreferKey.coverFont, ""))
-                scroll(settings, PreferKey.coverFont)
+                assertEquals(font.path, preferences.getString(fontKey, ""))
+                scroll(settings, fontKey)
                 onView(withText(R.string.cover_font_select)).perform(click())
                 onView(withId(R.id.menu_default)).perform(click())
-                assertEquals("", preferences.getString(PreferKey.coverFont, ""))
+                assertEquals("", preferences.getString(fontKey, ""))
                 assertNull(BookCover.fontTypeface)
                 assertEquals(systemFont, AppConfig.systemTypefaces)
                 assertEquals(readerFont, ReadBookConfig.textFont)
@@ -180,6 +206,22 @@ class CoverStylePreviewUiTest {
 
     private fun fragment(activity: ConfigActivity) = activity.supportFragmentManager
         .findFragmentByTag(ConfigTag.COVER_FONT_CONFIG) as CoverFontConfigFragment
+
+    private fun preferenceKeys(activity: ConfigActivity): List<String> {
+        val screen = fragment(activity).preferenceScreen
+        val keys = ArrayList<String>()
+        for (index in 0 until screen.preferenceCount) {
+            val preference = screen.getPreference(index)
+            if (preference is androidx.preference.PreferenceGroup) {
+                for (child in 0 until preference.preferenceCount) {
+                    keys.add(preference.getPreference(child).key)
+                }
+            } else {
+                keys.add(preference.key)
+            }
+        }
+        return keys
+    }
 
     private fun scroll(settings: ActivityScenario<ConfigActivity>, key: String) {
         settings.onActivity { fragment(it).scrollToPreference(key) }
@@ -208,10 +250,14 @@ class CoverStylePreviewUiTest {
                     Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888).also { view.draw(Canvas(it)) }
                 }
                 val ready = views.withIndex().all { (index, view) ->
+                    val textColor = if (BookCover.titleColorEnabled) BookCover.titleTextColor
+                    else context.accentColor
+                    val shadowColor = if (BookCover.titleColorEnabled) BookCover.titleShadowColor
+                    else context.backgroundColor
                     val expected = coverBitmapCacheKey(normalizeCoverText(titles[index], BookCover.keepPunctuation)!!,
                         normalizeCoverText(authors[index], BookCover.keepPunctuation), view.width, view.height,
                         BookCover.drawBookNameHorizontal, BookCover.drawBookAuthor,
-                        context.backgroundColor, context.accentColor, BookCover.adaptiveTitleSize,
+                        textColor, shadowColor, BookCover.adaptiveTitleSize,
                         BookCover.fontSizes, BookCover.fontCacheKey)
                     (field.get(view) as? Pair<*, *>)?.first == expected
                 }

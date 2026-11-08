@@ -107,8 +107,13 @@ class CoverConfigFragment : PreferenceFragment(),
     @SuppressLint("PrivateResource")
     override fun onPreferenceTreeClick(preference: Preference): Boolean {
         when (preference.key) {
-            ConfigTag.COVER_FONT_CONFIG -> startActivity<ConfigActivity> {
+            ConfigTag.COVER_FONT_CONFIG,
+            ConfigTag.COVER_FONT_CONFIG_NIGHT -> startActivity<ConfigActivity> {
                 putExtra("configTag", ConfigTag.COVER_FONT_CONFIG)
+                putExtra(
+                    CoverFontConfigFragment.EXTRA_NIGHT,
+                    preference.key == ConfigTag.COVER_FONT_CONFIG_NIGHT
+                )
             }
             "coverRule" -> showDialogFragment(CoverRuleConfigDialog())
             in coverKeys ->

@@ -27,14 +27,16 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.glide.BlurTransformation
 import io.legado.app.help.glide.ImageLoader
 import io.legado.app.help.glide.OkHttpModelLoader
+import io.legado.app.lib.theme.accentColor
+import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.utils.BitmapUtils
 import io.legado.app.utils.GSON
+import io.legado.app.utils.defaultSharedPreferences
 import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.getPrefBoolean
-import io.legado.app.utils.getPrefInt
 import io.legado.app.utils.getPrefString
 import kotlinx.coroutines.currentCoroutineContext
 import splitties.init.appCtx
@@ -55,10 +57,17 @@ object BookCover {
     private const val coverRuleConfigKey = "legadoCoverRuleConfig"
     const val configFileName = "coverRule.json"
     const val fontBackupFileName = "coverFont.ttf"
+    const val fontNightBackupFileName = "coverFontNight.ttf"
 
     var drawBookName = true
         private set
     var drawBookAuthor = true
+        private set
+    var titleColorEnabled = false
+        private set
+    var titleTextColor = 0
+        private set
+    var titleShadowColor = 0
         private set
     var drawBookNameHorizontal = false
         private set
@@ -94,26 +103,76 @@ object BookCover {
             drawBookAuthor = appCtx.getPrefBoolean(PreferKey.coverShowAuthor, true)
             path = appCtx.getPrefString(PreferKey.defaultCover)
         }
-        drawBookNameHorizontal = appCtx.getPrefBoolean(PreferKey.coverHorizontal, false)
-        adaptiveTitleSize = appCtx.getPrefBoolean(PreferKey.coverTitleAdaptive, true)
-        keepPunctuation = appCtx.getPrefBoolean(PreferKey.coverKeepPunctuation, false)
-        val fontFile = appCtx.getPrefString(PreferKey.coverFont)?.takeIf { it.isNotBlank() }?.let(::File)
+        titleColorEnabled =
+            dayOrNightBoolean(PreferKey.coverTitleCustomColor, PreferKey.coverTitleCustomColorN, false)
+        if (titleColorEnabled) {
+            titleTextColor = dayOrNightInt(
+                PreferKey.coverTitleTextColor,
+                PreferKey.coverTitleTextColorN,
+                appCtx.accentColor
+            )
+            titleShadowColor = dayOrNightInt(
+                PreferKey.coverTitleShadowColor,
+                PreferKey.coverTitleShadowColorN,
+                appCtx.backgroundColor
+            )
+        } else {
+            titleTextColor = 0
+            titleShadowColor = 0
+        }
+        drawBookNameHorizontal =
+            dayOrNightBoolean(PreferKey.coverHorizontal, PreferKey.coverHorizontalN, false)
+        adaptiveTitleSize =
+            dayOrNightBoolean(PreferKey.coverTitleAdaptive, PreferKey.coverTitleAdaptiveN, true)
+        keepPunctuation =
+            dayOrNightBoolean(PreferKey.coverKeepPunctuation, PreferKey.coverKeepPunctuationN, false)
+        val fontPath = dayOrNightString(PreferKey.coverFont, PreferKey.coverFontN)
+        val fontFile = fontPath?.takeIf { it.isNotBlank() }?.let(::File)
         val fontKey = fontFile?.let { "${it.path}:${it.length()}:${it.lastModified()}" }.orEmpty()
         if (fontCacheKey != fontKey) {
             fontTypeface = fontFile?.let { runCatching { Typeface.createFromFile(it) }.getOrNull() }
             fontCacheKey = fontKey
         }
-        fontSizes = if (appCtx.getPrefBoolean(PreferKey.coverCustomFontSize, false)) {
-            CoverFontSizes(
-                appCtx.getPrefInt(PreferKey.coverTitleLargeSize, 100).coerceIn(50, 200),
-                appCtx.getPrefInt(PreferKey.coverTitleSmallSize, 100).coerceIn(50, 200),
-                appCtx.getPrefInt(PreferKey.coverAuthorLargeSize, 100).coerceIn(50, 200),
-                appCtx.getPrefInt(PreferKey.coverAuthorSmallSize, 100).coerceIn(50, 200),
-            )
-        } else null
+        fontSizes =
+            if (dayOrNightBoolean(PreferKey.coverCustomFontSize, PreferKey.coverCustomFontSizeN, false)) {
+                CoverFontSizes(
+                    dayOrNightInt(PreferKey.coverTitleLargeSize, PreferKey.coverTitleLargeSizeN, 100)
+                        .coerceIn(50, 200),
+                    dayOrNightInt(PreferKey.coverTitleSmallSize, PreferKey.coverTitleSmallSizeN, 100)
+                        .coerceIn(50, 200),
+                    dayOrNightInt(PreferKey.coverAuthorLargeSize, PreferKey.coverAuthorLargeSizeN, 100)
+                        .coerceIn(50, 200),
+                    dayOrNightInt(PreferKey.coverAuthorSmallSize, PreferKey.coverAuthorSmallSizeN, 100)
+                        .coerceIn(50, 200),
+                )
+            } else null
         defaultDrawable = runCatching {
             BitmapUtils.decodeBitmap(path!!, 600, 900)!!.toDrawable(appCtx.resources)
         }.getOrDefault(appCtx.resources.getDrawable(R.drawable.image_cover_default, null))
+    }
+
+    /**
+     * 书名样式在白天和夜间分别保存；夜间键未写入时沿用白天设置，兼容旧版本数据。
+     */
+    private fun dayOrNightBoolean(dayKey: String, nightKey: String, default: Boolean): Boolean {
+        val prefs = appCtx.defaultSharedPreferences
+        val key = if (AppConfig.isNightTheme && prefs.contains(nightKey)) nightKey else dayKey
+        return prefs.getBoolean(key, default)
+    }
+
+    private fun dayOrNightInt(dayKey: String, nightKey: String, default: Int): Int {
+        val prefs = appCtx.defaultSharedPreferences
+        val key = if (AppConfig.isNightTheme && prefs.contains(nightKey)) nightKey else dayKey
+        return prefs.getInt(key, default)
+    }
+
+    private fun dayOrNightString(dayKey: String, nightKey: String): String? {
+        val prefs = appCtx.defaultSharedPreferences
+        return if (AppConfig.isNightTheme && prefs.contains(nightKey)) {
+            prefs.getString(nightKey, null)
+        } else {
+            prefs.getString(dayKey, null)
+        }
     }
 
     /**

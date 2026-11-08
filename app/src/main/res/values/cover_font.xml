@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="cover_font_config">Default title style</string>
+    <string name="cover_font_config_day">Title settings (day)</string>
+    <string name="cover_font_config_night">Title settings (night)</string>
     <string name="cover_font_select">Cover title font</string>
     <string name="cover_preview_short">Short title cover preview: 开源阅读, by 开源阅读LegadoTeam</string>
     <string name="cover_preview_long">Long title cover preview: 开源阅读可以看小说、看漫画、听书, by 开源阅读</string>
