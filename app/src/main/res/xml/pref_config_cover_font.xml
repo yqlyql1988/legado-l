@@ -2,62 +2,237 @@
 <androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <io.legado.app.lib.prefs.SwitchPreference
-        android:defaultValue="false"
-        android:key="coverHorizontal"
-        android:title="@string/cover_horizontal"
-        android:summary="@string/cover_horizontal_summary"
+    <io.legado.app.lib.prefs.PreferenceCategory
+        android:key="coverDayStyleCategory"
+        android:title="@string/day"
         app:allowDividerAbove="false"
         app:allowDividerBelow="false"
-        app:iconSpaceReserved="false" />
+        app:iconSpaceReserved="false"
+        app:layout="@layout/view_preference_category">
 
-    <io.legado.app.lib.prefs.SwitchPreference
-        android:defaultValue="true"
-        android:key="coverTitleAdaptive"
-        android:title="@string/cover_title_adaptive"
-        android:summary="@string/cover_title_adaptive_summary"
-        app:allowDividerAbove="false"
+        <io.legado.app.lib.prefs.SwitchPreference
+            android:defaultValue="false"
+            android:key="coverHorizontal"
+            android:title="@string/cover_horizontal"
+            android:summary="@string/cover_horizontal_summary"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.SwitchPreference
+            android:defaultValue="true"
+            android:key="coverTitleAdaptive"
+            android:title="@string/cover_title_adaptive"
+            android:summary="@string/cover_title_adaptive_summary"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.SwitchPreference
+            android:defaultValue="false"
+            android:key="coverKeepPunctuation"
+            android:title="@string/cover_keep_punctuation"
+            android:summary="@string/cover_keep_punctuation_summary"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
+            android:key="coverFont"
+            android:title="@string/cover_font_select"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.SwitchPreference
+            android:key="coverCustomFontSize"
+            android:defaultValue="false"
+            android:title="@string/cover_custom_font_size"
+            android:summary="@string/cover_custom_font_size_summary"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
+            android:key="coverTitleLargeSize"
+            android:dependency="coverCustomFontSize"
+            android:title="@string/cover_title_large_size"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
+            android:key="coverTitleSmallSize"
+            android:dependency="coverCustomFontSize"
+            android:title="@string/cover_title_small_size"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
+            android:key="coverAuthorLargeSize"
+            android:dependency="coverCustomFontSize"
+            android:title="@string/cover_author_large_size"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
+            android:key="coverAuthorSmallSize"
+            android:dependency="coverCustomFontSize"
+            android:title="@string/cover_author_small_size"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.SwitchPreference
+            android:defaultValue="false"
+            android:key="coverTitleCustomColor"
+            android:title="@string/cover_title_custom_color"
+            android:summary="@string/cover_title_custom_color_summary"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.ColorPreference
+            android:defaultValue="@color/md_red_600"
+            android:dependency="coverTitleCustomColor"
+            android:key="coverTitleTextColor"
+            android:title="@string/cover_title_text_color"
+            android:summary="@string/cover_title_text_color_summary"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:cpv_dialogType="preset"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.ColorPreference
+            android:defaultValue="@color/md_grey_100"
+            android:dependency="coverTitleCustomColor"
+            android:key="coverTitleShadowColor"
+            android:title="@string/cover_title_shadow_color"
+            android:summary="@string/cover_title_shadow_color_summary"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:cpv_dialogType="preset"
+            app:iconSpaceReserved="false" />
+
+    </io.legado.app.lib.prefs.PreferenceCategory>
+
+    <io.legado.app.lib.prefs.PreferenceCategory
+        android:key="coverNightStyleCategory"
+        android:title="@string/night"
+        app:allowDividerAbove="true"
         app:allowDividerBelow="false"
-        app:iconSpaceReserved="false" />
+        app:iconSpaceReserved="false"
+        app:layout="@layout/view_preference_category">
 
-    <io.legado.app.lib.prefs.SwitchPreference
-        android:defaultValue="false"
-        android:key="coverKeepPunctuation"
-        android:title="@string/cover_keep_punctuation"
-        android:summary="@string/cover_keep_punctuation_summary"
-        app:allowDividerAbove="false"
-        app:allowDividerBelow="false"
-        app:iconSpaceReserved="false" />
+        <io.legado.app.lib.prefs.SwitchPreference
+            android:defaultValue="false"
+            android:key="coverHorizontalN"
+            android:title="@string/cover_horizontal"
+            android:summary="@string/cover_horizontal_summary"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:iconSpaceReserved="false" />
 
-    <io.legado.app.lib.prefs.Preference
-        android:key="coverFont"
-        android:title="@string/cover_font_select" />
+        <io.legado.app.lib.prefs.SwitchPreference
+            android:defaultValue="true"
+            android:key="coverTitleAdaptiveN"
+            android:title="@string/cover_title_adaptive"
+            android:summary="@string/cover_title_adaptive_summary"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:iconSpaceReserved="false" />
 
-    <io.legado.app.lib.prefs.SwitchPreference
-        android:key="coverCustomFontSize"
-        android:defaultValue="false"
-        android:title="@string/cover_custom_font_size"
-        android:summary="@string/cover_custom_font_size_summary" />
+        <io.legado.app.lib.prefs.SwitchPreference
+            android:defaultValue="false"
+            android:key="coverKeepPunctuationN"
+            android:title="@string/cover_keep_punctuation"
+            android:summary="@string/cover_keep_punctuation_summary"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:iconSpaceReserved="false" />
 
-    <io.legado.app.lib.prefs.Preference
-        android:key="coverTitleLargeSize"
-        android:dependency="coverCustomFontSize"
-        android:title="@string/cover_title_large_size" />
+        <io.legado.app.lib.prefs.Preference
+            android:key="coverFontN"
+            android:title="@string/cover_font_select"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:iconSpaceReserved="false" />
 
-    <io.legado.app.lib.prefs.Preference
-        android:key="coverTitleSmallSize"
-        android:dependency="coverCustomFontSize"
-        android:title="@string/cover_title_small_size" />
+        <io.legado.app.lib.prefs.SwitchPreference
+            android:key="coverCustomFontSizeN"
+            android:defaultValue="false"
+            android:title="@string/cover_custom_font_size"
+            android:summary="@string/cover_custom_font_size_summary"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:iconSpaceReserved="false" />
 
-    <io.legado.app.lib.prefs.Preference
-        android:key="coverAuthorLargeSize"
-        android:dependency="coverCustomFontSize"
-        android:title="@string/cover_author_large_size" />
+        <io.legado.app.lib.prefs.Preference
+            android:key="coverTitleLargeSizeN"
+            android:dependency="coverCustomFontSizeN"
+            android:title="@string/cover_title_large_size"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:iconSpaceReserved="false" />
 
-    <io.legado.app.lib.prefs.Preference
-        android:key="coverAuthorSmallSize"
-        android:dependency="coverCustomFontSize"
-        android:title="@string/cover_author_small_size" />
+        <io.legado.app.lib.prefs.Preference
+            android:key="coverTitleSmallSizeN"
+            android:dependency="coverCustomFontSizeN"
+            android:title="@string/cover_title_small_size"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
+            android:key="coverAuthorLargeSizeN"
+            android:dependency="coverCustomFontSizeN"
+            android:title="@string/cover_author_large_size"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
+            android:key="coverAuthorSmallSizeN"
+            android:dependency="coverCustomFontSizeN"
+            android:title="@string/cover_author_small_size"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.SwitchPreference
+            android:defaultValue="false"
+            android:key="coverTitleCustomColorN"
+            android:title="@string/cover_title_custom_color"
+            android:summary="@string/cover_title_custom_color_summary"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.ColorPreference
+            android:defaultValue="@color/md_deep_orange_800"
+            android:dependency="coverTitleCustomColorN"
+            android:key="coverTitleTextColorN"
+            android:title="@string/cover_title_text_color"
+            android:summary="@string/cover_title_text_color_summary"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:cpv_dialogType="preset"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.ColorPreference
+            android:defaultValue="@color/md_grey_900"
+            android:dependency="coverTitleCustomColorN"
+            android:key="coverTitleShadowColorN"
+            android:title="@string/cover_title_shadow_color"
+            android:summary="@string/cover_title_shadow_color_summary"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:cpv_dialogType="preset"
+            app:iconSpaceReserved="false" />
+
+    </io.legado.app.lib.prefs.PreferenceCategory>
 
     <io.legado.app.ui.config.CoverPreviewPreference
         android:key="coverPreview"

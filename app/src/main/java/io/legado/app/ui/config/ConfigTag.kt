@@ -9,6 +9,7 @@ object ConfigTag {
     const val BACKUP_CONFIG = "backupConfig"
     const val COVER_CONFIG = "coverConfig"
     const val COVER_FONT_CONFIG = "coverFontConfig"
+    const val COVER_FONT_CONFIG_NIGHT = "coverFontConfigN"
     const val WELCOME_CONFIG = "welcomeConfig"
 
 }

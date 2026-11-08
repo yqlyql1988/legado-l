@@ -65,8 +65,8 @@ internal fun coverBitmapCacheKey(
     height: Int,
     horizontal: Boolean,
     drawAuthor: Boolean,
-    backgroundColor: Int,
-    accentColor: Int,
+    textColor: Int,
+    shadowColor: Int,
     adaptiveTitle: Boolean = true,
     fontSizes: CoverFontSizes? = null,
     fontCacheKey: String = "",
@@ -82,7 +82,7 @@ internal fun coverBitmapCacheKey(
     append('|').append(if (horizontal) 'h' else 'v')
     append('|').append(if (drawAuthor) 'a' else 'n')
     append('|').append(if (adaptiveTitle) 's' else 'f')
-    append('|').append(backgroundColor).append(',').append(accentColor)
+    append('|').append(textColor).append(',').append(shadowColor)
     if (fontSizes != null) append('|').append(fontSizes)
     append('|').append(fontCacheKey.length).append(':').append(fontCacheKey)
 }
@@ -156,8 +156,7 @@ class CoverImageView @JvmOverloads constructor(
         val currentName = this.name ?: return
         if (AppConfig.useDefaultCover || needNameBitmap[bitmapPath.toString()] == true) {
             val currentAuthor = this.author
-            val backgroundColor = appCtx.backgroundColor
-            val accentColor = appCtx.accentColor
+            val (titleTextColor, titleShadowColor) = coverTitleColors()
             val fontSizes = BookCover.fontSizes
             val fontTypeface = BookCover.fontTypeface
             val fontCacheKey = BookCover.fontCacheKey
@@ -168,8 +167,8 @@ class CoverImageView @JvmOverloads constructor(
                 height,
                 BookCover.drawBookNameHorizontal,
                 drawBookAuthor,
-                backgroundColor,
-                accentColor,
+                titleTextColor,
+                titleShadowColor,
                 BookCover.adaptiveTitleSize,
                 fontSizes,
                 fontCacheKey,
@@ -179,10 +178,17 @@ class CoverImageView @JvmOverloads constructor(
                 canvas.drawBitmap(cacheBitmap, 0f, 0f, null)
                 return
             }
-            drawNameAuthor(currentName, currentAuthor, backgroundColor, accentColor, false,
+            drawNameAuthor(currentName, currentAuthor, titleTextColor, titleShadowColor, false,
                 fontSizes, fontTypeface, fontCacheKey)
         }
     }
+
+    private fun coverTitleColors(): Pair<Int, Int> =
+        if (BookCover.titleColorEnabled) {
+            BookCover.titleTextColor to BookCover.titleShadowColor
+        } else {
+            appCtx.accentColor to appCtx.backgroundColor
+        }
 
     private fun getNameBitmap(cacheKey: String): Bitmap? {
         val currentBitmap = currentNameBitmap
@@ -208,18 +214,23 @@ class CoverImageView @JvmOverloads constructor(
     private fun drawNameAuthor(
         name: String,
         author: String?,
-        backgroundColor: Int = appCtx.backgroundColor,
-        accentColor: Int = appCtx.accentColor,
+        textColor: Int? = null,
+        shadowColor: Int? = null,
         asyncAwait: Boolean = true,
         fontSizes: CoverFontSizes? = BookCover.fontSizes,
         fontTypeface: Typeface? = BookCover.fontTypeface,
         fontCacheKey: String = BookCover.fontCacheKey,
     ) {
+        val (resolvedTextColor, resolvedShadowColor) = if (textColor != null && shadowColor != null) {
+            textColor to shadowColor
+        } else {
+            coverTitleColors()
+        }
         generateCoverAsync(
             name,
             author,
-            backgroundColor,
-            accentColor,
+            resolvedTextColor,
+            resolvedShadowColor,
             BookCover.drawBookNameHorizontal,
             BookCover.drawBookAuthor,
             BookCover.adaptiveTitleSize,
@@ -232,8 +243,8 @@ class CoverImageView @JvmOverloads constructor(
     private fun generateCoverAsync(
         name: String,
         author: String?,
-        backgroundColor: Int,
-        accentColor: Int,
+        textColor: Int,
+        shadowColor: Int,
         horizontal: Boolean,
         drawAuthor: Boolean,
         adaptiveTitle: Boolean,
@@ -270,8 +281,8 @@ class CoverImageView @JvmOverloads constructor(
                     renderHeight,
                     horizontal,
                     drawAuthor,
-                    backgroundColor,
-                    accentColor,
+                    textColor,
+                    shadowColor,
                     adaptiveTitle,
                     fontSizes,
                     fontCacheKey,
@@ -287,8 +298,8 @@ class CoverImageView @JvmOverloads constructor(
                     renderHeight,
                     horizontal,
                     drawAuthor,
-                    backgroundColor,
-                    accentColor,
+                    textColor,
+                    shadowColor,
                     adaptiveTitle,
                     fontSizes,
                     fontTypeface,
@@ -312,8 +323,8 @@ class CoverImageView @JvmOverloads constructor(
         renderHeight: Int,
         horizontal: Boolean,
         drawAuthor: Boolean,
-        backgroundColor: Int,
-        accentColor: Int,
+        textColor: Int,
+        shadowColor: Int,
         adaptiveTitle: Boolean,
         fontSizes: CoverFontSizes?,
         fontTypeface: Typeface?,
@@ -329,8 +340,8 @@ class CoverImageView @JvmOverloads constructor(
                 bitmapCanvas,
                 name,
                 author,
-                backgroundColor,
-                accentColor,
+                textColor,
+                shadowColor,
                 drawAuthor,
                 viewWidth,
                 viewHeight,
@@ -356,10 +367,10 @@ class CoverImageView @JvmOverloads constructor(
             namePaint.strokeWidth = namePaint.textSize / 6
             name.forEachIndexed { index, char ->
                 if (fontSizes != null) namePaint.strokeWidth = namePaint.textSize / 6
-                namePaint.color = backgroundColor
+                namePaint.color = shadowColor
                 namePaint.style = Paint.Style.STROKE
                 bitmapCanvas.drawText(char, startX, startY, namePaint)
-                namePaint.color = accentColor
+                namePaint.color = textColor
                 namePaint.style = Paint.Style.FILL
                 bitmapCanvas.drawText(char, startX, startY, namePaint)
                 startY += namePaint.textHeight
@@ -409,10 +420,10 @@ class CoverImageView @JvmOverloads constructor(
             var startY = viewHeight * 0.95f - author.size * authorPaint.textHeight
             startY = maxOf(startY, viewHeight * 0.3f)
             author.forEach {
-                authorPaint.color = backgroundColor
+                authorPaint.color = shadowColor
                 authorPaint.style = Paint.Style.STROKE
                 bitmapCanvas.drawText(it, startX, startY, authorPaint)
-                authorPaint.color = accentColor
+                authorPaint.color = textColor
                 authorPaint.style = Paint.Style.FILL
                 bitmapCanvas.drawText(it, startX, startY, authorPaint)
                 startY += authorPaint.textHeight
@@ -428,8 +439,8 @@ class CoverImageView @JvmOverloads constructor(
         canvas: Canvas,
         name: String?,
         author: String?,
-        backgroundColor: Int,
-        accentColor: Int,
+        textColor: Int,
+        shadowColor: Int,
         drawAuthor: Boolean,
         viewWidth: Float,
         viewHeight: Float,
@@ -465,10 +476,10 @@ class CoverImageView @JvmOverloads constructor(
             val titleY = viewHeight * 0.1f
             canvas.save()
             canvas.translate(titleX, titleY)
-            titlePaint.color = backgroundColor
+            titlePaint.color = shadowColor
             titlePaint.style = Paint.Style.STROKE
             titleLayout.draw(canvas)
-            titlePaint.color = accentColor
+            titlePaint.color = textColor
             titlePaint.style = Paint.Style.FILL
             titleLayout.draw(canvas)
             canvas.restore()
@@ -506,10 +517,10 @@ class CoverImageView @JvmOverloads constructor(
             ).toString()
             val authorX = viewWidth * 0.9f
             val authorY = viewHeight * 0.92f
-            authorPaint.color = backgroundColor
+            authorPaint.color = shadowColor
             authorPaint.style = Paint.Style.STROKE
             canvas.drawText(displayAuthor, authorX, authorY, authorPaint)
-            authorPaint.color = accentColor
+            authorPaint.color = textColor
             authorPaint.style = Paint.Style.FILL
             canvas.drawText(displayAuthor, authorX, authorY, authorPaint)
         }

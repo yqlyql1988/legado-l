@@ -395,8 +395,14 @@ object Backup {
         }
         currentCoroutineContext().ensureActive()
         val preferenceSnapshot = HashMap<String, Any?>(appCtx.defaultSharedPreferences.all)
-        (preferenceSnapshot[PreferKey.coverFont] as? String)?.takeIf { it.isNotBlank() }?.let {
-            if (!File(it).exists()) preferenceSnapshot[PreferKey.coverFont] = ""
+        val coverFontBackups = listOf(
+            PreferKey.coverFont to BookCover.fontBackupFileName,
+            PreferKey.coverFontN to BookCover.fontNightBackupFileName,
+        )
+        coverFontBackups.forEach { (key, _) ->
+            (preferenceSnapshot[key] as? String)?.takeIf { it.isNotBlank() }?.let {
+                if (!File(it).exists()) preferenceSnapshot[key] = ""
+            }
         }
         writePreferenceSnapshot(appCtx, backupPath, "config") {
             putInt("readRecordSort", LocalConfig.getInt("readRecordSort", 0))
@@ -445,15 +451,18 @@ object Backup {
         currentCoroutineContext().ensureActive()
         val zipFileName = getNowZipFileName()
         val paths = ArrayList(selectedBackupFileNames(enabledContentKeys::contains))
-        if (BackupConfig.settingContentKey in enabledContentKeys &&
-            BackupConfig.keyIsNotIgnore(PreferKey.coverFont)
-        ) {
-            (preferenceSnapshot[PreferKey.coverFont] as? String)?.takeIf { it.isNotBlank() }?.let { fontPath ->
-                val fontBackup = File(backupPath, BookCover.fontBackupFileName)
-                val fontFile = File(fontPath)
-                check(fontFile.isFile) { "Invalid cover font: $fontPath" }
-                fontFile.copyTo(fontBackup, overwrite = true)
-                paths.add(BookCover.fontBackupFileName)
+        coverFontBackups.forEach { (key, backupFileName) ->
+            if (BackupConfig.settingContentKey in enabledContentKeys &&
+                BackupConfig.keyIsNotIgnore(key)
+            ) {
+                (preferenceSnapshot[key] as? String)?.takeIf { it.isNotBlank() }
+                    ?.let { fontPath ->
+                        val fontBackup = File(backupPath, backupFileName)
+                        val fontFile = File(fontPath)
+                        check(fontFile.isFile) { "Invalid cover font: $fontPath" }
+                        fontFile.copyTo(fontBackup, overwrite = true)
+                        paths.add(backupFileName)
+                    }
             }
         }
         if (lanTransfer) {

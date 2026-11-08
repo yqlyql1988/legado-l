@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="cover_font_config">默认书名样式设置</string>
+    <string name="cover_font_config_day">书名设置（白天）</string>
+    <string name="cover_font_config_night">书名设置（夜间）</string>
     <string name="cover_font_select">书名字体设置</string>
     <string name="cover_preview_short">短书名封面预览：开源阅读，作者开源阅读LegadoTeam</string>
     <string name="cover_preview_long">长书名封面预览：开源阅读可以看小说、看漫画、听书，作者开源阅读</string>
