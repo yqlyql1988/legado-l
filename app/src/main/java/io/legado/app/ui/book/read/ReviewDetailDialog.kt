@@ -46,6 +46,7 @@ import io.legado.app.model.ReadBook
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.analyzeRule.AnalyzeUrl.Companion.getMediaItem
 import io.legado.app.model.analyzeRule.ReviewRuleParser
+import io.legado.app.model.analyzeRule.ReviewRulePoster
 import io.legado.app.model.analyzeRule.ReviewRuleParser.DetailItem as ReviewDetailItem
 import io.legado.app.model.jsSource.JsSourceReview
 import io.legado.app.utils.dpToPx
@@ -276,8 +277,11 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_review_detail) {
 
     private fun setupReviewComposer() {
         val source = ReadBook.bookSource
-        val canPost = source != null && source.isJsSource() &&
-                JsSourceReview.hasPostReviewCapability(source)
+        val canPost = source != null && (
+                (source.isJsSource() && JsSourceReview.hasPostReviewCapability(source)) ||
+                        (!source.isJsSource() &&
+                                !source.ruleReview?.postReviewUrl.isNullOrBlank())
+                )
         binding.llReviewComposer.visibility = if (canPost) View.VISIBLE else View.GONE
         if (!canPost) return
         binding.tvReviewSend.setOnClickListener { sendReview() }
@@ -288,7 +292,7 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_review_detail) {
         val content = binding.etReviewContent.text?.toString()?.trim().orEmpty()
         if (content.isEmpty()) return
         val source = ReadBook.bookSource ?: return
-        if (!source.isJsSource()) return
+        val rulePost = !source.isJsSource()
         isSending = true
         binding.tvReviewSend.isEnabled = false
         binding.etReviewContent.isEnabled = false
@@ -298,14 +302,25 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_review_detail) {
             if (source.getKey() != sourceKey) return@async false
             val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex)
                 ?: return@async false
-            JsSourceReview.postReviewAwait(
-                source = source,
-                book = book,
-                chapter = chapter,
-                paragraphIndex = paragraphNum,
-                paragraphData = paragraphData,
-                content = content,
-            )
+            if (rulePost) {
+                ReviewRulePoster.postReview(
+                    source = source,
+                    book = book,
+                    chapter = chapter,
+                    paragraphIndex = paragraphNum,
+                    paragraphData = paragraphData,
+                    content = content,
+                )
+            } else {
+                JsSourceReview.postReviewAwait(
+                    source = source,
+                    book = book,
+                    chapter = chapter,
+                    paragraphIndex = paragraphNum,
+                    paragraphData = paragraphData,
+                    content = content,
+                )
+            }
         }.onSuccess(Main) { success ->
             if (view == null) return@onSuccess
             isSending = false

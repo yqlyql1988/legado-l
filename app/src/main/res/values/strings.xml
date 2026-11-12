@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--App-->
     <string name="app_name">阅读L</string>
@@ -1773,6 +1773,7 @@
     <string name="review_play_audio">Play audio</string>
     <string name="review_pause_audio">Pause audio</string>
     <string name="review_empty">No paragraph reviews</string>
+    <string name="chapter_review">章评</string>
     <string name="review_rule_missing">Paragraph review rules are not configured</string>
     <string name="review_detail_url_missing">Paragraph review detail URL is not configured</string>
     <string name="review_detail_rule_missing">Paragraph review detail rules are not configured</string>
@@ -1942,3 +1943,4 @@
     <string name="main_top_bar_image_used">Applied directly, no crop needed</string>
     <string name="main_top_bar_image_error">Unable to process this image</string>
 </resources>
+
