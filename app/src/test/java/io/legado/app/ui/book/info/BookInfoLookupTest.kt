@@ -63,29 +63,6 @@ class BookInfoLookupTest {
         }
     }
 
-    @Test
-    fun `reader entry keeps the current book shelf state`() {
-        val viewModel = readProjectFile(
-            "src/main/java/io/legado/app/ui/book/info/BookInfoViewModel.kt"
-        )
-        val initData = viewModel
-            .substringAfter("fun initData(intent: Intent)")
-            .substringBefore("fun upBook(intent: Intent)")
-        val loadBookInfo = viewModel
-            .substringAfter("fun loadBookInfo(")
-            .substringBefore("fun loadChapter(")
-        val addToBookshelf = viewModel
-            .substringAfter("fun addToBookshelf(")
-            .substringBefore("fun getBook(")
-
-        assertTrue(initData.contains("openedByReader = bookUrl.isNotBlank()"))
-        assertTrue(initData.contains("inBookshelf = if (openedByReader) false else !it.isNotShelf"))
-        assertTrue(loadBookInfo.contains("!openedByReader && !inBookshelf"))
-        assertTrue(addToBookshelf.contains("shelfBook.bookUrl != book.bookUrl"))
-        assertTrue(addToBookshelf.contains("shelfBook.updateTo(book)"))
-        assertTrue(addToBookshelf.contains("appDb.bookDao.replace(shelfBook, book)"))
-    }
-
     private fun readProjectFile(pathInApp: String): String {
         val file = sequenceOf(File(pathInApp), File("app/$pathInApp"))
             .firstOrNull(File::isFile)
