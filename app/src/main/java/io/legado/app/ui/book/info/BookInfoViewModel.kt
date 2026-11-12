@@ -125,17 +125,20 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             val name = intent.getStringExtra("name") ?: ""
             val author = intent.getStringExtra("author") ?: ""
             val bookUrl = intent.getStringExtra("bookUrl") ?: ""
-            appDb.bookDao.getBook(name, author)?.let {
-                inBookshelf = !it.isNotShelf
-                upBook(it)
-                return@execute
-            }
+            // 正文/漫画阅读界面按书籍地址精确定位当前书，避免书名、作者变化后匹配不到
             if (bookUrl.isNotBlank()) {
                 appDb.bookDao.getBook(bookUrl)?.let {
                     inBookshelf = !it.isNotShelf
                     upBook(it)
                     return@execute
                 }
+            }
+            appDb.bookDao.getBook(name, author)?.let {
+                inBookshelf = !it.isNotShelf
+                upBook(it)
+                return@execute
+            }
+            if (bookUrl.isNotBlank()) {
                 appDb.searchBookDao.getSearchBook(bookUrl)?.toBook()?.let {
                     upBook(it)
                     return@execute
@@ -154,6 +157,13 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
 
     fun upBook(intent: Intent) {
         execute {
+            val bookUrl = intent.getStringExtra("bookUrl") ?: ""
+            if (bookUrl.isNotBlank()) {
+                appDb.bookDao.getBook(bookUrl)?.let { book ->
+                    upBook(book)
+                    return@execute
+                }
+            }
             val name = intent.getStringExtra("name") ?: ""
             val author = intent.getStringExtra("author") ?: ""
             appDb.bookDao.getBook(name, author)?.let { book ->

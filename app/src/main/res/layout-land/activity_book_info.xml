@@ -383,7 +383,7 @@
                         android:layout_weight="1"
                         android:gravity="center"
                         android:includeFontPadding="false"
-                        android:text="@string/remove_from_bookshelf"
+                        android:text="@string/add_to_bookshelf"
                         android:textSize="15sp"
                         app:radius="8dp" />
 
