@@ -1,4 +1,4 @@
-package io.legado.app.api.controller
+﻿package io.legado.app.api.controller
 
 import androidx.annotation.Keep
 import androidx.collection.LruCache
@@ -207,7 +207,7 @@ object ReviewController {
             chapter = context.chapter,
             coroutineContext = coroutineContext,
         )
-        val body = analyzeUrl.getStrResponseAwait(useWebView = false).body.orEmpty()
+        val body = analyzeUrl.getStrResponseAwait(useWebView = true).body.orEmpty()
         ReviewRuleParser.parseSummary(
             body,
             rule,
@@ -298,7 +298,7 @@ object ReviewController {
             chapter = context.chapter,
             coroutineContext = coroutineContext,
         )
-        val body = analyzeUrl.getStrResponseAwait(useWebView = false).body.orEmpty()
+        val body = analyzeUrl.getStrResponseAwait(useWebView = true).body.orEmpty()
         val result = ReviewRuleParser.parseDetailPage(
             body = body,
             rule = rule,
@@ -379,7 +379,7 @@ object ReviewController {
             chapter = context.chapter,
             coroutineContext = coroutineContext,
         )
-        val body = analyzeUrl.getStrResponseAwait(useWebView = false).body
+        val body = analyzeUrl.getStrResponseAwait(useWebView = true).body
             ?.takeIf { it.isNotBlank() }
             ?: error("段评回复内容为空")
         val items = ReviewRuleParser.parseReplyPage(
@@ -705,3 +705,4 @@ object ReviewController {
     private const val LEGACY_REVIEW_SESSION_TTL = 2 * 60 * 60 * 1000L
     private const val MAX_LEGACY_REVIEW_SCRIPT = 64 * 1024
 }
+
