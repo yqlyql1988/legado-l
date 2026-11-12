@@ -51,6 +51,29 @@ class BookTagsTest {
     }
 
     @Test
+    fun `middle dot separated source kinds become separate tags`() {
+        val book = Book(
+            kind = "玄幻·东方玄幻·王朝争霸",
+            wordCount = "30万字",
+        )
+
+        assertEquals(listOf("玄幻", "东方玄幻", "王朝争霸"), book.sourceTags())
+        assertEquals("玄幻,东方玄幻,王朝争霸", normalizeBookTags(book.kind))
+        assertEquals(
+            listOf("30万字", "玄幻", "东方玄幻", "王朝争霸"),
+            book.getKindList(),
+        )
+    }
+
+    @Test
+    fun `middle dot variants are accepted as tag separators`() {
+        assertEquals(
+            listOf("都市", "仙侠", "悬疑"),
+            "都市·仙侠・悬疑".bookTags(),
+        )
+    }
+
+    @Test
     fun `display tags deduplicate source and user labels without case`() {
         val book = Book(
             kind = "都市,SCI-FI",
