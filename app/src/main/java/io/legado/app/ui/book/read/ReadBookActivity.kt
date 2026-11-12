@@ -2175,8 +2175,23 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
     }
 
-    override fun payAction() {
-        val book = ReadBook.book ?: return
+    override fun openChapterReview() {
+        val source = ReadBook.bookSource ?: return
+        if (source.isJsSource()) {
+            if (!io.legado.app.model.jsSource.JsSourceReview.hasReviewCapability(source)) return
+        } else if (source.ruleReview?.enabled != true) {
+            return
+        }
+        val chapterIndex = ReadBook.durChapterIndex
+        val count = ChapterProvider.getReviewCount(
+            paragraphNum = 0,
+            isTitle = true,
+            chapterIndex = chapterIndex,
+        )
+        showReviewDialog(-1, count, chapterIndex)
+    }
+
+    override fun payAction() {        val book = ReadBook.book ?: return
         if (book.isLocal) return
         val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, ReadBook.durChapterIndex)
         if (chapter == null) {

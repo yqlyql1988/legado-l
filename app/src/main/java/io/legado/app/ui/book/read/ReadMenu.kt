@@ -480,18 +480,26 @@ class ReadMenu @JvmOverloads constructor(
         //书源操作
         tvSourceAction.onClick {
             val hasLogin = ReadBook.bookSource?.hasLogin() == true
+            val source = ReadBook.bookSource
+            val hasReview = source != null && if (source.isJsSource()) {
+                io.legado.app.model.jsSource.JsSourceReview.hasReviewCapability(source)
+            } else {
+                source.ruleReview?.enabled == true
+            }
             val canPay = hasLogin
                     && ReadBook.curTextChapter?.isVip == true
                     && ReadBook.curTextChapter?.isPay != true
             popupActionMenu(context) {
                 item(context.getString(R.string.login), "login", hasLogin)
                 item(context.getString(R.string.chapter_pay), "chapterPay", canPay)
+                item(context.getString(R.string.chapter_review), "chapterReview", hasReview)
                 item(context.getString(R.string.edit_book_source), "editSource")
                 item(context.getString(R.string.disable_book_source), "disableSource")
             }.show(tvSourceAction) { action ->
                 when (action) {
                     "login" -> callBack.showLogin()
                     "chapterPay" -> callBack.payAction()
+                    "chapterReview" -> callBack.openChapterReview()
                     "editSource" -> callBack.openSourceEditActivity()
                     "disableSource" -> callBack.disableSource()
                 }
@@ -752,6 +760,7 @@ class ReadMenu @JvmOverloads constructor(
         fun showHelp()
         fun showLogin()
         fun payAction()
+        fun openChapterReview()
         fun disableSource()
         fun skipToChapter(index: Int)
         fun onMenuShow()
