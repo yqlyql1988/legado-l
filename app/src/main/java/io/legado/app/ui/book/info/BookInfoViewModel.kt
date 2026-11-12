@@ -110,6 +110,8 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
     var hasCustomBtn = false
     var bookSource: BookSource? = null
     private var changeSourceCoroutine: Coroutine<*>? = null
+    /** 从正文/漫画阅读界面打开，按当前阅读的书显示书架状态 */
+    private var openedByReader = false
     val waitDialogData = MutableLiveData<Boolean>()
     val loadingData = MutableLiveData<Boolean>()
     private val networkLoadingCounter = BookInfoNetworkLoadingCounter(loadingData::postValue)
@@ -125,6 +127,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             val name = intent.getStringExtra("name") ?: ""
             val author = intent.getStringExtra("author") ?: ""
             val bookUrl = intent.getStringExtra("bookUrl") ?: ""
+            openedByReader = bookUrl.isNotBlank()
             // 正文/漫画阅读界面按书籍地址精确定位当前书，避免书名、作者变化后匹配不到
             if (bookUrl.isNotBlank()) {
                 appDb.bookDao.getBook(bookUrl)?.let {
@@ -134,7 +137,8 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 }
             }
             appDb.bookDao.getBook(name, author)?.let {
-                inBookshelf = !it.isNotShelf
+                // 从阅读界面打开但按书籍地址没查到，说明当前书还未加入书架
+                inBookshelf = if (openedByReader) false else !it.isNotShelf
                 upBook(it)
                 return@execute
             }
@@ -267,7 +271,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 .onSuccess(IO) {
                     var persistedBook = oldBook
                     val dbBook = appDb.bookDao.getBook(book.name, book.author)
-                    if (!inBookshelf && dbBook != null && !dbBook.isNotShelf && dbBook.origin == book.origin) {
+                    if (!openedByReader && !inBookshelf && dbBook != null && !dbBook.isNotShelf && dbBook.origin == book.origin) {
                         /**
                          * book 来自搜索时(inBookshelf == false)，搜索的书名不存在于书架，但是加载详情后，书名更新，存在同名书籍
                          * 此时 book 的数据会与数据库中的不同，需要更新 #3652 #4619
@@ -564,17 +568,27 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 if (book.order == 0) {
                     book.order = appDb.bookDao.minOrder - 1
                 }
-                appDb.bookDao.getBook(book.name, book.author)?.let {
-                    book.durChapterIndex = it.durChapterIndex
-                    book.durChapterPos = it.durChapterPos
-                    book.durChapterTitle = it.durChapterTitle
+                val shelfBook = appDb.bookDao.getBook(book.name, book.author)
+                if (shelfBook != null && shelfBook.bookUrl != book.bookUrl &&
+                    shelfBook.isLocal == book.isLocal
+                ) {
+                    // 同名同作者已有书架记录（书源更换了书籍地址）：把当前书合并进书架记录
+                    shelfBook.updateTo(book)
+                    book.removeType(BookType.notShelf)
+                    appDb.bookDao.replace(shelfBook, book)
+                } else {
+                    shelfBook?.let {
+                        book.durChapterIndex = it.durChapterIndex
+                        book.durChapterPos = it.durChapterPos
+                        book.durChapterTitle = it.durChapterTitle
+                    }
+                    book.save()
                 }
                 if (ReadBook.book?.isSameNameAuthor(book) == true) {
                     ReadBook.book = book
                 } else if (AudioPlay.book?.isSameNameAuthor(book) == true) {
                     AudioPlay.book = book
                 }
-                book.save()
                 markReaderInBookshelf(book)
                 SourceCallBack.callBackBook(SourceCallBack.ADD_BOOK_SHELF, bookSource, book)
             }
