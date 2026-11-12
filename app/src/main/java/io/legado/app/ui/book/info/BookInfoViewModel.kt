@@ -77,6 +77,14 @@ internal fun normalizeWebFileName(
     }
 }
 
+internal fun isSameReaderBook(readerBook: Book?, book: Book): Boolean {
+    readerBook ?: return false
+    if (readerBook.bookUrl.isNotBlank() && readerBook.bookUrl == book.bookUrl) {
+        return true
+    }
+    return readerBook.name.isNotBlank() && readerBook.isSameNameAuthor(book)
+}
+
 internal class BookInfoNetworkLoadingCounter(
     private val onLoadingChanged: (Boolean) -> Unit,
 ) {
@@ -557,6 +565,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                     AudioPlay.book = book
                 }
                 book.save()
+                markReaderInBookshelf(book)
                 SourceCallBack.callBackBook(SourceCallBack.ADD_BOOK_SHELF, bookSource, book)
             }
             chapterListData.value?.let { chapters ->
@@ -567,6 +576,23 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             inBookshelf = true
         }.onSuccess {
             success?.invoke()
+        }
+    }
+
+    /**
+     * 书籍详情加入书架后同步正在阅读的会话。
+     * 否则从正文阅读界面进入书籍详情加入书架再返回，退出阅读时仍会提示是否加入书架，
+     * 选择“否”还会删掉刚加入的书。书籍信息更新书名或更换书源后按书籍地址识别同一本书。
+     */
+    private fun markReaderInBookshelf(book: Book) {
+        if (isSameReaderBook(ReadBook.book, book)) {
+            ReadBook.inBookshelf = true
+        }
+        if (isSameReaderBook(AudioPlay.book, book)) {
+            AudioPlay.inBookshelf = true
+        }
+        if (isSameReaderBook(ReadManga.book, book)) {
+            ReadManga.inBookshelf = true
         }
     }
 
