@@ -2,8 +2,7 @@ package io.legado.app.data.entities
 
 import java.util.Locale
 
-// 起点等书源的分类用“·”连接多个标签，按同一套分隔符拆成独立标签
-private val bookTagSeparators = Regex("[,，、·・\\n\\r]")
+private val bookTagSeparators = Regex("[,，、\\n\\r]")
 
 fun String?.bookTags(): List<String> {
     if (this.isNullOrBlank()) return emptyList()

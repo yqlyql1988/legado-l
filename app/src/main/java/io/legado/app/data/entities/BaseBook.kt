@@ -3,6 +3,7 @@ package io.legado.app.data.entities
 import io.legado.app.help.RuleBigDataHelp
 import io.legado.app.model.analyzeRule.RuleDataInterface
 import io.legado.app.utils.GSON
+import io.legado.app.utils.splitNotBlank
 
 interface BaseBook : RuleDataInterface {
     var name: String
@@ -44,7 +45,8 @@ interface BaseBook : RuleDataInterface {
             if (it.isNotBlank()) kindList.add(it)
         }
         kind?.let {
-            kindList.addAll(it.bookTags())
+            val kinds = it.splitNotBlank(",", "\n")
+            kindList.addAll(kinds)
         }
         return kindList
     }
