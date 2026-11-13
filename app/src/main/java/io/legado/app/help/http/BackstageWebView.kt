@@ -111,6 +111,22 @@ class BackstageWebView(
 
     @Throws(AndroidRuntimeException::class)
     private fun load(navigationContext: CoroutineContext) {
+        // 把书源登录时保存的 Cookie 注入 WebView，避免后台 WebView 与登录页状态不一致。
+        // 只写入当前域名，不用 CookieStore.setWebCookie，避免误清其他会话 Cookie。
+        url?.takeIf { it.isNotBlank() }?.let { targetUrl ->
+            val cookie = CookieStore.getCookie(targetUrl)
+            if (cookie.isNotBlank()) {
+                val cookieManager = android.webkit.CookieManager.getInstance()
+                cookieManager.setAcceptCookie(true)
+                cookie.split(";").forEach { item ->
+                    val value = item.trim()
+                    if (value.isNotEmpty()) {
+                        cookieManager.setCookie(targetUrl, value)
+                    }
+                }
+                cookieManager.flush()
+            }
+        }
         val requestConfig = headerMap.toWebViewRequestConfig(AppConfig.userAgent)
         val webView = createWebView(requestConfig, navigationContext)
         try {

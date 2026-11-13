@@ -488,7 +488,14 @@ class AnalyzeUrl(
                             if (!encodedForm.isNullOrEmpty() || body.isNullOrBlank()) {
                                 postForm(encodedForm ?: "")
                             } else {
-                                postJson(body)
+                                // 保留书源声明的 Content-Type，避免表单提交被改成 application/json
+                                val postBody = body
+                                val contentType = headerMap["Content-Type"]
+                                if (!contentType.isNullOrBlank() && postBody != null) {
+                                    post(postBody.toRequestBody(contentType.toMediaType()))
+                                } else {
+                                    postJson(postBody)
+                                }
                             }
                         }
                         if (shouldReturnRedirectBeforeWebView(followRedirects, res.raw.code)) {

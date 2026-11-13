@@ -71,12 +71,21 @@ object ReviewRulePoster {
             ),
         )
         val body = analyzeUrl.getStrResponseAwait(useWebView = true).body.orEmpty()
-        if (body.isBlank()) return true
+        if (body.isBlank()) {
+            throw NoStackTraceException("发送失败：接口没有返回结果")
+        }
+        // 起点等站点在未登录或被拦截时返回网页，不能当成发送成功。
+        if (body.trimStart().startsWith("<")) {
+            throw NoStackTraceException("发送失败：接口返回网页而不是结果，请确认已登录")
+        }
+        // 返回 JSON 且带 code 的接口按 code 判断；其他书源返回纯文本或无 code 时保持原判断，避免误伤。
         val json = GSON.fromJsonObject<Map<String, Any?>>(body).getOrNull() ?: return true
-        val code = (json["code"] as? Number)?.toInt()
+        val code = (json["code"] as? Number)?.toInt() ?: return true
         if (code == 0) return true
         val message = json["msg"]?.toString().orEmpty()
-        throw NoStackTraceException(message.ifBlank { "发送失败" })
+        throw NoStackTraceException(
+            message.ifBlank { "发送失败（code=$code）" }
+        )
     }
 
 }
