@@ -72,6 +72,57 @@ object ReadingNotes {
             verified = trusted)
     }
 
+    /**
+     * 批量定位高亮/书签。
+     * 逐条 [target] 会为每条笔记重新扫描整本目录并逐条查询数据库，
+     * 高亮较多的书每次打开都会因此明显变慢。
+     */
+    fun targets(
+        legacies: List<ReadingNoteLocation>,
+        chapters: List<BookChapter>,
+    ): List<ReadingNoteLocation?> {
+        if (legacies.isEmpty()) return emptyList()
+        val preferredBookUrl = chapters.firstOrNull()?.bookUrl
+        val locationsByKey = HashMap<Pair<String, Long>, MutableList<ReadingNoteLocation>>()
+        legacies.groupBy { it.kind }.forEach { (kind, notes) ->
+            val times = notes.map { it.noteTime }.distinct()
+            if (times.isEmpty()) return@forEach
+            appDb.readingNoteDao.locationsForNotes(kind, times).forEach { location ->
+                locationsByKey.getOrPut(location.kind to location.noteTime) { ArrayList() }
+                    .add(location)
+            }
+        }
+        val chapterIndex = ReadingNoteChapter.index(chapters)
+        return legacies.map { legacy ->
+            val saved = pickLocation(
+                legacy,
+                locationsByKey[legacy.kind to legacy.noteTime].orEmpty(),
+                preferredBookUrl
+            )
+            val chapter = chapterIndex.candidate(saved) ?: return@map null
+            val trusted = saved.verified && ReadingNoteChapter.sameUrl(saved.chapterUrl, chapter.url)
+            if (saved.quote.isBlank() && !trusted) return@map null
+            saved.copy(
+                bookUrl = chapter.bookUrl,
+                chapterUrl = chapter.url,
+                chapterIndex = chapter.index,
+                verified = trusted
+            )
+        }
+    }
+
+    private fun pickLocation(
+        legacy: ReadingNoteLocation,
+        locations: List<ReadingNoteLocation>,
+        preferredBookUrl: String?,
+    ): ReadingNoteLocation {
+        preferredBookUrl?.let { url ->
+            locations.firstOrNull { it.bookUrl == url }
+        }?.let { return it }
+        locations.firstOrNull { it.bookUrl == legacy.bookUrl }?.let { return it }
+        return legacy
+    }
+
     fun captured(
         location: ReadingNoteLocation,
         chapter: BookChapter,

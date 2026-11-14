@@ -358,13 +358,14 @@ object ReadBook : CoroutineScope by MainScope() {
         highlights = appDb.bookHighlightDao.getByBook(book.bookUrl)
         noteLocations = appDb.readingNoteDao.locationsForBook(book.bookUrl)
         val chapters = appDb.bookChapterDao.getChapterList(book.bookUrl)
-        highlightCandidateTargets = highlights.mapNotNull { highlight ->
-            ReadingNotes.target(ReadingNotes.legacy(highlight), chapters)
-                ?.let { highlight.time to it }
+        val highlightNotes = highlights.map { ReadingNotes.legacy(it) }
+        val bookmarkNotes = appDb.bookmarkDao.getByBook(book.name, book.author)
+            .map { ReadingNotes.legacy(it, book.bookUrl) }
+        val targets = ReadingNotes.targets(highlightNotes + bookmarkNotes, chapters)
+        highlightCandidateTargets = highlightNotes.indices.mapNotNull { index ->
+            targets.getOrNull(index)?.let { highlights[index].time to it }
         }.toMap()
-        noteBookmarkTargets = appDb.bookmarkDao.getByBook(book.name, book.author).mapNotNull {
-            ReadingNotes.target(ReadingNotes.legacy(it, book.bookUrl), chapters)
-        }
+        noteBookmarkTargets = targets.drop(highlightNotes.size).filterNotNull()
         loadHighlightTags(book.bookUrl)
         highlightsVersion++
     }
