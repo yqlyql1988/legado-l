@@ -18,6 +18,9 @@ interface ReadingNoteDao {
     @Query("SELECT * FROM reading_note_locations WHERE kind = :kind AND noteTime = :time")
     fun locationsForNote(kind: String, time: Long): List<ReadingNoteLocation>
 
+    @Query("SELECT * FROM reading_note_locations WHERE kind = :kind AND noteTime IN (:times)")
+    fun locationsForNotes(kind: String, times: List<Long>): List<ReadingNoteLocation>
+
     @Query("SELECT * FROM reading_note_sources")
     fun sources(): List<ReadingNoteSource>
 
