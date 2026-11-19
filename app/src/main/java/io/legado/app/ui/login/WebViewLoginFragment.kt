@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.net.http.SslError
 import android.os.Bundle
+import android.os.Message
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
@@ -14,6 +15,7 @@ import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.OnBackPressedCallback
 import androidx.fragment.app.activityViewModels
 import androidx.core.view.WindowInsetsCompat
 import io.legado.app.R
@@ -43,6 +45,10 @@ class WebViewLoginFragment : BaseFragment(R.layout.fragment_web_view_login) {
     private val viewModel by activityViewModels<SourceLoginViewModel>()
     private var pooledWebView: PooledWebView? = null
     private var currentWebView: WebView? = null
+    private var popupWebView: WebView? = null
+    private val popupBack = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() = closePopup()
+    }
 
     private var checking = false
 
@@ -54,6 +60,8 @@ class WebViewLoginFragment : BaseFragment(R.layout.fragment_web_view_login) {
             windowInsets
         }
         setSupportToolbar(binding.titleBar.toolbar)
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, popupBack)
+        binding.titleBar.setNavigationOnClickListener { closePopup() }
         viewModel.source?.let {
             binding.titleBar.title = getString(R.string.login_source, it.getTag())
             initWebView(it)
@@ -93,6 +101,7 @@ class WebViewLoginFragment : BaseFragment(R.layout.fragment_web_view_login) {
             useWideViewPort = true
             loadWithOverviewMode = true
             userAgentString = requestConfig.userAgent
+            setSupportMultipleWindows(true)
         }
         val cookieManager = CookieManager.getInstance()
         webView.webViewClient = object : WebViewClient() {
@@ -147,16 +156,104 @@ class WebViewLoginFragment : BaseFragment(R.layout.fragment_web_view_login) {
                 handler?.proceed()
             }
         }
-        webView.webChromeClient = object : WebChromeClient() {
-
-            override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                super.onProgressChanged(view, newProgress)
-                binding.progressBar.setDurProgress(newProgress)
-                binding.progressBar.gone(newProgress == 100)
+        webView.webChromeClient = object : LoginChromeClient() {
+            override fun onCreateWindow(
+                view: WebView,
+                isDialog: Boolean,
+                isUserGesture: Boolean,
+                resultMsg: Message
+            ): Boolean {
+                if (!isUserGesture || popupWebView != null || checking) return false
+                val transport = resultMsg.obj as? WebView.WebViewTransport ?: return false
+                // Keep the opener alive so the authorization page can return its result.
+                transport.webView = createPopup(view.settings.userAgentString)
+                resultMsg.sendToTarget()
+                return true
             }
-
         }
         loadUrl(source)
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun createPopup(userAgent: String): WebView {
+        val popup = WebView(requireContext()).apply {
+            setBackgroundColor(requireContext().backgroundColor)
+            settings.apply {
+                javaScriptEnabled = true
+                domStorageEnabled = true
+                useWideViewPort = true
+                loadWithOverviewMode = true
+                builtInZoomControls = true
+                displayZoomControls = false
+                userAgentString = userAgent
+            }
+            webViewClient = object : WebViewClient() {
+                override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
+                    if (view === popupWebView) binding.titleBar.subtitle = url.toUri().host
+                }
+
+                override fun shouldOverrideUrlLoading(
+                    view: WebView,
+                    request: WebResourceRequest
+                ): Boolean {
+                    val url = request.url
+                    if (url.scheme == "https" || url.scheme == "http") return false
+                    if (request.isForMainFrame && request.hasGesture()) {
+                        binding.root.longSnackbar(R.string.jump_to_another_app, R.string.confirm) {
+                            context?.openUrl(url)
+                        }
+                    }
+                    return true
+                }
+            }
+            webChromeClient = object : LoginChromeClient() {
+                override fun onCloseWindow(window: WebView) {
+                    window.post { if (window === popupWebView) closePopup() }
+                }
+            }
+        }
+        popupWebView = popup
+        currentWebView?.visibility = View.INVISIBLE
+        binding.webViewContainer.addView(popup, -1, -1)
+        popupBack.isEnabled = true
+        binding.titleBar.toolbar.apply {
+            setNavigationIcon(R.drawable.ic_arrow_back)
+            setNavigationContentDescription(R.string.back)
+            menu.findItem(R.id.menu_ok)?.isVisible = false
+        }
+        binding.titleBar.applyForegroundColor()
+        updateProgress(0)
+        return popup
+    }
+
+    private fun closePopup() {
+        val popup = popupWebView ?: return
+        popupWebView = null
+        binding.webViewContainer.removeView(popup)
+        popup.destroy()
+        popupBack.isEnabled = false
+        binding.titleBar.subtitle = null
+        binding.titleBar.toolbar.apply {
+            navigationIcon = null
+            menu.findItem(R.id.menu_ok)?.isVisible = true
+        }
+        currentWebView?.let {
+            it.visibility = View.VISIBLE
+            updateProgress(it.progress)
+        }
+    }
+
+    private open inner class LoginChromeClient : WebChromeClient() {
+        override fun onProgressChanged(view: WebView?, newProgress: Int) {
+            if (view != null && view === (popupWebView ?: currentWebView)) {
+                updateProgress(newProgress)
+            }
+        }
+    }
+
+    private fun updateProgress(progress: Int) {
+        binding.progressBar.setDurProgress(progress)
+        binding.progressBar.gone(progress == 100)
     }
 
     private fun loadUrl(source: BaseSource) {
@@ -169,11 +266,14 @@ class WebViewLoginFragment : BaseFragment(R.layout.fragment_web_view_login) {
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
+    override fun onDestroyView() {
+        closePopup()
+        currentWebView?.settings?.setSupportMultipleWindows(false)
         pooledWebView?.let { WebViewPool.release(it) }
         pooledWebView = null
         currentWebView = null
+        checking = false
+        super.onDestroyView()
     }
 
 }
