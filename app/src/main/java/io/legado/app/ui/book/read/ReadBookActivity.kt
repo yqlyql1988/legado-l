@@ -95,6 +95,7 @@ import io.legado.app.ui.book.bookmark.BookmarkDialog
 import io.legado.app.ui.book.changesource.ChangeBookSourceDialog
 import io.legado.app.ui.book.changesource.ChangeChapterSourceDialog
 import io.legado.app.ui.book.info.BookInfoActivity
+import io.legado.app.ui.book.info.EXTRA_FROM_READER
 import io.legado.app.ui.book.read.config.AutoReadDialog
 import io.legado.app.ui.book.read.config.BgTextConfigDialog.Companion.BG_COLOR
 import io.legado.app.ui.book.read.config.BgTextConfigDialog.Companion.REVIEW_ICON_COLOR
@@ -2034,6 +2035,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                 putExtra("name", it.name)
                 putExtra("author", it.author)
                 putExtra("bookUrl", it.bookUrl)
+                putExtra(EXTRA_FROM_READER, true)
             }
         }
     }
@@ -3328,6 +3330,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     override fun finish() {
         val book = ReadBook.book ?: return super.finish()
         if (ReadBook.inBookshelf) {
+            setResult(RESULT_OK)
             callBackBookEnd()
             return super.finish()
         }

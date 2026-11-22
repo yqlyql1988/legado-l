@@ -23,6 +23,7 @@ import io.legado.app.help.book.ResourceThemeGeneration
 import io.legado.app.help.book.refreshBookResources
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isLocalModified
+import io.legado.app.help.book.isNotShelf
 import io.legado.app.help.book.removeType
 import io.legado.app.help.book.simulatedTotalChapterNum
 import io.legado.app.help.book.update
@@ -103,7 +104,6 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
      */
     fun initData(intent: Intent, success: (() -> Unit)? = null) {
         execute {
-            ReadBook.inBookshelf = intent.getBooleanExtra("inBookshelf", true)
             val hasHighlightTarget =
                 intent.hasExtra(TocActivityResult.EXTRA_HIGHLIGHT_LAYOUT_TITLE_LENGTH)
             ReadBook.chapterChanged =
@@ -114,7 +114,10 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
                 else -> appDb.bookDao.getBook(bookUrl)
             } ?: ReadBook.book
             when {
-                book != null -> initBook(book)
+                book != null -> {
+                    ReadBook.inBookshelf = !book.isNotShelf
+                    initBook(book)
+                }
                 else -> {
                     ReadBook.upMsg(context.getString(R.string.no_book))
                     AppLog.put("未找到书籍\nbookUrl:$bookUrl")
