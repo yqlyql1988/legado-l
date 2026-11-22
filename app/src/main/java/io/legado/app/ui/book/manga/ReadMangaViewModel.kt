@@ -19,6 +19,7 @@ import io.legado.app.help.AppWebDav
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isLocalModified
+import io.legado.app.help.book.isNotShelf
 import io.legado.app.help.book.removeType
 import io.legado.app.help.book.simulatedTotalChapterNum
 import io.legado.app.help.book.update
@@ -55,7 +56,6 @@ class ReadMangaViewModel(application: Application) : BaseViewModel(application) 
      */
     fun initData(intent: Intent, success: (() -> Unit)? = null) {
         execute {
-            ReadManga.inBookshelf = intent.getBooleanExtra("inBookshelf", true)
             ReadManga.chapterChanged = intent.getBooleanExtra("chapterChanged", false)
             val bookUrl = intent.getStringExtra("bookUrl")
             val book = when {
@@ -63,7 +63,10 @@ class ReadMangaViewModel(application: Application) : BaseViewModel(application) 
                 else -> appDb.bookDao.getBook(bookUrl)
             } ?: ReadManga.book
             when {
-                book != null -> initManga(book)
+                book != null -> {
+                    ReadManga.inBookshelf = !book.isNotShelf
+                    initManga(book)
+                }
                 else -> {
                     ReadManga.loadFail(context.getString(R.string.no_book), false)
                     AppLog.put("未找到漫画书籍\nbookUrl:$bookUrl")

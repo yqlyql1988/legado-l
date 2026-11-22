@@ -77,6 +77,8 @@ internal fun normalizeWebFileName(
     }
 }
 
+internal const val EXTRA_FROM_READER = "fromReader"
+
 internal fun isSameReaderBook(readerBook: Book?, book: Book): Boolean {
     readerBook ?: return false
     if (readerBook.bookUrl.isNotBlank() && readerBook.bookUrl == book.bookUrl) {
@@ -107,6 +109,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
     val chapterListData = MutableLiveData<List<BookChapter>>()
     val webFiles = mutableListOf<WebFile>()
     var inBookshelf = false
+    private var fromReader = false
     var hasCustomBtn = false
     var bookSource: BookSource? = null
     private var changeSourceCoroutine: Coroutine<*>? = null
@@ -125,11 +128,21 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             val name = intent.getStringExtra("name") ?: ""
             val author = intent.getStringExtra("author") ?: ""
             val bookUrl = intent.getStringExtra("bookUrl") ?: ""
+            fromReader = intent.getBooleanExtra(EXTRA_FROM_READER, false)
             // 正文/漫画阅读界面按书籍地址精确定位当前书，避免书名、作者变化后匹配不到
             if (bookUrl.isNotBlank()) {
                 appDb.bookDao.getBook(bookUrl)?.let {
                     inBookshelf = !it.isNotShelf
                     upBook(it)
+                    return@execute
+                }
+                if (fromReader) {
+                    val book = ReadBook.book?.takeIf { it.bookUrl == bookUrl }
+                        ?: ReadManga.book?.takeIf { it.bookUrl == bookUrl }
+                        ?: appDb.searchBookDao.getSearchBook(bookUrl)?.toBook()
+                        ?: throw NoStackTraceException("未找到书籍")
+                    inBookshelf = false
+                    upBook(book.copy())
                     return@execute
                 }
             }
@@ -263,11 +276,13 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 return
             }
             val oldBook = book.copy()
-            WebBook.getBookInfo(scope, bookSource, book, canReName = canReName)
+            WebBook.getBookInfo(scope, bookSource, book, canReName = canReName && !fromReader)
                 .onSuccess(IO) {
                     var persistedBook = oldBook
-                    val dbBook = appDb.bookDao.getBook(book.name, book.author)
-                    if (!inBookshelf && dbBook != null && !dbBook.isNotShelf && dbBook.origin == book.origin) {
+                    val dbBook = if (!fromReader && !inBookshelf) {
+                        appDb.bookDao.getBook(book.name, book.author)
+                    } else null
+                    if (dbBook != null && !dbBook.isNotShelf && dbBook.origin == book.origin) {
                         /**
                          * book 来自搜索时(inBookshelf == false)，搜索的书名不存在于书架，但是加载详情后，书名更新，存在同名书籍
                          * 此时 book 的数据会与数据库中的不同，需要更新 #3652 #4619
@@ -569,11 +584,6 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                     book.durChapterPos = it.durChapterPos
                     book.durChapterTitle = it.durChapterTitle
                 }
-                if (ReadBook.book?.isSameNameAuthor(book) == true) {
-                    ReadBook.book = book
-                } else if (AudioPlay.book?.isSameNameAuthor(book) == true) {
-                    AudioPlay.book = book
-                }
                 book.save()
                 markReaderInBookshelf(book)
                 SourceCallBack.callBackBook(SourceCallBack.ADD_BOOK_SHELF, bookSource, book)
@@ -596,12 +606,21 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
      */
     private fun markReaderInBookshelf(book: Book) {
         if (isSameReaderBook(ReadBook.book, book)) {
+            ReadBook.book?.takeIf { it.bookUrl == book.bookUrl }?.let {
+                it.removeType(BookType.notShelf)
+                it.order = book.order
+            } ?: run { ReadBook.book = book }
             ReadBook.inBookshelf = true
         }
         if (isSameReaderBook(AudioPlay.book, book)) {
+            AudioPlay.book = book
             AudioPlay.inBookshelf = true
         }
         if (isSameReaderBook(ReadManga.book, book)) {
+            ReadManga.book?.takeIf { it.bookUrl == book.bookUrl }?.let {
+                it.removeType(BookType.notShelf)
+                it.order = book.order
+            } ?: run { ReadManga.book = book }
             ReadManga.inBookshelf = true
         }
     }
